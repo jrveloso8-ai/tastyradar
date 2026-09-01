@@ -1,0 +1,1589 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RADAR TASTYTRADE PRO IA - Radar B3 + Motor GEX Unificado</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            radar: {
+              bg: '#070b14',
+              header: '#090e18',
+              card: '#0c1322',
+              cardInner: '#10192e',
+              border: '#1f293d',
+              emerald: '#10b981',
+              cyan: '#06b6d4',
+              purple: '#8b5cf6',
+              rose: '#f43f5e',
+              amber: '#f59e0b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #070b14;
+      color: #f3f4f6;
+      font-family: 'Inter', sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #090e18;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #1f293d;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #374151;
+    }
+    .active-nav-tab {
+      background: rgba(16, 185, 129, 0.12) !important;
+      color: #34d399 !important;
+      border-color: rgba(16, 185, 129, 0.35) !important;
+    }
+    .active-sub-tab {
+      background: rgba(16, 185, 129, 0.15) !important;
+      color: #34d399 !important;
+      border-color: rgba(16, 185, 129, 0.4) !important;
+      font-weight: 600 !important;
+    }
+    .active-gex-view {
+      background: rgba(6, 182, 212, 0.18) !important;
+      color: #22d3ee !important;
+      border-color: rgba(6, 182, 212, 0.5) !important;
+      font-weight: 700 !important;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-emerald-500/30 selection:text-emerald-300">
+
+  <!-- ================= TOP HEADER / NAVBAR (RADAR B3 + GEX) ================= -->
+  <header class="sticky top-0 z-50 bg-[#090e18] border-b border-gray-800/90 shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        
+        <!-- Logo -->
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center shadow-md shadow-emerald-500/20">
+            <i data-lucide="activity" class="w-5 h-5 text-slate-950 stroke-[2.5]"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="font-black text-base tracking-wider text-white font-mono">RADAR</span>
+              <span class="px-1.5 py-0.5 text-[10px] font-bold font-mono rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">TASTY</span>
+              <span class="px-1.5 py-0.5 text-[10px] font-bold font-mono rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">PRO IA</span>
+              <span class="px-1.5 py-0.5 text-[9px] font-bold font-mono rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">+ GEX</span>
+            </div>
+            <p class="text-[9px] text-gray-400 font-mono tracking-tight">US • TASTYTRADE • GEX & CNPI-US Engine</p>
+          </div>
+        </div>
+
+        <!-- 5 Main Navigation Tabs -->
+        <nav class="hidden md:flex items-center gap-1.5 bg-[#070b14] p-1 rounded-xl border border-gray-800/80">
+          <button onclick="switchTab('panorama')" id="tab-btn-panorama" class="nav-tab active-nav-tab px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all flex items-center gap-1.5 border border-transparent text-gray-400 hover:text-gray-200">
+            <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
+            <span>Panorama Geral</span>
+          </button>
+          
+          <button onclick="switchTab('consulta')" id="tab-btn-consulta" class="nav-tab px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all flex items-center gap-1.5 border border-transparent text-gray-400 hover:text-gray-200">
+            <i data-lucide="search" class="w-3.5 h-3.5"></i>
+            <span>Consulta & Gráfico 12M</span>
+          </button>
+
+          <button onclick="switchTab('rastreador')" id="tab-btn-rastreador" class="nav-tab px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all flex items-center gap-1.5 border border-transparent text-gray-400 hover:text-gray-200">
+            <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
+            <span>Rastreador de Tendências</span>
+          </button>
+
+          <button onclick="switchTab('barreiras')" id="tab-btn-barreiras" class="nav-tab px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all flex items-center gap-1.5 border border-transparent text-gray-400 hover:text-gray-200">
+            <i data-lucide="target" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <span class="text-cyan-300 font-semibold">Barreiras & Motor GEX</span>
+          </button>
+
+          <button onclick="switchTab('manual')" id="tab-btn-manual" class="nav-tab px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all flex items-center gap-1.5 border border-transparent text-gray-400 hover:text-gray-200">
+            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+            <span>Manual & Ajuda IA</span>
+          </button>
+        </nav>
+
+        <!-- Right Header Badges -->
+        <div class="flex items-center gap-2.5">
+          <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#0c1322] border border-gray-800 text-[11px] font-mono text-cyan-300">
+            <i data-lucide="users" class="w-3 h-3 text-cyan-400"></i>
+            <span><strong>3</strong> únicos</span>
+          </div>
+
+          <div class="hidden lg:block text-[11px] font-mono text-gray-400">
+            v3.2.0 • 01/09/2026
+          </div>
+
+          <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/60 border border-emerald-700/50 text-emerald-400 text-[11px] font-mono">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>TASTYTRADE + DXLink <strong class="text-emerald-300">84ms</strong></span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= TICKER TAPE US ================= -->
+  <div class="bg-[#05080f] border-b border-gray-800/80 py-2 px-4 overflow-x-auto custom-scrollbar">
+    <div class="max-w-7xl mx-auto flex items-center gap-8 text-xs font-mono whitespace-nowrap">
+      <div class="flex items-center gap-2">
+        <span class="text-gray-400 font-bold">S&P 500 (SPX)</span>
+        <span class="text-white font-bold">$6,000.25</span>
+        <span class="text-emerald-400 font-semibold">+48.75 (+0.82%) ▲</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-gray-400 font-bold">NASDAQ (NDX)</span>
+        <span class="text-white font-bold">$21,450.10</span>
+        <span class="text-emerald-400 font-semibold">+245.30 (+1.15%) ▲</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-gray-400 font-bold">VOLATILIDADE (VIX)</span>
+        <span class="text-purple-300 font-bold">14.18</span>
+        <span class="text-emerald-400 font-semibold">-0.65 (-4.20%) ▼</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-gray-400 font-bold">NET GEX (SPX)</span>
+        <span class="text-cyan-300 font-bold">+$2.85B</span>
+        <span class="text-emerald-400 font-semibold">Long Gamma</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-gray-400 font-bold">NVIDIA (NVDA)</span>
+        <span class="text-white font-bold">$142.50</span>
+        <span class="text-emerald-400 font-semibold">+3.95 (+2.84%) ▲</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-gray-400 font-bold">APPLE (AAPL)</span>
+        <span class="text-white font-bold">$238.10</span>
+        <span class="text-emerald-400 font-semibold">+1.55 (+0.65%) ▲</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MAIN CONTAINER ================= -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- ========================================================================= -->
+    <!-- ABA 1: PANORAMA GERAL -->
+    <!-- ========================================================================= -->
+    <section id="panel-panorama" class="tab-panel space-y-6">
+      
+      <!-- Sub-navegação do Panorama -->
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 pb-3">
+        <div class="flex items-center gap-2 text-xs font-mono text-gray-400 uppercase tracking-wider">
+          <i data-lucide="layout-grid" class="w-4 h-4 text-emerald-400"></i>
+          <span>VISÃO DO PANORAMA GERAL:</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="active-sub-tab px-3 py-1 rounded-lg text-xs font-mono border border-gray-800 flex items-center gap-1.5">
+            <i data-lucide="gauge" class="w-3.5 h-3.5 text-emerald-400"></i>
+            <span>1. Sentimento & Termômetro</span>
+          </button>
+          <button class="px-3 py-1 rounded-lg text-xs font-mono border border-gray-800 text-gray-400 hover:text-gray-200 flex items-center gap-1.5 bg-[#0c1322]">
+            <i data-lucide="globe" class="w-3.5 h-3.5"></i>
+            <span>2. Índices Globais & US</span>
+          </button>
+          <button class="px-3 py-1 rounded-lg text-xs font-mono border border-gray-800 text-gray-400 hover:text-gray-200 flex items-center gap-1.5 bg-[#0c1322]">
+            <i data-lucide="pie-chart" class="w-3.5 h-3.5"></i>
+            <span>3. Setores do S&P 500</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Card Principal do Termômetro de Sentimento -->
+      <div class="bg-[#0c1322] border border-gray-800/90 rounded-2xl p-6 shadow-xl space-y-6">
+        
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+              <i data-lucide="gauge" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[10px] font-mono font-bold">DESTAQUE DO DIA</span>
+                <h2 class="text-xl font-bold text-white tracking-tight">Termômetro de Sentimento & Apetite a Risco</h2>
+                <span class="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded text-[10px] font-mono font-bold">ÚLTIMAS 24H</span>
+              </div>
+              <p class="text-xs text-gray-400 mt-0.5">Score consolidado ponderando Bolsas Globais, Commodities, Câmbio DXY, Curva de Juros Treasury / FOMC e Fluxo Institucional de GEX da Tastytrade.</p>
+            </div>
+          </div>
+
+          <div class="bg-[#10192e] border border-gray-800 px-4 py-2 rounded-xl text-right">
+            <div class="text-[10px] text-gray-400 font-mono">STATUS CONSOLIDADO</div>
+            <div class="text-sm font-bold font-mono text-amber-400">MODERADAMENTE OTIMISTA (58/100)</div>
+          </div>
+        </div>
+
+        <!-- Gauge & 5 Pillars Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center pt-2">
+          
+          <!-- Left Column: Speedometer Gauge -->
+          <div class="lg:col-span-5 bg-[#090e18] border border-gray-800/80 rounded-2xl p-5 text-center space-y-3">
+            <div class="relative w-56 h-28 mx-auto flex items-end justify-center">
+              <canvas id="gaugeCanvas" width="220" height="110"></canvas>
+              <div class="absolute bottom-1 text-center">
+                <div class="text-3xl font-black font-mono text-white">58</div>
+              </div>
+            </div>
+
+            <div class="font-bold text-sm font-mono text-emerald-400 tracking-wide">
+              ZONA NEUTRO-ALTISTA (APETITE CONTROLADO)
+            </div>
+            <p class="text-[11px] text-gray-400">Mercado externo favorável com Net GEX positivo (volatilidade contida) e suporte institucional em $5,980.</p>
+
+            <div class="flex justify-between text-[10px] font-mono text-gray-500 px-2 pt-2 border-t border-gray-800/80">
+              <span class="text-rose-400">0 - Pessimista</span>
+              <span class="text-amber-400">50 - Neutro</span>
+              <span class="text-emerald-400">100 - Otimista</span>
+            </div>
+
+            <div class="pt-2 text-left text-[10px] font-mono text-gray-400 bg-[#0c1322] p-2.5 rounded-lg border border-gray-800">
+              <div class="flex justify-between items-center text-cyan-300 font-semibold mb-1">
+                <span>⏱ Última consolidação: Hoje às 08h45 (US Pre-Market)</span>
+                <span class="px-1 py-0.2 bg-emerald-500/20 text-emerald-400 rounded text-[9px]">EDIÇÃO CONCLUÍDA</span>
+              </div>
+              <div>Próxima atualização: Próximo pregão às 08h45 (US Pre-Market)</div>
+            </div>
+          </div>
+
+          <!-- Right Column: 5 Quantitative Pillars Breakdown -->
+          <div class="lg:col-span-7 space-y-2.5">
+            <div class="flex justify-between text-xs font-mono text-gray-400 mb-1">
+              <span>Decomposição dos 5 Pilares Quantitativos:</span>
+              <span class="text-white font-bold">Score Final: 58/100</span>
+            </div>
+
+            <div class="p-3 rounded-xl bg-[#090e18] border border-gray-800 flex items-center justify-between text-xs font-mono">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span class="text-gray-200">1. Bolsas Globais & Futuros EUA (Peso 20%)</span>
+              </div>
+              <span class="text-emerald-400 font-bold">+15 pts (Altista)</span>
+            </div>
+
+            <div class="p-3 rounded-xl bg-[#090e18] border border-gray-800 flex items-center justify-between text-xs font-mono">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span class="text-gray-200">2. Commodities: Petróleo WTI & Metais (Peso 20%)</span>
+              </div>
+              <span class="text-emerald-400 font-bold">+12 pts (Positivo)</span>
+            </div>
+
+            <div class="p-3 rounded-xl bg-[#090e18] border border-gray-800 flex items-center justify-between text-xs font-mono">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                <span class="text-gray-200">3. Câmbio DXY & Carry Trade Global (Peso 15%)</span>
+              </div>
+              <span class="text-cyan-400 font-bold">+10 pts (Estável)</span>
+            </div>
+
+            <div class="p-3 rounded-xl bg-[#090e18] border border-gray-800 flex items-center justify-between text-xs font-mono">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+                <span class="text-gray-200">4. Curva de Juros Treasury 10Y & FOMC Fed (Peso 25%)</span>
+              </div>
+              <span class="text-rose-400 font-bold">-12 pts (Cautela)</span>
+            </div>
+
+            <div class="p-3 rounded-xl bg-[#090e18] border border-gray-800 flex items-center justify-between text-xs font-mono">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span class="text-gray-200">5. Fluxo Institucional & GEX Tastytrade (Peso 20%)</span>
+              </div>
+              <span class="text-emerald-400 font-bold">+13 pts (Entrada Líquida)</span>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- 4 Mini Metric Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <div class="bg-[#0c1322] border border-gray-800 p-4 rounded-xl">
+          <div class="text-[11px] text-gray-400 font-mono">FUTUROS S&P 500</div>
+          <div class="text-lg font-bold font-mono text-emerald-400 mt-1">+0.82% (6.000 pts)</div>
+          <div class="text-[10px] text-gray-400 mt-0.5">Tom positivo / Techs liderando</div>
+        </div>
+
+        <div class="bg-[#0c1322] border border-gray-800 p-4 rounded-xl">
+          <div class="text-[11px] text-gray-400 font-mono">PETRÓLEO BRENT / WTI</div>
+          <div class="text-lg font-bold font-mono text-amber-400 mt-1">US$ 78.40 / barril</div>
+          <div class="text-[10px] text-gray-400 mt-0.5">Estabilidade / Geopolítica</div>
+        </div>
+
+        <div class="bg-[#0c1322] border border-gray-800 p-4 rounded-xl">
+          <div class="text-[11px] text-gray-400 font-mono">DÓLAR / DXY</div>
+          <div class="text-lg font-bold font-mono text-cyan-400 mt-1">DXY 103.8 • US10Y 4.42%</div>
+          <div class="text-[10px] text-gray-400 mt-0.5">Treasury em patamar estável</div>
+        </div>
+
+        <div class="bg-[#0c1322] border border-gray-800 p-4 rounded-xl">
+          <div class="text-[11px] text-gray-400 font-mono">NET GEX / FLUXO INSTITUCIONAL</div>
+          <div class="text-lg font-bold font-mono text-emerald-400 mt-1">+$2.85 Bi (GEX)</div>
+          <div class="text-[10px] text-gray-400 mt-0.5">Volatilidade contida / Suporte $5.980</div>
+        </div>
+
+      </div>
+
+      <!-- Newsletter Box -->
+      <div class="bg-[#0c1322] border border-gray-800 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center border border-cyan-500/30">
+            <i data-lucide="mail" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-sm font-bold text-white">Resumo da Abertura do Mercado</h3>
+              <span class="px-1.5 py-0.5 bg-cyan-500/20 text-cyan-300 rounded text-[10px] font-mono font-bold">DIÁRIO • 08h45</span>
+            </div>
+            <p class="text-xs text-gray-400">Receba antes da abertura do pregão o panorama global (S&P 500, Petróleo, DXY e Sentimento Tastytrade) no seu e-mail.</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 w-full md:w-auto">
+          <input type="email" placeholder="Seu melhor e-mail corporativo ou pessoal..." class="bg-[#070b14] border border-gray-700 rounded-lg px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-cyan-500 w-72">
+          <button class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold rounded-lg transition flex items-center gap-1.5">
+            <i data-lucide="send" class="w-3.5 h-3.5"></i>
+            <span>Receber Resumo Diário</span>
+          </button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- ABA 2: CONSULTA & GRÁFICO 12M -->
+    <!-- ========================================================================= -->
+    <section id="panel-consulta" class="tab-panel hidden space-y-6">
+      
+      <!-- Search Bar -->
+      <div class="bg-[#0c1322] border border-gray-800 p-4 rounded-xl space-y-3">
+        <div class="flex items-center gap-3">
+          <div class="relative flex-1">
+            <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-3"></i>
+            <input type="text" id="active-asset-input" value="NVDA" class="w-full bg-[#070b14] border border-gray-700 rounded-lg pl-9 pr-4 py-2 text-sm font-mono text-white focus:outline-none focus:border-emerald-500 uppercase" placeholder="Buscar Ticker US (ex: NVDA, AAPL, SPY, TSLA, MSFT)">
+          </div>
+          <button class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-mono font-bold transition flex items-center gap-1.5 shadow-lg shadow-emerald-600/20">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+            <span>Analisar Ativo</span>
+          </button>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
+          <span class="text-gray-400">Destaques US:</span>
+          <button onclick="setConsultSymbol('NVDA')" class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">NVDA</button>
+          <button onclick="setConsultSymbol('AAPL')" class="px-2 py-0.5 rounded bg-[#070b14] border border-gray-800 text-gray-300 hover:border-gray-700">AAPL</button>
+          <button onclick="setConsultSymbol('SPY')" class="px-2 py-0.5 rounded bg-[#070b14] border border-gray-800 text-gray-300 hover:border-gray-700">SPY</button>
+          <button onclick="setConsultSymbol('QQQ')" class="px-2 py-0.5 rounded bg-[#070b14] border border-gray-800 text-gray-300 hover:border-gray-700">QQQ</button>
+          <button onclick="setConsultSymbol('TSLA')" class="px-2 py-0.5 rounded bg-[#070b14] border border-gray-800 text-gray-300 hover:border-gray-700">TSLA</button>
+          <button onclick="setConsultSymbol('MSFT')" class="px-2 py-0.5 rounded bg-[#070b14] border border-gray-800 text-gray-300 hover:border-gray-700">MSFT</button>
+        </div>
+      </div>
+
+      <!-- Asset Banner Card -->
+      <div class="bg-[#0c1322] border border-gray-800/90 rounded-2xl p-6 space-y-6 shadow-xl">
+        
+        <!-- Header do Ativo -->
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-800 pb-4">
+          <div class="space-y-1">
+            <div class="flex items-center gap-3">
+              <h2 id="consult-symbol-display" class="text-3xl font-black font-mono text-white">NVDA</h2>
+              <span class="text-sm text-gray-400 font-sans">NVIDIA Corporation (Common Stock)</span>
+              <span class="px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-mono font-bold">RECOMENDAÇÃO DE COMPRA</span>
+              <span class="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-xs font-mono">SINCRONIZADO COM RASTREADOR</span>
+            </div>
+            <div class="flex items-center gap-2 text-[11px] font-mono text-gray-400 pt-1">
+              <span class="text-emerald-400">1. SPOT: REAL</span> •
+              <span class="text-emerald-400">2. FUNDAM: APROVADO</span> •
+              <span class="text-cyan-400">3. OPÇÕES: NET GEX POSITIVO</span> •
+              <span class="text-gray-300">4. MACRO: FED 4.50%</span>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-4 text-right">
+            <div class="bg-[#10192e] px-3 py-1.5 rounded-lg border border-gray-800">
+              <div class="text-[10px] text-gray-400 font-mono">SPOT</div>
+              <div class="text-lg font-bold font-mono text-white">$142.50</div>
+            </div>
+            <div class="bg-[#10192e] px-3 py-1.5 rounded-lg border border-gray-800">
+              <div class="text-[10px] text-gray-400 font-mono">VARIAÇÃO</div>
+              <div class="text-lg font-bold font-mono text-emerald-400">+2.84%</div>
+            </div>
+            <div class="bg-[#10192e] px-3 py-1.5 rounded-lg border border-gray-800">
+              <div class="text-[10px] text-gray-400 font-mono">VENCIMENTO OPÇÕES</div>
+              <div class="text-lg font-bold font-mono text-cyan-300">2026-09-18 (12 DTE)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5 Sub-Abas de Estudo -->
+        <div class="flex items-center gap-2 border-b border-gray-800 pb-3 text-xs font-mono">
+          <button class="active-sub-tab px-3 py-1.5 rounded-lg border border-gray-800 flex items-center gap-1.5">
+            <i data-lucide="line-chart" class="w-3.5 h-3.5 text-emerald-400"></i>
+            <span>Técnico (CNPI-T)</span>
+          </button>
+          <button class="px-3 py-1.5 rounded-lg border border-gray-800 text-gray-400 hover:text-gray-200 flex items-center gap-1.5 bg-[#090e18]">
+            <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+            <span>Fundamentos (CNPI-F)</span>
+          </button>
+          <button class="px-3 py-1.5 rounded-lg border border-gray-800 text-gray-400 hover:text-gray-200 flex items-center gap-1.5 bg-[#090e18]" onclick="switchTab('barreiras')">
+            <i data-lucide="target" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <span>Opções & GEX (Tastytrade)</span>
+          </button>
+          <button class="px-3 py-1.5 rounded-lg border border-gray-800 text-gray-400 hover:text-gray-200 flex items-center gap-1.5 bg-[#090e18]">
+            <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+            <span>Recomendações de Estudo</span>
+          </button>
+          <button class="px-3 py-1.5 rounded-lg border border-gray-800 text-gray-400 hover:text-gray-200 flex items-center gap-1.5 bg-[#090e18]">
+            <i data-lucide="bot" class="w-3.5 h-3.5 text-purple-400"></i>
+            <span>Consultor IA</span>
+          </button>
+        </div>
+
+        <!-- Grid de Métricas Técnicas -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
+          <div class="p-2.5 rounded-lg bg-[#090e18] border border-gray-800 text-center">
+            <div class="text-[10px] text-gray-400 font-mono">SPOT</div>
+            <div class="text-sm font-bold font-mono text-white mt-0.5">$142.50</div>
+            <div class="text-[9px] text-gray-500 font-mono">52w: 75.6 - 149.7</div>
+          </div>
+
+          <div class="p-2.5 rounded-lg bg-[#090e18] border border-emerald-500/30 text-center">
+            <div class="text-[10px] text-gray-400 font-mono">MA20 (CURTA)</div>
+            <div class="text-sm font-bold font-mono text-emerald-400 mt-0.5">$136.40</div>
+            <div class="text-[9px] text-emerald-400 font-mono">▲ Acima</div>
+          </div>
+
+          <div class="p-2.5 rounded-lg bg-[#090e18] border border-gray-800 text-center">
+            <div class="text-[10px] text-gray-400 font-mono">MA50 (MÉDIA)</div>
+            <div class="text-sm font-bold font-mono text-white mt-0.5">$128.20</div>
+            <div class="text-[9px] text-gray-500 font-mono">Médio Prazo</div>
+          </div>
+
+          <div class="p-2.5 rounded-lg bg-[#090e18] border border-gray-800 text-center">
+            <div class="text-[10px] text-gray-400 font-mono">MA200 (LONGA)</div>
+            <div class="text-sm font-bold font-mono text-white mt-0.5">$105.80</div>
+            <div class="text-[9px] text-gray-500 font-mono">Tendência Primária</div>
+          </div>
+
+          <div class="p-2.5 rounded-lg bg-[#090e18] border border-gray-800 text-center">
+            <div class="text-[10px] text-gray-400 font-mono">RSI(14)</div>
+            <div class="text-sm font-bold font-mono text-cyan-300 mt-0.5">64.2</div>
+            <div class="text-[9px] text-cyan-400 font-mono">Momentum Saudável</div>
+          </div>
+
+          <div class="p-2.5 rounded-lg bg-[#090e18] border border-gray-800 text-center">
+            <div class="text-[10px] text-gray-400 font-mono">MACD HIST</div>
+            <div class="text-sm font-bold font-mono text-emerald-400 mt-0.5">+1.85</div>
+            <div class="text-[9px] text-emerald-400 font-mono">Sinal: A.C.</div>
+          </div>
+
+          <div class="p-2.5 rounded-lg bg-[#090e18] border border-gray-800 text-center">
+            <div class="text-[10px] text-gray-400 font-mono">ATR(14)</div>
+            <div class="text-sm font-bold font-mono text-white mt-0.5">$4.12</div>
+            <div class="text-[9px] text-gray-500 font-mono">Volatilidade Diária</div>
+          </div>
+
+          <div class="p-2.5 rounded-lg bg-[#090e18] border border-gray-800 text-center">
+            <div class="text-[10px] text-gray-400 font-mono">VOL VS MÉDIA20</div>
+            <div class="text-sm font-bold font-mono text-emerald-400 mt-0.5">142%</div>
+            <div class="text-[9px] text-emerald-400 font-mono">Liquidez Alta</div>
+          </div>
+        </div>
+
+        <!-- Candlestick Chart -->
+        <div class="bg-[#070b14] border border-gray-800 rounded-xl p-4 space-y-3">
+          <div class="flex justify-between items-center">
+            <div class="flex items-center gap-2 text-xs font-mono text-gray-300">
+              <i data-lucide="candlestick-chart" class="w-4 h-4 text-emerald-400"></i>
+              <span class="font-bold text-white">GRÁFICO CANDLESTICK & INDICADORES CNPI-T</span>
+              <span class="text-gray-500">• Médias Móveis (MA20/50/200), Volume, RSI(14) e MACD</span>
+            </div>
+            <div class="flex items-center gap-1 text-[10px] font-mono">
+              <button class="px-2 py-0.5 rounded bg-gray-800 text-gray-400 hover:text-white">20P</button>
+              <button class="px-2 py-0.5 rounded bg-gray-800 text-gray-400 hover:text-white">50P</button>
+              <button class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold">90P</button>
+              <button class="px-2 py-0.5 rounded bg-gray-800 text-gray-400 hover:text-white">180P</button>
+              <button class="px-2 py-0.5 rounded bg-gray-800 text-gray-400 hover:text-white">Tudo</button>
+            </div>
+          </div>
+
+          <div class="h-64 w-full relative">
+            <canvas id="candleMockChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Checklist & Risco/Retorno -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          <div class="lg:col-span-6 bg-[#090e18] border border-gray-800 rounded-xl p-4 space-y-2.5">
+            <div class="flex justify-between items-center text-xs font-mono border-b border-gray-800 pb-2">
+              <span class="font-bold text-white flex items-center gap-1.5">
+                <i data-lucide="check-square" class="w-3.5 h-3.5 text-emerald-400"></i>
+                CHECKLIST TÉCNICO (5 ITENS CNPI-T)
+              </span>
+              <span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">APROVADO (5/5)</span>
+            </div>
+
+            <div class="p-2 rounded-lg bg-[#0c1322] border border-gray-800/80 text-xs font-mono flex items-start gap-2">
+              <i data-lucide="check" class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0"></i>
+              <div>
+                <div class="text-white font-semibold">Alinhamento de Médias Altista (Spot > MA20)</div>
+                <div class="text-[10px] text-gray-400">Preço ($142.50) operando acima da MA20 ($136.40) e MA50 ($128.20).</div>
+              </div>
+            </div>
+
+            <div class="p-2 rounded-lg bg-[#0c1322] border border-gray-800/80 text-xs font-mono flex items-start gap-2">
+              <i data-lucide="check" class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0"></i>
+              <div>
+                <div class="text-white font-semibold">Momentum RSI(14) Saudável (40 - 65)</div>
+                <div class="text-[10px] text-gray-400">RSI(14) em 64.2 — zona de aceleração compradora sem sobrecompra.</div>
+              </div>
+            </div>
+
+            <div class="p-2 rounded-lg bg-[#0c1322] border border-gray-800/80 text-xs font-mono flex items-start gap-2">
+              <i data-lucide="check" class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0"></i>
+              <div>
+                <div class="text-white font-semibold">MACD Histograma Positivo / Cruzamento</div>
+                <div class="text-[10px] text-gray-400">Histograma positivo (+1.85) confirmando pressão compradora institucional.</div>
+              </div>
+            </div>
+
+            <div class="p-2 rounded-lg bg-[#0c1322] border border-gray-800/80 text-xs font-mono flex items-start gap-2">
+              <i data-lucide="check" class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0"></i>
+              <div>
+                <div class="text-white font-semibold">Volume de Confirmação (>= 90% da média 20d)</div>
+                <div class="text-[10px] text-gray-400">Volume em 142% da média de 20 pregões (liquidez e fluxo comprador).</div>
+              </div>
+            </div>
+
+            <div class="p-2 rounded-lg bg-[#0c1322] border border-gray-800/80 text-xs font-mono flex items-start gap-2">
+              <i data-lucide="check" class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0"></i>
+              <div>
+                <div class="text-white font-semibold">Assimetria Suporte vs Resistência (R:R >= 1.4)</div>
+                <div class="text-[10px] text-gray-400">Suporte estrutural permitindo stop loss curto e alvos livres.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="lg:col-span-6 bg-[#090e18] border border-gray-800 rounded-xl p-4 space-y-3">
+            <div class="flex justify-between items-center text-xs font-mono border-b border-gray-800 pb-2">
+              <span class="font-bold text-white flex items-center gap-1.5">
+                <i data-lucide="crosshair" class="w-3.5 h-3.5 text-cyan-400"></i>
+                PARÂMETROS DE ESTUDO & RISCO/RETORNO
+              </span>
+              <span class="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold text-[10px]">R:R 2.45 : 1</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 text-xs font-mono">
+              <div class="p-2.5 rounded-lg bg-[#0c1322] border border-gray-800">
+                <div class="text-[10px] text-gray-400">VIÉS TÉCNICO</div>
+                <div class="text-sm font-bold text-emerald-400 mt-0.5">LONG (COMPRA)</div>
+              </div>
+
+              <div class="p-2.5 rounded-lg bg-[#0c1322] border border-gray-800">
+                <div class="text-[10px] text-gray-400">STOP TÉCNICO</div>
+                <div class="text-sm font-bold text-rose-400 mt-0.5">$135.80</div>
+              </div>
+
+              <div class="p-2.5 rounded-lg bg-[#0c1322] border border-gray-800">
+                <div class="text-[10px] text-gray-400">ALVO 1 (RESISTÊNCIA)</div>
+                <div class="text-sm font-bold text-emerald-400 mt-0.5">$149.50</div>
+              </div>
+
+              <div class="p-2.5 rounded-lg bg-[#0c1322] border border-gray-800">
+                <div class="text-[10px] text-gray-400">ALVO 2 (2ª RESISTÊNCIA)</div>
+                <div class="text-sm font-bold text-emerald-400 mt-0.5">$158.00</div>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-gray-800/80 space-y-1.5 text-[11px] font-mono">
+              <div class="flex justify-between">
+                <span class="text-gray-400">Níveis de Suporte:</span>
+                <span class="text-emerald-400 font-bold">$138.50 | $135.80 | $128.20</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-400">Níveis de Resistência:</span>
+                <span class="text-rose-400 font-bold">$149.50 | $154.00 | $158.00</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- ABA 3: RASTREADOR DE TENDÊNCIAS -->
+    <!-- ========================================================================= -->
+    <section id="panel-rastreador" class="tab-panel hidden space-y-6">
+      
+      <div class="bg-[#0c1322] border border-gray-800 p-5 rounded-2xl space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-lg font-bold text-white">Rastreador de Oportunidades & Lista de Execução</h2>
+              <span class="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono font-bold">Classificação Técnica + Crivo CNPI-US + Execução Tastytrade</span>
+            </div>
+            <p class="text-xs text-gray-400 mt-0.5">Lista acionável filtrada por solvência, alinhamento estrito de médias móveis e liquidez real de derivativos.</p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1 bg-[#070b14] p-1 rounded-lg border border-gray-800 text-[11px] font-mono">
+              <span class="text-gray-400 px-2">Escanear:</span>
+              <button class="px-2 py-0.5 rounded bg-gray-800 text-gray-300">40</button>
+              <button class="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold">60</button>
+              <button class="px-2 py-0.5 rounded bg-gray-800 text-gray-300">100</button>
+              <button class="px-2 py-0.5 rounded bg-gray-800 text-gray-300">Todos</button>
+            </div>
+            <button class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-mono font-bold transition flex items-center gap-1">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              <span>Atualizar</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center border-t border-gray-800/80 pt-3">
+          <input type="text" placeholder="Filtrar por ticker (ex: NVDA, AAPL, SPY)..." class="bg-[#070b14] border border-gray-700 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-emerald-500 w-80">
+          <span class="text-xs font-mono text-gray-400">Total de Ativos Analisados no Crivo: <strong class="text-white">60</strong></span>
+        </div>
+      </div>
+
+      <!-- 1. ALTA -->
+      <div class="bg-[#0c1322] border border-emerald-500/30 rounded-2xl p-5 space-y-4">
+        <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+            <h3 class="text-sm font-bold font-mono text-emerald-400">ALTA — Oportunidades de Compra</h3>
+            <span class="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-mono font-bold">4 ativos</span>
+          </div>
+          <span class="text-[10px] font-mono text-gray-400">Critério: Tendência de Alta (MM20 > MM50 > MM200) + Fundamentos Aprovados</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div class="p-3.5 rounded-xl bg-[#090e18] border border-gray-800 hover:border-emerald-500/50 transition cursor-pointer" onclick="switchTab('consulta'); setConsultSymbol('NVDA');">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="font-black font-mono text-sm text-white">NVDA</div>
+                <div class="text-[10px] text-gray-400 font-sans">NVIDIA Corp</div>
+              </div>
+              <div class="text-right font-mono">
+                <div class="text-sm font-bold text-white">$142.50</div>
+                <div class="text-[11px] text-emerald-400 font-semibold">+2.84%</div>
+              </div>
+            </div>
+            <div class="mt-3 pt-2 border-t border-gray-800/80 flex justify-between text-[10px] font-mono">
+              <span>Stop: <strong class="text-rose-400">$135.80</strong></span>
+              <span>Alvo 1: <strong class="text-emerald-400">$149.50</strong></span>
+              <span>R:R: <strong class="text-cyan-300">2.45:1</strong></span>
+            </div>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-[#090e18] border border-gray-800 hover:border-emerald-500/50 transition cursor-pointer" onclick="switchTab('consulta'); setConsultSymbol('AAPL');">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="font-black font-mono text-sm text-white">AAPL</div>
+                <div class="text-[10px] text-gray-400 font-sans">Apple Inc</div>
+              </div>
+              <div class="text-right font-mono">
+                <div class="text-sm font-bold text-white">$238.10</div>
+                <div class="text-[11px] text-emerald-400 font-semibold">+0.65%</div>
+              </div>
+            </div>
+            <div class="mt-3 pt-2 border-t border-gray-800/80 flex justify-between text-[10px] font-mono">
+              <span>Stop: <strong class="text-rose-400">$231.50</strong></span>
+              <span>Alvo 1: <strong class="text-emerald-400">$246.00</strong></span>
+              <span>R:R: <strong class="text-cyan-300">1.85:1</strong></span>
+            </div>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-[#090e18] border border-gray-800 hover:border-emerald-500/50 transition cursor-pointer" onclick="switchTab('consulta'); setConsultSymbol('SPY');">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="font-black font-mono text-sm text-white">SPY</div>
+                <div class="text-[10px] text-gray-400 font-sans">SPDR S&P 500</div>
+              </div>
+              <div class="text-right font-mono">
+                <div class="text-sm font-bold text-white">$598.80</div>
+                <div class="text-[11px] text-emerald-400 font-semibold">+0.78%</div>
+              </div>
+            </div>
+            <div class="mt-3 pt-2 border-t border-gray-800/80 flex justify-between text-[10px] font-mono">
+              <span>Stop: <strong class="text-rose-400">$591.00</strong></span>
+              <span>Alvo 1: <strong class="text-emerald-400">$608.00</strong></span>
+              <span>R:R: <strong class="text-cyan-300">2.10:1</strong></span>
+            </div>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-[#090e18] border border-gray-800 hover:border-emerald-500/50 transition cursor-pointer" onclick="switchTab('consulta'); setConsultSymbol('META');">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="font-black font-mono text-sm text-white">META</div>
+                <div class="text-[10px] text-gray-400 font-sans">Meta Platforms</div>
+              </div>
+              <div class="text-right font-mono">
+                <div class="text-sm font-bold text-white">$612.40</div>
+                <div class="text-[11px] text-emerald-400 font-semibold">+1.45%</div>
+              </div>
+            </div>
+            <div class="mt-3 pt-2 border-t border-gray-800/80 flex justify-between text-[10px] font-mono">
+              <span>Stop: <strong class="text-rose-400">$598.00</strong></span>
+              <span>Alvo 1: <strong class="text-emerald-400">$632.00</strong></span>
+              <span>R:R: <strong class="text-cyan-300">1.95:1</strong></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. BAIXA -->
+      <div class="bg-[#0c1322] border border-rose-500/30 rounded-2xl p-5 space-y-4">
+        <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-400"></span>
+            <h3 class="text-sm font-bold font-mono text-rose-400">BAIXA — Oportunidades de Venda / Trava Baixa</h3>
+            <span class="px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 text-[10px] font-mono font-bold">1 ativo</span>
+          </div>
+          <span class="text-[10px] font-mono text-gray-400">Critério: Tendência de Baixa (MM20 < MM50 < MM200) + Deterioração</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div class="p-3.5 rounded-xl bg-[#090e18] border border-gray-800 hover:border-rose-500/50 transition cursor-pointer">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="font-black font-mono text-sm text-white">TSLA</div>
+                <div class="text-[10px] text-gray-400 font-sans">Tesla Inc</div>
+              </div>
+              <div class="text-right font-mono">
+                <div class="text-sm font-bold text-white">$248.30</div>
+                <div class="text-[11px] text-rose-400 font-semibold">-1.15%</div>
+              </div>
+            </div>
+            <div class="mt-2 text-[10px] text-gray-400 font-mono">Trava de baixa com opções (Bear Put Spread)</div>
+            <div class="mt-2 pt-2 border-t border-gray-800/80 flex justify-between text-[10px] font-mono text-amber-400">
+              <span>⚠ Estratégia de Risco Definido</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. LATERAL -->
+      <div class="bg-[#0c1322] border border-purple-500/30 rounded-2xl p-5 space-y-4">
+        <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-purple-400"></span>
+            <h3 class="text-sm font-bold font-mono text-purple-300">LATERAL — Renda com Opções (Iron Condor / Credit Spreads)</h3>
+            <span class="px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 text-[10px] font-mono font-bold">12 ativos</span>
+          </div>
+          <span class="text-[10px] font-mono text-gray-400">Critério: Mercado Lateral + Balanço Aprovado + IV ATM Real Favorável (DTE 14 a 35)</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div class="p-3.5 rounded-xl bg-[#090e18] border border-gray-800 hover:border-purple-500/50 transition cursor-pointer">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="font-black font-mono text-sm text-white">KO</div>
+                <div class="text-[10px] text-gray-400 font-sans">Coca-Cola Co</div>
+              </div>
+              <div class="text-right font-mono">
+                <div class="text-sm font-bold text-white">$68.40</div>
+                <div class="text-[11px] text-emerald-400 font-semibold">+0.20%</div>
+              </div>
+            </div>
+            <div class="mt-2 text-[10px] text-cyan-300 font-mono">Iron Condor #20 a Crédito (4 Pernas)</div>
+            <div class="mt-1 text-[10px] text-gray-400 font-mono flex justify-between">
+              <span>IV Rank: 38%</span>
+              <span class="text-emerald-400 font-bold">Crédito Institucional</span>
+            </div>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-[#090e18] border border-gray-800 hover:border-purple-500/50 transition cursor-pointer">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="font-black font-mono text-sm text-white">JNJ</div>
+                <div class="text-[10px] text-gray-400 font-sans">Johnson & Johnson</div>
+              </div>
+              <div class="text-right font-mono">
+                <div class="text-sm font-bold text-white">$156.20</div>
+                <div class="text-[11px] text-emerald-400 font-semibold">+0.15%</div>
+              </div>
+            </div>
+            <div class="mt-2 text-[10px] text-cyan-300 font-mono">Iron Condor #20 a Crédito (4 Pernas)</div>
+            <div class="mt-1 text-[10px] text-gray-400 font-mono flex justify-between">
+              <span>IV Rank: 42%</span>
+              <span class="text-emerald-400 font-bold">Crédito Institucional</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- ABA 4: BARREIRAS DE OPÇÕES & MOTOR GEX UNIFICADO -->
+    <!-- ========================================================================= -->
+    <section id="panel-barreiras" class="tab-panel hidden space-y-6">
+      
+      <!-- Seletor de Visão no Topo (1. Barreiras & Walls vs 2. Motor GEX & Gamma Flip) -->
+      <div class="bg-[#0c1322] border border-gray-800 p-4 rounded-xl flex flex-wrap items-center justify-between gap-4">
+        
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-mono text-gray-400 uppercase">Visão de Derivativos:</span>
+          <button onclick="switchGexSubView('barreiras-padrao')" id="gex-subview-btn-1" class="active-gex-view px-3 py-1.5 rounded-lg text-xs font-mono border border-cyan-500/30 flex items-center gap-1.5 transition">
+            <i data-lucide="shield" class="w-3.5 h-3.5"></i>
+            <span>1. Barreiras & Walls (OI / Volume)</span>
+          </button>
+          
+          <button onclick="switchGexSubView('motor-gex')" id="gex-subview-btn-2" class="px-3 py-1.5 rounded-lg text-xs font-mono border border-gray-800 text-gray-400 hover:text-white bg-[#070b14] flex items-center gap-1.5 transition">
+            <i data-lucide="zap" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <span>2. Motor GEX & Gamma Exposure (Tempo Real)</span>
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-mono text-gray-400">Ativo:</span>
+          <select id="options-main-symbol-select" onchange="updateOptionsSymbol(this.value)" class="bg-[#070b14] border border-gray-700 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-cyan-500">
+            <option value="SPX" selected>SPX (S&P 500 Index)</option>
+            <option value="SPY">SPY (SPDR S&P 500 ETF)</option>
+            <option value="QQQ">QQQ (Invesco QQQ)</option>
+            <option value="NDX">NDX (Nasdaq 100)</option>
+            <option value="NVDA">NVDA (NVIDIA)</option>
+            <option value="AAPL">AAPL (Apple)</option>
+            <option value="TSLA">TSLA (Tesla)</option>
+          </select>
+        </div>
+
+      </div>
+
+      <!-- ================= SUB-VISÃO 1: BARREIRAS TRADICIONAIS DO RADAR B3 ================= -->
+      <div id="gex-subview-container-1" class="space-y-6">
+        
+        <!-- Grade de Vencimentos Oficiais OCC -->
+        <div class="bg-[#0c1322] border border-gray-800 p-4 rounded-xl space-y-2.5">
+          <div class="flex justify-between items-center text-xs font-mono">
+            <span class="text-white font-bold flex items-center gap-1.5">
+              <i data-lucide="calendar" class="w-3.5 h-3.5 text-emerald-400"></i>
+              GRADE DE VENCIMENTOS OFICIAIS (SPX / SPY)
+            </span>
+            <span class="text-cyan-300">Série Selecionada: <strong>Weekly / Monthly • 12 Dias Úteis (DTE)</strong></span>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
+            <button class="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-bold">Exp 18 Set (Mais Líquida)</button>
+            <button class="px-3 py-1.5 rounded-lg bg-[#070b14] border border-gray-800 text-gray-300">Exp 25 Set (Semanal)</button>
+            <button class="px-3 py-1.5 rounded-lg bg-[#070b14] border border-gray-800 text-gray-300">Exp 16 Out (Mensal)</button>
+            <button class="px-3 py-1.5 rounded-lg bg-[#070b14] border border-gray-800 text-gray-300">Exp 20 Nov (Mensal)</button>
+          </div>
+        </div>
+
+        <!-- 6 Metrics Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono">
+          <div class="p-3 rounded-xl bg-[#0c1322] border border-gray-800">
+            <div class="text-[10px] text-gray-400">VENCIMENTO ANALISADO</div>
+            <div class="text-sm font-bold text-white mt-1">2026-09-18</div>
+            <div class="text-[10px] text-gray-500">Série Regular OCC</div>
+          </div>
+
+          <div class="p-3 rounded-xl bg-[#0c1322] border border-emerald-500/30">
+            <div class="text-[10px] text-gray-400">DTE (DIAS ÚTEIS)</div>
+            <div class="text-sm font-bold text-emerald-400 mt-1">12 dias úteis</div>
+            <div class="text-[10px] text-emerald-400">✓ Padrão Tastytrade</div>
+          </div>
+
+          <div class="p-3 rounded-xl bg-[#0c1322] border border-gray-800">
+            <div class="text-[10px] text-gray-400">IV ATM (CALL/PUT)</div>
+            <div class="text-sm font-bold text-purple-300 mt-1">13.68% / 14.09%</div>
+            <div class="text-[10px] text-gray-500">Percentil IV: ~35%</div>
+          </div>
+
+          <div class="p-3 rounded-xl bg-[#0c1322] border border-gray-800">
+            <div class="text-[10px] text-gray-400">HV21 / HV63 (REAL)</div>
+            <div class="text-sm font-bold text-white mt-1">12.8% / 13.4%</div>
+            <div class="text-[10px] text-gray-500">Volatilidade Realizada</div>
+          </div>
+
+          <div class="p-3 rounded-xl bg-[#0c1322] border border-gray-800">
+            <div class="text-[10px] text-gray-400">P/C RATIO (OI)</div>
+            <div class="text-sm font-bold text-emerald-400 mt-1">0.68</div>
+            <div class="text-[10px] text-emerald-400">Predomínio de Calls</div>
+          </div>
+
+          <div class="p-3 rounded-xl bg-[#0c1322] border border-gray-800">
+            <div class="text-[10px] text-gray-400">MAX PAIN / FLIP</div>
+            <div class="text-sm font-bold text-cyan-300 mt-1">$5,950.00</div>
+            <div class="text-[10px] text-gray-500">Menor prejuízo lançadores</div>
+          </div>
+        </div>
+
+        <!-- Distribuição de Volume por Strike + Top 5 Call & Put Walls -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          <!-- Distribuição de Volume por Strike (Bidirecional) -->
+          <div class="lg:col-span-6 bg-[#0c1322] border border-gray-800 rounded-2xl p-5 space-y-4">
+            <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+              <div class="flex items-center gap-2">
+                <i data-lucide="bar-chart-2" class="w-4 h-4 text-cyan-400"></i>
+                <h3 class="text-sm font-bold text-white font-mono">DISTRIBUIÇÃO DE VOLUME / OI POR STRIKE</h3>
+              </div>
+              <div class="text-[11px] font-mono text-gray-400">
+                Spot: <strong class="text-white">$6,000.25</strong> • Max Pain: <strong class="text-cyan-300">$5,950.00</strong>
+              </div>
+            </div>
+
+            <div class="space-y-2 text-xs font-mono">
+              <div class="flex items-center gap-2">
+                <div class="w-20 text-right text-gray-400">12.450</div>
+                <div class="flex-1 flex items-center gap-2 justify-end"><div class="h-3 bg-rose-500/80 rounded-l" style="width: 25%;"></div></div>
+                <div class="w-20 text-center font-bold text-white bg-[#070b14] py-0.5 rounded border border-gray-800">$5,850</div>
+                <div class="flex-1 flex items-center gap-2"><div class="h-3 bg-emerald-500/80 rounded-r" style="width: 5%;"></div></div>
+                <div class="w-20 text-left text-gray-400">2.100</div>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <div class="w-20 text-right text-gray-400">24.800</div>
+                <div class="flex-1 flex items-center gap-2 justify-end"><div class="h-3 bg-rose-500/80 rounded-l" style="width: 48%;"></div></div>
+                <div class="w-20 text-center font-bold text-white bg-[#070b14] py-0.5 rounded border border-gray-800">$5,900</div>
+                <div class="flex-1 flex items-center gap-2"><div class="h-3 bg-emerald-500/80 rounded-r" style="width: 12%;"></div></div>
+                <div class="w-20 text-left text-gray-400">5.800</div>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <div class="w-20 text-right text-gray-400 font-bold text-rose-400">58.400</div>
+                <div class="flex-1 flex items-center gap-2 justify-end"><div class="h-4 bg-rose-500 rounded-l shadow-sm shadow-rose-500/50" style="width: 90%;"></div></div>
+                <div class="w-20 text-center font-black text-rose-400 bg-rose-950/40 py-0.5 rounded border border-rose-800">$5,950</div>
+                <div class="flex-1 flex items-center gap-2"><div class="h-3 bg-emerald-500/80 rounded-r" style="width: 22%;"></div></div>
+                <div class="w-20 text-left text-gray-400">14.200</div>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <div class="w-20 text-right text-gray-400">18.200</div>
+                <div class="flex-1 flex items-center gap-2 justify-end"><div class="h-3 bg-rose-500/80 rounded-l" style="width: 35%;"></div></div>
+                <div class="w-20 text-center font-black text-cyan-300 bg-cyan-950/40 py-0.5 rounded border border-cyan-800">$6,000 (ATM)</div>
+                <div class="flex-1 flex items-center gap-2"><div class="h-4 bg-emerald-500 rounded-r shadow-sm shadow-emerald-500/50" style="width: 95%;"></div></div>
+                <div class="w-20 text-left text-gray-400 font-bold text-emerald-400">62.500</div>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <div class="w-20 text-right text-gray-400">6.400</div>
+                <div class="flex-1 flex items-center gap-2 justify-end"><div class="h-3 bg-rose-500/80 rounded-l" style="width: 12%;"></div></div>
+                <div class="w-20 text-center font-bold text-white bg-[#070b14] py-0.5 rounded border border-gray-800">$6,050</div>
+                <div class="flex-1 flex items-center gap-2"><div class="h-3 bg-emerald-500/80 rounded-r" style="width: 65%;"></div></div>
+                <div class="w-20 text-left text-gray-400">41.800</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Top 5 Call Walls & Top 5 Put Walls -->
+          <div class="lg:col-span-6 space-y-4">
+            <div class="bg-[#0c1322] border border-gray-800 rounded-2xl p-5 space-y-3">
+              <div class="flex justify-between items-center border-b border-gray-800 pb-2.5">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="shield-alert" class="w-4 h-4 text-emerald-400"></i>
+                  <h3 class="text-xs font-bold font-mono text-white uppercase">TOP 5 CALL WALLS (RESISTÊNCIA INSTITUCIONAL)</h3>
+                </div>
+                <span class="text-[10px] font-mono text-gray-500">VOLUME / OI</span>
+              </div>
+
+              <table class="w-full text-left text-xs font-mono">
+                <thead class="text-gray-500 text-[10px] uppercase border-b border-gray-800">
+                  <tr>
+                    <th class="pb-1.5">Strike</th>
+                    <th class="pb-1.5">Símbolo OCC</th>
+                    <th class="pb-1.5">Contratos</th>
+                    <th class="pb-1.5">IV</th>
+                    <th class="pb-1.5">Delta</th>
+                    <th class="pb-1.5 text-right">Dist. Spot</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-800/50 text-[11px]">
+                  <tr>
+                    <td class="py-1.5 font-bold text-emerald-400">$6,000.00</td>
+                    <td class="text-gray-300">.SPXW260918C6000</td>
+                    <td class="text-white font-semibold">62.500</td>
+                    <td class="text-purple-300">13.8%</td>
+                    <td class="text-emerald-400">0.50</td>
+                    <td class="text-right text-emerald-400">+0.0%</td>
+                  </tr>
+                  <tr>
+                    <td class="py-1.5 font-bold text-emerald-400">$6,050.00</td>
+                    <td class="text-gray-300">.SPXW260918C6050</td>
+                    <td class="text-white font-semibold">41.800</td>
+                    <td class="text-purple-300">14.1%</td>
+                    <td class="text-emerald-400">0.35</td>
+                    <td class="text-right text-emerald-400">+0.8%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="bg-[#0c1322] border border-gray-800 rounded-2xl p-5 space-y-3">
+              <div class="flex justify-between items-center border-b border-gray-800 pb-2.5">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="shield" class="w-4 h-4 text-rose-400"></i>
+                  <h3 class="text-xs font-bold font-mono text-white uppercase">TOP 5 PUT WALLS (SUPORTE INSTITUCIONAL)</h3>
+                </div>
+                <span class="text-[10px] font-mono text-gray-500">VOLUME / OI</span>
+              </div>
+
+              <table class="w-full text-left text-xs font-mono">
+                <thead class="text-gray-500 text-[10px] uppercase border-b border-gray-800">
+                  <tr>
+                    <th class="pb-1.5">Strike</th>
+                    <th class="pb-1.5">Símbolo OCC</th>
+                    <th class="pb-1.5">Contratos</th>
+                    <th class="pb-1.5">IV</th>
+                    <th class="pb-1.5">Delta</th>
+                    <th class="pb-1.5 text-right">Dist. Spot</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-800/50 text-[11px]">
+                  <tr>
+                    <td class="py-1.5 font-bold text-rose-400">$5,950.00</td>
+                    <td class="text-gray-300">.SPXW260918P5950</td>
+                    <td class="text-white font-semibold">58.400</td>
+                    <td class="text-purple-300">14.5%</td>
+                    <td class="text-rose-400">-0.38</td>
+                    <td class="text-right text-rose-400">-0.8%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- ================= SUB-VISÃO 2: MOTOR GEX EM TEMPO REAL (TASTYTRADE DXFEED) ================= -->
+      <div id="gex-subview-container-2" class="hidden space-y-6">
+        
+        <!-- 4 Key GEX Metrics Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono">
+          <div class="bg-[#0c1322] border border-gray-800 p-4 rounded-xl">
+            <div class="text-[11px] text-gray-400">SPOT PRICE (DXFEED)</div>
+            <div class="text-2xl font-black text-white mt-1">$6,000.25</div>
+            <div class="text-[10px] text-emerald-400 mt-1">▲ +0.82% em tempo real</div>
+          </div>
+
+          <div class="bg-[#0c1322] border border-cyan-800/50 p-4 rounded-xl">
+            <div class="text-[11px] text-cyan-300">ZERO GAMMA (FLIP LEVEL)</div>
+            <div class="text-2xl font-black text-cyan-400 mt-1">$5,980.00</div>
+            <div class="text-[10px] text-gray-400 mt-1">Fronteira de Volatilidade</div>
+          </div>
+
+          <div class="bg-[#0c1322] border border-purple-800/50 p-4 rounded-xl">
+            <div class="text-[11px] text-purple-300">MAX GEX MAGNET</div>
+            <div class="text-2xl font-black text-purple-300 mt-1">$6,050.00</div>
+            <div class="text-[10px] text-gray-400 mt-1">Strike de Maior Atração</div>
+          </div>
+
+          <div class="bg-[#0c1322] border border-emerald-500/40 p-4 rounded-xl">
+            <div class="text-[11px] text-gray-400">TOTAL NET GEX</div>
+            <div class="text-2xl font-black text-emerald-400 mt-1">+$2.85 Bilhões</div>
+            <div class="text-[10px] text-emerald-300 mt-1">Regime: Long Gamma (Calmo)</div>
+          </div>
+        </div>
+
+        <!-- GEX Chart & Live Greeks Table -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          <!-- Left 7 Cols: GEX by Strike Chart (Call Gamma vs Put Gamma) -->
+          <div class="lg:col-span-7 bg-[#0c1322] border border-gray-800 rounded-2xl p-5 space-y-4">
+            <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+              <div>
+                <h3 class="text-sm font-bold text-white font-mono flex items-center gap-1.5">
+                  <i data-lucide="zap" class="w-4 h-4 text-cyan-400"></i>
+                  GAMMA EXPOSURE (GEX) POR STRIKE
+                </h3>
+                <p class="text-[11px] text-gray-400 font-mono">GEX = Gamma × Open Interest × 100 × Spot Price</p>
+              </div>
+
+              <div class="flex items-center gap-3 text-xs font-mono">
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-emerald-500"></span> Call GEX</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-rose-500"></span> Put GEX</span>
+              </div>
+            </div>
+
+            <div class="h-80 w-full relative">
+              <canvas id="unifiedGexChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Right 5 Cols: Live Option Chain Table com Gregas (Delta, Gamma, Theta, Vega, IV) -->
+          <div class="lg:col-span-5 bg-[#0c1322] border border-gray-800 rounded-2xl p-5 space-y-3 flex flex-col">
+            <div class="flex justify-between items-center border-b border-gray-800 pb-2.5">
+              <div class="flex items-center gap-2">
+                <i data-lucide="list-ordered" class="w-4 h-4 text-emerald-400"></i>
+                <h3 class="text-xs font-bold font-mono text-white">OPTION CHAIN & GREGAS (DXLINK)</h3>
+              </div>
+              <span class="text-[10px] font-mono text-emerald-400 font-bold">STREAMING</span>
+            </div>
+
+            <div class="overflow-y-auto max-h-80 custom-scrollbar flex-1">
+              <table class="w-full text-left text-xs font-mono">
+                <thead class="bg-[#090e18] text-gray-400 text-[10px] uppercase sticky top-0 border-b border-gray-800">
+                  <tr>
+                    <th class="p-2">Strike</th>
+                    <th class="p-2 text-emerald-400">Delta</th>
+                    <th class="p-2 text-cyan-300">Gamma</th>
+                    <th class="p-2 text-rose-400">Theta</th>
+                    <th class="p-2 text-purple-300">IV</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-800/40 text-[11px]">
+                  <tr>
+                    <td class="p-2 font-bold text-white">$5,950</td>
+                    <td class="p-2 text-emerald-400">0.72</td>
+                    <td class="p-2 text-cyan-300">0.0034</td>
+                    <td class="p-2 text-rose-400">-1.24</td>
+                    <td class="p-2 text-purple-300">14.8%</td>
+                  </tr>
+                  <tr>
+                    <td class="p-2 font-bold text-cyan-300">$5,980 (Flip)</td>
+                    <td class="p-2 text-emerald-400">0.58</td>
+                    <td class="p-2 text-cyan-300">0.0048</td>
+                    <td class="p-2 text-rose-400">-1.45</td>
+                    <td class="p-2 text-purple-300">14.2%</td>
+                  </tr>
+                  <tr class="bg-slate-800/30">
+                    <td class="p-2 font-black text-cyan-300">$6,000 (ATM)</td>
+                    <td class="p-2 text-emerald-400 font-bold">0.50</td>
+                    <td class="p-2 text-cyan-300 font-bold">0.0052</td>
+                    <td class="p-2 text-rose-400 font-bold">-1.60</td>
+                    <td class="p-2 text-purple-300 font-bold">14.0%</td>
+                  </tr>
+                  <tr>
+                    <td class="p-2 font-bold text-purple-300">$6,050 (Magnet)</td>
+                    <td class="p-2 text-emerald-400">0.28</td>
+                    <td class="p-2 text-cyan-300">0.0042</td>
+                    <td class="p-2 text-rose-400">-1.05</td>
+                    <td class="p-2 text-purple-300">14.3%</td>
+                  </tr>
+                  <tr>
+                    <td class="p-2 font-bold text-white">$6,100</td>
+                    <td class="p-2 text-emerald-400">0.14</td>
+                    <td class="p-2 text-cyan-300">0.0021</td>
+                    <td class="p-2 text-rose-400">-0.65</td>
+                    <td class="p-2 text-purple-300">14.7%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="p-2.5 rounded-lg bg-[#090e18] border border-gray-800 text-[10px] font-mono text-gray-400 flex justify-between">
+              <span>DXLink WS: <strong class="text-emerald-400">Connected</strong></span>
+              <span>Eventos: <strong class="text-white">1,480 greeks/s</strong></span>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- ABA 5: MANUAL & AJUDA IA -->
+    <!-- ========================================================================= -->
+    <section id="panel-manual" class="tab-panel hidden space-y-6">
+      
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <div class="lg:col-span-7 space-y-3">
+          <div class="p-4 rounded-xl bg-[#0c1322] border border-gray-800">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="book-open" class="w-5 h-5 text-emerald-400"></i>
+              Manual de Operações & Metodologia Quantitativa (Radar + GEX)
+            </h3>
+            <p class="text-xs text-gray-400 mt-1">Guia detalhado de como o sistema analisa tendências, valida fundamentos, calcula o Gamma Exposure e estrutura posições com a Tastytrade.</p>
+          </div>
+
+          <div class="space-y-2 font-mono text-xs">
+            
+            <div class="bg-[#0c1322] border border-gray-800 rounded-xl overflow-hidden">
+              <button onclick="toggleAccordion('acc-1')" class="w-full p-3.5 text-left flex items-center justify-between hover:bg-slate-800/40">
+                <div class="flex items-center gap-3">
+                  <span class="w-7 h-7 rounded-lg bg-[#070b14] border border-gray-700 text-cyan-400 flex items-center justify-center font-bold text-xs">01</span>
+                  <div>
+                    <div class="font-bold text-white">Arquitetura das 3 Camadas + Motor GEX</div>
+                    <div class="text-[10px] text-gray-400">Visão Geral do Modelo de Decisão</div>
+                  </div>
+                </div>
+                <i data-lucide="chevron-down" id="icon-acc-1" class="w-4 h-4 text-gray-400 transition-transform"></i>
+              </button>
+              <div id="acc-1" class="hidden p-4 pt-1 text-[11px] text-gray-300 font-sans border-t border-gray-800/60 leading-relaxed bg-[#090e18]">
+                O sistema combina de forma estrita 3 camadas independentes: 1) Técnica (Médias Móveis e Momentum), 2) Fundamentos e Solvência, e 3) Derivativos & Gamma Exposure (GEX) da Tastytrade em tempo real.
+              </div>
+            </div>
+
+            <div class="bg-[#0c1322] border border-gray-800 rounded-xl overflow-hidden">
+              <button onclick="toggleAccordion('acc-2')" class="w-full p-3.5 text-left flex items-center justify-between hover:bg-slate-800/40">
+                <div class="flex items-center gap-3">
+                  <span class="w-7 h-7 rounded-lg bg-[#070b14] border border-gray-700 text-cyan-400 flex items-center justify-center font-bold text-xs">02</span>
+                  <div>
+                    <div class="font-bold text-white">O que é Gamma Exposure (GEX) e Zero Gamma Flip</div>
+                    <div class="text-[10px] text-gray-400">Mecânica de Formadores de Mercado (Market Makers)</div>
+                  </div>
+                </div>
+                <i data-lucide="chevron-down" id="icon-acc-2" class="w-4 h-4 text-gray-400 transition-transform"></i>
+              </button>
+              <div id="acc-2" class="hidden p-4 pt-1 text-[11px] text-gray-300 font-sans border-t border-gray-800/60 leading-relaxed bg-[#090e18]">
+                GEX mede o rebalanceamento de Delta dos Market Makers. Quando o preço está acima do Zero Gamma Flip, os MMs operam contra a tendência (comprando na queda e vendendo na alta), comprimindo a volatilidade. Abaixo do Zero Gamma, operam a favor da tendência, amplificando quedas.
+              </div>
+            </div>
+
+            <div class="bg-[#0c1322] border border-gray-800 rounded-xl overflow-hidden">
+              <button onclick="toggleAccordion('acc-3')" class="w-full p-3.5 text-left flex items-center justify-between hover:bg-slate-800/40">
+                <div class="flex items-center gap-3">
+                  <span class="w-7 h-7 rounded-lg bg-[#070b14] border border-gray-700 text-cyan-400 flex items-center justify-center font-bold text-xs">03</span>
+                  <div>
+                    <div class="font-bold text-white">Rastreador de Tendências & Execução de Iron Condor</div>
+                    <div class="text-[10px] text-gray-400">Classificação Alta / Baixa / Lateral</div>
+                  </div>
+                </div>
+                <i data-lucide="chevron-down" id="icon-acc-3" class="w-4 h-4 text-gray-400 transition-transform"></i>
+              </button>
+              <div id="acc-3" class="hidden p-4 pt-1 text-[11px] text-gray-300 font-sans border-t border-gray-800/60 leading-relaxed bg-[#090e18]">
+                O rastreador classifica ativos em 3 regimes: compras direcionais em tendências claras de alta, travas de baixa com opções em tendências baixistas, e operações estruturadas de renda lateral (Iron Condor #20 a crédito com 4 pernas) quando o IV Rank for favorável.
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Right 5 Cols: Video & Chat -->
+        <div class="lg:col-span-5 space-y-4">
+          <div class="bg-[#0c1322] border border-gray-800 rounded-2xl p-4 space-y-3">
+            <div class="flex items-center gap-2 border-b border-gray-800 pb-2.5">
+              <i data-lucide="bot" class="w-4 h-4 text-purple-400"></i>
+              <span class="text-xs font-bold font-mono text-white">Consultor IA & Dúvidas Operacionais</span>
+            </div>
+
+            <div class="relative">
+              <input type="text" placeholder="Faça uma pergunta sobre o manual ou GEX..." class="w-full bg-[#070b14] border border-gray-700 rounded-lg pl-3 pr-10 py-2.5 text-xs font-mono text-white focus:outline-none focus:border-purple-500">
+              <button class="absolute right-2 top-2 p-1.5 rounded-md bg-purple-600 hover:bg-purple-500 text-white transition">
+                <i data-lucide="send" class="w-3 h-3"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="bg-[#0c1322] border border-gray-800 rounded-2xl p-4 space-y-3">
+            <div class="flex justify-between items-center border-b border-gray-800 pb-2">
+              <div class="flex items-center gap-2">
+                <i data-lucide="play-circle" class="w-4 h-4 text-cyan-400"></i>
+                <span class="text-xs font-bold font-mono text-white">Vídeo: Desmistificando o Radar Tastytrade</span>
+              </div>
+              <span class="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 text-[10px] font-mono">AULA COMPLETA</span>
+            </div>
+
+            <div class="w-full h-44 bg-[#070b14] border border-gray-800 rounded-xl flex flex-col items-center justify-center p-4 text-center relative overflow-hidden group cursor-pointer">
+              <div class="w-12 h-12 rounded-full bg-emerald-500/20 border border-emerald-500 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition shadow-lg shadow-emerald-500/30">
+                <i data-lucide="play" class="w-6 h-6 ml-0.5 fill-current"></i>
+              </div>
+              <div class="mt-2 text-xs font-bold text-white">Desmistificando o Radar Tastytrade + GEX</div>
+              <div class="text-[10px] text-gray-400 font-mono">Duração: 9:17 • Arquitetura 3 Camadas & Motor GEX US</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="w-full border-t border-gray-800/80 bg-[#090e18] py-4 px-4 sm:px-6 lg:px-8 mt-auto">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3 text-xs">
+      <div class="flex flex-wrap items-center gap-2 text-gray-400">
+        <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+        <span class="font-bold text-white font-mono">RADAR TASTYTRADE PRO IA</span>
+        <span class="text-gray-600">|</span>
+        <span class="font-mono text-emerald-400 font-semibold">v3.2.0 (Radar B3 + GEX Engine)</span>
+        <span class="text-gray-600">•</span>
+        <span class="text-gray-400">Tastytrade Open API & DXLink Realtime</span>
+      </div>
+
+      <div class="flex items-center gap-4 text-gray-500 text-[11px] font-mono">
+        <span class="text-emerald-400/80 flex items-center gap-1">
+          <i data-lucide="shield" class="w-3 h-3 text-emerald-400"></i>
+          CNPI 3 Camadas US + GEX Realtime
+        </span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ================= SCRIPTS ================= -->
+  <script>
+    lucide.createIcons();
+
+    // Tab Switcher
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-panel').forEach(el => el.classList.add('hidden'));
+      const panel = document.getElementById('panel-' + tabId);
+      if (panel) panel.classList.remove('hidden');
+
+      document.querySelectorAll('.nav-tab').forEach(btn => {
+        btn.classList.remove('active-nav-tab');
+        btn.classList.add('text-gray-400');
+      });
+
+      const activeBtn = document.getElementById('tab-btn-' + tabId);
+      if (activeBtn) {
+        activeBtn.classList.add('active-nav-tab');
+        activeBtn.classList.remove('text-gray-400');
+      }
+
+      if (tabId === 'panorama') drawGauge(58);
+      if (tabId === 'consulta') renderCandleMock();
+      if (tabId === 'barreiras') renderUnifiedGexChart();
+    }
+
+    // GEX Sub-View Switcher (1. Barreiras Padrao vs 2. Motor GEX)
+    function switchGexSubView(viewType) {
+      const container1 = document.getElementById('gex-subview-container-1');
+      const container2 = document.getElementById('gex-subview-container-2');
+      const btn1 = document.getElementById('gex-subview-btn-1');
+      const btn2 = document.getElementById('gex-subview-btn-2');
+
+      if (viewType === 'barreiras-padrao') {
+        container1.classList.remove('hidden');
+        container2.classList.add('hidden');
+        btn1.className = "active-gex-view px-3 py-1.5 rounded-lg text-xs font-mono border border-cyan-500/30 flex items-center gap-1.5 transition";
+        btn2.className = "px-3 py-1.5 rounded-lg text-xs font-mono border border-gray-800 text-gray-400 hover:text-white bg-[#070b14] flex items-center gap-1.5 transition";
+      } else {
+        container1.classList.add('hidden');
+        container2.classList.remove('hidden');
+        btn2.className = "active-gex-view px-3 py-1.5 rounded-lg text-xs font-mono border border-cyan-500/30 flex items-center gap-1.5 transition";
+        btn1.className = "px-3 py-1.5 rounded-lg text-xs font-mono border border-gray-800 text-gray-400 hover:text-white bg-[#070b14] flex items-center gap-1.5 transition";
+        renderUnifiedGexChart();
+      }
+    }
+
+    function setConsultSymbol(sym) {
+      document.getElementById('active-asset-input').value = sym;
+      document.getElementById('consult-symbol-display').textContent = sym;
+    }
+
+    function updateOptionsSymbol(sym) {
+      // Updates options calculations
+      renderUnifiedGexChart();
+    }
+
+    function toggleAccordion(id) {
+      const el = document.getElementById(id);
+      const icon = document.getElementById('icon-' + id);
+      if (!el) return;
+      if (el.classList.contains('hidden')) {
+        el.classList.remove('hidden');
+        if (icon) icon.classList.add('rotate-180');
+      } else {
+        el.classList.add('hidden');
+        if (icon) icon.classList.remove('rotate-180');
+      }
+    }
+
+    function drawGauge(score) {
+      const canvas = document.getElementById('gaugeCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height - 10;
+      const radius = 90;
+
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, Math.PI, 2 * Math.PI);
+      ctx.lineWidth = 18;
+      ctx.strokeStyle = '#1f293d';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, Math.PI, Math.PI + (Math.PI * 0.35));
+      ctx.lineWidth = 18;
+      ctx.strokeStyle = '#f43f5e';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, Math.PI + (Math.PI * 0.35), Math.PI + (Math.PI * 0.55));
+      ctx.lineWidth = 18;
+      ctx.strokeStyle = '#f59e0b';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, Math.PI + (Math.PI * 0.55), 2 * Math.PI);
+      ctx.lineWidth = 18;
+      ctx.strokeStyle = '#10b981';
+      ctx.stroke();
+
+      const angle = Math.PI + (score / 100) * Math.PI;
+      const needleLength = 75;
+      const needleX = centerX + needleLength * Math.cos(angle);
+      const needleY = centerY + needleLength * Math.sin(angle);
+
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.lineTo(needleX, needleY);
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 6, 0, 2 * Math.PI);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+    }
+
+    let candleChartInstance = null;
+    function renderCandleMock() {
+      const ctx = document.getElementById('candleMockChart');
+      if (!ctx) return;
+      if (candleChartInstance) candleChartInstance.destroy();
+
+      const labels = ['D-20', 'D-18', 'D-16', 'D-14', 'D-12', 'D-10', 'D-8', 'D-6', 'D-4', 'D-2', 'Hoje'];
+      const priceData = [132, 130, 131, 134, 133, 137, 136, 139, 140, 139, 142.5];
+      const ma20Data = [128, 129, 130, 131, 132, 133, 134, 135, 135.5, 136, 136.4];
+
+      candleChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Preço Spot (USD)',
+              data: priceData,
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              fill: true,
+              tension: 0.2,
+              borderWidth: 2,
+              pointRadius: 4,
+              pointBackgroundColor: '#10b981'
+            },
+            {
+              label: 'MA20 Curta ($136.40)',
+              data: ma20Data,
+              borderColor: '#06b6d4',
+              borderDash: [4, 4],
+              borderWidth: 2,
+              pointRadius: 0,
+              fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#9ca3af', font: { family: 'JetBrains Mono', size: 10 } } }
+          },
+          scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#6b7280', font: { family: 'JetBrains Mono', size: 10 } } },
+            y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#6b7280', font: { family: 'JetBrains Mono', size: 10 } } }
+          }
+        }
+      });
+    }
+
+    let unifiedGexChartInstance = null;
+    function renderUnifiedGexChart() {
+      const ctx = document.getElementById('unifiedGexChart');
+      if (!ctx) return;
+      if (unifiedGexChartInstance) unifiedGexChartInstance.destroy();
+
+      const strikes = [5850, 5880, 5900, 5920, 5940, 5960, 5980, 6000, 6020, 6040, 6050, 6060, 6080, 6100, 6120];
+      const callGex = [20, 45, 80, 140, 220, 380, 650, 1100, 850, 720, 1450, 680, 420, 260, 110];
+      const putGex = [-800, -720, -640, -510, -420, -310, -210, -140, -80, -50, -30, -20, -10, -5, -2];
+
+      unifiedGexChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: strikes.map(s => '$' + s),
+          datasets: [
+            {
+              label: 'Call Gamma ($M)',
+              data: callGex,
+              backgroundColor: '#10b981',
+              borderRadius: 4,
+            },
+            {
+              label: 'Put Gamma ($M)',
+              data: putGex,
+              backgroundColor: '#f43f5e',
+              borderRadius: 4,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return context.dataset.label + ': $' + Math.abs(context.raw) + 'M';
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255,255,255,0.05)' },
+              ticks: { color: '#9ca3af', font: { family: 'JetBrains Mono', size: 10 } }
+            },
+            y: {
+              grid: { color: 'rgba(255,255,255,0.05)' },
+              ticks: {
+                color: '#9ca3af',
+                font: { family: 'JetBrains Mono', size: 10 },
+                callback: function(val) { return '$' + val + 'M'; }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      drawGauge(58);
+      renderCandleMock();
+      renderUnifiedGexChart();
+    });
+  </script>
+</body>
+</html>
