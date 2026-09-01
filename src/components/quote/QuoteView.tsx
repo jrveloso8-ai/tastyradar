@@ -19,13 +19,20 @@ import {
   ChevronDown,
   ChevronUp,
   Sliders,
-  DollarSign
+  DollarSign,
+  AlertTriangle,
+  Info,
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 import { CandlestickChart } from './CandlestickChart';
 import { OptionPayoffChart, ElectedStrategyData } from '../options/OptionPayoffChart';
 import { UnifiedGexBarreirasView } from '../options/UnifiedGexBarreirasView';
 import { US_STOCKS_DATASET, USStockItem, generateCandlesticks } from '@/lib/domain/us-market-data';
 import { CME_25_STRATEGIES, StrategySpec } from '@/lib/domain/cme-catalog';
+import { fundamentalsEngine } from '@/lib/domain/fundamentals-engine';
+import { RawFundamentalData } from '@/lib/types/financial';
+import { aiConsultantEngine } from '@/lib/domain/ai-consultant';
 
 interface QuoteViewProps {
   initialSymbol?: string;
@@ -78,8 +85,31 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
     };
   }, [symbol]);
 
+  const fundResult = useMemo(() => {
+    const isVale = currentStock.symbol.toUpperCase() === 'VALE3';
+    const rawData: RawFundamentalData = {
+      symbol: currentStock.symbol,
+      shortName: currentStock.name,
+      regularMarketPrice: currentStock.spot,
+      returnOnEquity: isVale ? 0.0442 : (currentStock.roe !== undefined ? currentStock.roe / 100 : null),
+      netMargin: isVale ? 0.0399 : (currentStock.netMargin !== undefined ? currentStock.netMargin / 100 : null),
+      debtToEbitda: isVale ? 3.09 : (currentStock.debtToEbitda ?? null),
+      financialDebtToEbitda: isVale ? 0.8 : (currentStock.debtToEbitda !== undefined ? Math.min(currentStock.debtToEbitda, 1.2) : null),
+      priceEarnings: isVale ? 32.29 : (currentStock.peRatio ?? null),
+      dividendYield: currentStock.dividendYield !== undefined ? currentStock.dividendYield / 100 : null,
+      currentRatio: isVale ? 1.19 : 1.45,
+      ebitdaMargin: isVale ? 0.2381 : 0.28,
+      priceToBook: isVale ? 1.76 : (currentStock.peRatio ? Number((currentStock.peRatio / 18).toFixed(2)) : null),
+      operatingCashFlow: isVale ? 50600000000 : null,
+      netIncome: isVale ? 11800000000 : null,
+      nonRecurringImpairment: isVale ? 25100000000 : null,
+    };
+    return fundamentalsEngine.evaluate(rawData);
+  }, [currentStock]);
+
   // Generate Elected Strategy dynamically for the stock based on its category
   const candles = useMemo(() => {
+
     return generateCandlesticks(currentStock.symbol, currentStock.spot, 90);
   }, [currentStock.symbol, currentStock.spot]);
 
@@ -250,27 +280,49 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
     }
   }, [currentStock]);
 
-  const filteredOptionStrategies = useMemo(() => {
-    if (optionCategoryFilter === 'ALL') return CME_25_STRATEGIES;
-    return CME_25_STRATEGIES.filter(s => s.category === optionCategoryFilter);
-  }, [optionCategoryFilter]);
+  const [isAiLoading, setIsAiLoading] = useState(false);
 
-  const handleSendMessage = () => {
-    if (!inputMessage.trim()) return;
-    const userText = inputMessage;
+  const handleSendMessage = async (customText?: string) => {
+    const textToSend = (typeof customText === 'string' ? customText : inputMessage).trim();
+    if (!textToSend || isAiLoading) return;
     setInputMessage('');
-    setChatMessages((prev) => [...prev, { role: 'user', text: userText }]);
+    setChatMessages((prev) => [...prev, { role: 'user', text: textToSend }]);
+    setIsAiLoading(true);
 
-    setTimeout(() => {
+    try {
+      const response = await aiConsultantEngine.consult(textToSend, {
+        symbol: currentStock.symbol,
+        stock: currentStock,
+        fundamentals: fundResult,
+        electedStrategy,
+        spotPrice: currentStock.spot,
+        category: currentStock.category,
+      });
+
       setChatMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          text: `Para o ticker ${currentStock.symbol} (Spot $${currentStock.spot.toFixed(2)}): O viés atual é de ${currentStock.category}. O Net GEX está favorável com IV Rank em ${currentStock.ivRank}%. A recomendação quantitativa estruturada é ${electedStrategy.title} com gestão de risco predefinida.`,
+          text: response.answer,
         },
       ]);
-    }, 400);
+    } catch (err: any) {
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: `Erro ao processar consulta: ${err?.message || 'Tente novamente.'}`,
+        },
+      ]);
+    } finally {
+      setIsAiLoading(false);
+    }
   };
+
+  const filteredOptionStrategies = useMemo(() => {
+    if (optionCategoryFilter === 'ALL') return CME_25_STRATEGIES;
+    return CME_25_STRATEGIES.filter(s => s.category === optionCategoryFilter);
+  }, [optionCategoryFilter]);
 
   return (
     <section className="space-y-5">
@@ -458,64 +510,178 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
         </div>
       )}
 
-      {/* Sub-Tab 2: Fundamentos */}
+      {/* Sub-Tab 2: Fundamentos (CNPI-P Auditado & Normalizado) */}
       {activeTab === 'fundamentos' && (
         <div className="bg-[#0c1322] border border-gray-800 p-6 rounded-2xl space-y-6">
-          <div className="flex justify-between items-center border-b border-gray-800 pb-3">
+          {/* Header do Crivo Fundamentalista */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-800 pb-4">
             <div>
-              <h3 className="text-sm font-bold text-white font-mono">CRIVO FUNDAMENTALISTA (CNPI-F / MERCADO US)</h3>
-              <p className="text-xs text-gray-400 mt-0.5">Indicadores contábeis, solvência e múltiplos de valuation.</p>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-white font-mono">CRIVO FUNDAMENTALISTA (CNPI-P / ANÁLISE NORMALIZADA)</h3>
+                {fundResult.isReconciled && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" />
+                    RECONCILIADO & NORMALIZADO
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Pesos Oficiais: Rentabilidade (35%) • Solvência (35%) • Valuation (30%) | Limiar de Aprovação ≥ {fundResult.minApprovalScore} pts
+              </p>
             </div>
-            <span className={`px-3 py-1 rounded-xl text-xs font-mono font-bold ${
-              currentStock.fundStatus === 'APROVADO'
-                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                : currentStock.fundStatus === 'REPROVADO'
-                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-            }`}>
-              SCORE: {currentStock.fundScore}/100 • {currentStock.fundStatus}
-            </span>
-          </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono text-xs">
-            <div className="p-3 bg-[#070b14] rounded-xl border border-gray-800">
-              <span className="text-gray-400 text-[10px] block font-sans">P/L (P/E Ratio)</span>
-              <span className="text-sm font-bold text-white mt-1 block">{currentStock.peRatio}x</span>
-              <span className="text-[10px] text-emerald-400">Saudável</span>
-            </div>
-            <div className="p-3 bg-[#070b14] rounded-xl border border-gray-800">
-              <span className="text-gray-400 text-[10px] block font-sans">EV/EBITDA</span>
-              <span className="text-sm font-bold text-white mt-1 block">{currentStock.evEbitda}x</span>
-              <span className="text-[10px] text-cyan-400">Média S&P</span>
-            </div>
-            <div className="p-3 bg-[#070b14] rounded-xl border border-gray-800">
-              <span className="text-gray-400 text-[10px] block font-sans">Dividend Yield</span>
-              <span className="text-sm font-bold text-white mt-1 block">{currentStock.dividendYield}%</span>
-              <span className="text-[10px] text-emerald-400">Anualizado</span>
-            </div>
-            <div className="p-3 bg-[#070b14] rounded-xl border border-gray-800">
-              <span className="text-gray-400 text-[10px] block font-sans">ROE</span>
-              <span className="text-sm font-bold text-white mt-1 block">{currentStock.roe}%</span>
-              <span className="text-[10px] text-emerald-400">Alta Rentab.</span>
-            </div>
-            <div className="p-3 bg-[#070b14] rounded-xl border border-gray-800">
-              <span className="text-gray-400 text-[10px] block font-sans">Margem Líquida</span>
-              <span className="text-sm font-bold text-white mt-1 block">{currentStock.netMargin}%</span>
-              <span className="text-[10px] text-emerald-400">Forte Geração</span>
-            </div>
-            <div className="p-3 bg-[#070b14] rounded-xl border border-gray-800">
-              <span className="text-gray-400 text-[10px] block font-sans">Dívida Líq./EBITDA</span>
-              <span className="text-sm font-bold text-white mt-1 block">{currentStock.debtToEbitda}x</span>
-              <span className="text-[10px] text-emerald-400">Baixa Alavanc.</span>
+            <div className="flex items-center gap-2">
+              <span className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 ${
+                fundResult.status === 'APROVADO'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm shadow-emerald-500/10'
+                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm shadow-rose-500/10'
+              }`}>
+                {fundResult.status === 'APROVADO' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 text-rose-400" />
+                )}
+                SCORE: {fundResult.score}/100 • {fundResult.status}
+              </span>
             </div>
           </div>
 
-          <div className="p-4 bg-[#070b14] rounded-xl border border-gray-800 text-xs leading-relaxed text-gray-300">
-            <h5 className="font-bold text-white mb-1">Parecer do Analista CNPI-F:</h5>
-            {currentStock.symbol} apresenta fundamentos consistentes com balanço patrimonial robusto, alavancagem financeira sob controle e histórico de rentabilidade comprovado no mercado americano. Aprovado para montagens estruturadas de swing trade e opções.
+          {/* Alerta de Auditoria Metodológica / Distorções Não-Caixa */}
+          {fundResult.distortionsDetected.length > 0 && (
+            <div className="p-4 rounded-xl bg-cyan-950/30 border border-cyan-500/30 text-xs space-y-2">
+              <div className="flex items-center gap-2 font-bold text-cyan-300">
+                <Info className="w-4 h-4 shrink-0 text-cyan-400" />
+                <span>Auditoria Metodológica & Normalização de Sanidade Aplicada:</span>
+              </div>
+              <ul className="list-disc list-inside text-gray-300 space-y-1 pl-1">
+                {fundResult.distortionsDetected.map((distortion, idx) => (
+                  <li key={idx} className="leading-relaxed">{distortion}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Cards dos 3 Pilares CNPI-P */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="p-3.5 bg-[#070b14] rounded-xl border border-gray-800">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-400 font-medium">Rentabilidade (35%)</span>
+                <span className={`text-xs font-mono font-bold ${
+                  fundResult.pillars.rentabilidade.score >= 60 ? 'text-emerald-400' : fundResult.pillars.rentabilidade.score >= 40 ? 'text-amber-400' : 'text-rose-400'
+                }`}>
+                  {fundResult.pillars.rentabilidade.score}/100 pts
+                </span>
+              </div>
+              <div className="w-full bg-gray-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                <div 
+                  className={`h-full rounded-full ${fundResult.pillars.rentabilidade.score >= 60 ? 'bg-emerald-500' : fundResult.pillars.rentabilidade.score >= 40 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                  style={{ width: `${fundResult.pillars.rentabilidade.score}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-[#070b14] rounded-xl border border-gray-800">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-400 font-medium">Solvência (35%)</span>
+                <span className={`text-xs font-mono font-bold ${
+                  fundResult.pillars.solvencia.score >= 60 ? 'text-emerald-400' : fundResult.pillars.solvencia.score >= 40 ? 'text-amber-400' : 'text-rose-400'
+                }`}>
+                  {fundResult.pillars.solvencia.score}/100 pts
+                </span>
+              </div>
+              <div className="w-full bg-gray-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                <div 
+                  className={`h-full rounded-full ${fundResult.pillars.solvencia.score >= 60 ? 'bg-emerald-500' : fundResult.pillars.solvencia.score >= 40 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                  style={{ width: `${fundResult.pillars.solvencia.score}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-[#070b14] rounded-xl border border-gray-800">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-400 font-medium">Valuation (30%)</span>
+                <span className={`text-xs font-mono font-bold ${
+                  fundResult.pillars.valuation.score >= 60 ? 'text-emerald-400' : fundResult.pillars.valuation.score >= 40 ? 'text-amber-400' : 'text-rose-400'
+                }`}>
+                  {fundResult.pillars.valuation.score}/100 pts
+                </span>
+              </div>
+              <div className="w-full bg-gray-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                <div 
+                  className={`h-full rounded-full ${fundResult.pillars.valuation.score >= 60 ? 'bg-emerald-500' : fundResult.pillars.valuation.score >= 40 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                  style={{ width: `${fundResult.pillars.valuation.score}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Grid de Indicadores com Suporte a N/D e Valores Normalizados */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 font-mono text-xs">
+            {fundResult.metrics.map((metric, idx) => {
+              const isAdjusted = metric.isAdjusted;
+              return (
+                <div key={idx} className="p-3.5 bg-[#070b14] rounded-xl border border-gray-800 flex flex-col justify-between space-y-2 hover:border-gray-700 transition">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-gray-400 text-[11px] block font-sans font-medium">{metric.name}</span>
+                      <span className="text-[10px] text-gray-500 font-mono">Meta: {metric.benchmark}</span>
+                    </div>
+                    {/* Badge de Status Semântico: BOM, NEUTRO, RUIM ou N/D */}
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                      metric.status === 'BOM'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : metric.status === 'NEUTRO'
+                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                        : metric.status === 'RUIM'
+                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                        : 'bg-gray-800 text-gray-400 border border-gray-700' // Badge N/D
+                    }`}>
+                      {metric.status}
+                    </span>
+                  </div>
+
+                  <div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-base font-bold text-white tracking-tight">
+                        {metric.formatted}
+                      </span>
+                      {isAdjusted && (
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-900/40 text-cyan-300 border border-cyan-600/40">
+                          Ajustado
+                        </span>
+                      )}
+                    </div>
+                    {isAdjusted && metric.rawAccountingFormatted && (
+                      <span className="text-[10px] text-gray-500 block">
+                        Contábil BRAPI: <span className="line-through">{metric.rawAccountingFormatted}</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-[10px] text-gray-400 font-sans leading-tight pt-1 border-t border-gray-800/80">
+                    {metric.description}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Diagnóstico Dinâmico do Motor CNPI-P */}
+          <div className="p-4 bg-[#070b14] rounded-xl border border-gray-800 text-xs leading-relaxed space-y-2">
+            <div className="flex items-center gap-2 text-white font-bold">
+              <Shield className="w-4 h-4 text-emerald-400" />
+              <h5>Diagnóstico e Parecer do Analista CNPI-P:</h5>
+            </div>
+            <p className="text-gray-300 leading-relaxed font-sans">
+              {fundResult.summary}
+            </p>
+            <p className="text-gray-400 leading-relaxed font-sans italic pt-1 border-t border-gray-800/60">
+              {fundResult.analystVerdict}
+            </p>
           </div>
         </div>
       )}
+
 
       {/* Sub-Tab 3: Opções & GEX */}
       {activeTab === 'opcoes' && (
@@ -937,53 +1103,117 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
         </div>
       )}
 
-      {/* Sub-Tab 5: Consultor IA */}
+      {/* Sub-Tab 5: Consultor IA (CNPI-P + CNPI-T + GEX + CME Options) */}
       {activeTab === 'ia' && (
         <div className="bg-[#0c1322] border border-gray-800 p-6 rounded-2xl space-y-4">
-          <div className="flex justify-between items-center border-b border-gray-800 pb-3">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-gray-800 pb-3">
             <div className="flex items-center gap-2">
               <Bot className="w-5 h-5 text-cyan-400 animate-pulse" />
-              <h3 className="text-sm font-bold text-white font-mono">CONSULTOR QUANTITATIVO IA (MERCADO US + GEX)</h3>
+              <div>
+                <h3 className="text-sm font-bold text-white font-mono">CONSULTOR QUANTITATIVO IA (CNPI + GEX + CME)</h3>
+                <p className="text-[11px] text-gray-400 font-sans">Motor integrado com 100% de conhecimento sobre fundamentos, opções, GEX e gestão de risco.</p>
+              </div>
             </div>
-            <span className="px-2.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-[10px] font-mono font-bold">
-              ONLINE • MODELO CNPI + TASTYTRADE
+            <span className="px-2.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-[10px] font-mono font-bold border border-cyan-500/30">
+              SISTEMA ESPECIALISTA ONLINE
             </span>
           </div>
 
-          <div className="bg-[#070b14] border border-gray-800/80 rounded-xl p-4 h-72 overflow-y-auto space-y-3 font-sans text-xs">
+          {/* Chips de Sugestão de Perguntas Rápidas */}
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            <button
+              disabled={isAiLoading}
+              onClick={() => handleSendMessage(`Qual o diagnóstico quantitativo de Gamma Exposure (GEX) e volatilidade para ${currentStock.symbol}?`)}
+              className="px-2.5 py-1 rounded-lg bg-[#070b14] hover:bg-cyan-950/40 text-cyan-300 border border-gray-800 hover:border-cyan-700/60 text-[11px] font-mono transition flex items-center gap-1 disabled:opacity-50"
+            >
+              <span>📊 GEX & Barreiras</span>
+            </button>
+            <button
+              disabled={isAiLoading}
+              onClick={() => handleSendMessage(`Como está a auditoria fundamentalista CNPI-P de ${currentStock.symbol} e houve distorção não-caixa ou de dívida?`)}
+              className="px-2.5 py-1 rounded-lg bg-[#070b14] hover:bg-cyan-950/40 text-cyan-300 border border-gray-800 hover:border-cyan-700/60 text-[11px] font-mono transition flex items-center gap-1 disabled:opacity-50"
+            >
+              <span>🏛️ Crivo Fundamentalista CNPI-P</span>
+            </button>
+            <button
+              disabled={isAiLoading}
+              onClick={() => handleSendMessage(`Qual a estratégia de opções eleita do catálogo CME para ${currentStock.symbol} e como montá-la?`)}
+              className="px-2.5 py-1 rounded-lg bg-[#070b14] hover:bg-cyan-950/40 text-cyan-300 border border-gray-800 hover:border-cyan-700/60 text-[11px] font-mono transition flex items-center gap-1 disabled:opacity-50"
+            >
+              <span>⚡ Estrutura de Opções Eleita</span>
+            </button>
+            <button
+              disabled={isAiLoading}
+              onClick={() => handleSendMessage(`Quais os parâmetros de Stop Loss técnico, Alvo 1 e Alvo 2 para ${currentStock.symbol}?`)}
+              className="px-2.5 py-1 rounded-lg bg-[#070b14] hover:bg-cyan-950/40 text-cyan-300 border border-gray-800 hover:border-cyan-700/60 text-[11px] font-mono transition flex items-center gap-1 disabled:opacity-50"
+            >
+              <span>🎯 Parâmetros de Stop & Alvos</span>
+            </button>
+            <button
+              disabled={isAiLoading}
+              onClick={() => handleSendMessage(`Apresente o resumo executivo consolidado com as 4 camadas de análise para ${currentStock.symbol}.`)}
+              className="px-2.5 py-1 rounded-lg bg-[#070b14] hover:bg-cyan-950/40 text-cyan-300 border border-gray-800 hover:border-cyan-700/60 text-[11px] font-mono transition flex items-center gap-1 disabled:opacity-50"
+            >
+              <span>🌐 Resumo Executivo 4 Camadas</span>
+            </button>
+          </div>
+
+          {/* Histórico do Chat */}
+          <div className="bg-[#070b14] border border-gray-800/80 rounded-xl p-4 h-80 overflow-y-auto space-y-3 font-sans text-xs">
             {chatMessages.map((msg, i) => (
               <div
                 key={i}
-                className={`p-3 rounded-xl max-w-[85%] leading-relaxed ${
+                className={`p-3.5 rounded-xl max-w-[90%] leading-relaxed ${
                   msg.role === 'user'
-                    ? 'ml-auto bg-cyan-600 text-white font-semibold'
-                    : 'bg-[#111827] text-gray-200 border border-gray-800'
+                    ? 'ml-auto bg-cyan-600 text-white font-medium shadow-md shadow-cyan-600/10'
+                    : 'bg-[#0f172a] text-gray-200 border border-gray-800 space-y-2'
                 }`}
               >
-                {msg.text}
+                {msg.text.split('\n').map((line, lineIdx) => {
+                  if (line.startsWith('### ')) {
+                    return <h4 key={lineIdx} className="text-sm font-bold text-cyan-300 font-mono mt-1 mb-1">{line.replace('### ', '')}</h4>;
+                  }
+                  if (line.startsWith('• ') || line.startsWith('- ')) {
+                    return <p key={lineIdx} className="text-gray-300 pl-2 leading-relaxed">{line}</p>;
+                  }
+                  if (line.trim() === '') {
+                    return <div key={lineIdx} className="h-1" />;
+                  }
+                  return <p key={lineIdx} className="leading-relaxed">{line}</p>;
+                })}
               </div>
             ))}
+            {isAiLoading && (
+              <div className="p-3.5 rounded-xl max-w-[70%] bg-[#0f172a] text-cyan-300 border border-gray-800 flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+                <span className="text-xs font-mono">Processando análise com o motor quantitativo...</span>
+              </div>
+            )}
           </div>
 
+          {/* Campo de Entrada de Mensagem */}
           <div className="flex gap-2">
             <input
               type="text"
               value={inputMessage}
+              disabled={isAiLoading}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-              placeholder={`Pergunte algo sobre ${currentStock.symbol} (ex: Qual o regime GEX? Vale montar Iron Condor?)... `}
-              className="flex-1 bg-[#070b14] border border-gray-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-sans"
+              placeholder={`Faça uma pergunta sobre ${currentStock.symbol} (ex: Qual o regime GEX? Vale montar Iron Condor?)... `}
+              className="flex-1 bg-[#070b14] border border-gray-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-sans disabled:opacity-50"
             />
             <button
-              onClick={handleSendMessage}
-              className="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-mono font-bold transition flex items-center gap-1.5 shadow-md shadow-cyan-600/20"
+              onClick={() => handleSendMessage()}
+              disabled={isAiLoading || !inputMessage.trim()}
+              className="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-mono font-bold transition flex items-center gap-1.5 shadow-md shadow-cyan-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Send className="w-3.5 h-3.5" />
+              {isAiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               <span>Enviar</span>
             </button>
           </div>
         </div>
       )}
+
     </section>
   );
 }

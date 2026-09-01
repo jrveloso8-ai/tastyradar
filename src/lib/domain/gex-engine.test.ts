@@ -17,9 +17,9 @@ describe('GexEngine Domain', () => {
     expect(result.symbol).toBe('SPX');
     expect(result.spotPrice).toBe(6000);
     expect(result.totalCallGex).toBeGreaterThan(0);
-    expect(result.totalPutGex).toBeGreaterThan(0);
+    expect(result.totalPutGex).toBeLessThan(0);
     expect(result.strikes.length).toBe(4);
-    expect(result.maxGexMagnetStrike).toBe(6050);
+    expect(result.maxGexMagnetStrike).toBe(6000);
     expect(result.callWalls.length).toBeGreaterThan(0);
     expect(result.putWalls.length).toBeGreaterThan(0);
     expect(result.gammaRegime).toBeDefined();

@@ -1,0 +1,275 @@
+================================================================================
+ROTEIRO MESTRE DE VÍDEO & DOCUMENTAÇÃO COMPLETA DO SISTEMA RADAR PRO QUANT
+(Integração Tastytrade, B3, GEX, Motor Fundamentalista CNPI-P & Consultor IA)
+================================================================================
+Data-base: Setembro/2026
+Versão: 2.0 Pro Quant Institutional
+Duração Estimada do Vídeo: 18 a 25 minutos
+Público-Alvo: Traders de Opções, Investidores, Analistas CNPI e Operadores Quantitativos
+
+--------------------------------------------------------------------------------
+SUMÁRIO DA ESTRUTURA DO VÍDEO
+--------------------------------------------------------------------------------
+BLOCO 01 (00:00 - 02:30) : Introdução & O Novo Paradigma Quantitativo
+BLOCO 02 (02:30 - 09:30) : A Arquitetura das 4 Camadas de Decisão
+BLOCO 03 (09:30 - 16:30) : Tour Prático pelos Módulos do Sistema
+BLOCO 04 (16:30 - 19:30) : O Consultor Quantitativo IA Especialista
+BLOCO 05 (19:30 - 22:00) : Gestão de Risco CNPI, Manejo de Capital e Encerramento
+ANEXO TÉCNICO            : Guia de Edição, Marcações Visuais e Dicas de Gravação
+
+================================================================================
+BLOCO 1: INTRODUÇÃO & O NOVO PARADIGMA QUANTITATIVO (00:00 - 02:30)
+================================================================================
+
+[CENA 1: ABERTURA VISUAL]
+TELA: Dashboard principal do RADAR em tela cheia (Dark Mode). Gráfico de velas
+interativo, mapas de calor de Gamma Exposure (GEX) e badges de score em tempo real.
+ÁUDIO / TRILHA: Trilha sonora moderna, cadenciada, estilo Tech/Institutional.
+
+LOCUÇÃO:
+"No mercado financeiro moderno, tentar operar ações e opções olhando apenas para
+gráficos de preços ou múltiplos contábeis isolados é como tentar navegar um oceano
+em tempestade usando uma bússola de brinquedo.
+
+Hoje, mais de 70% do volume negociado nas bolsas americanas (S&P 500, Nasdaq) e na
+B3 é dominado por algoritmos de alta frequência, fundos quantitativos e,
+principalmente, pela atividade de hedging dos Market Makers nos mercados de opções.
+
+Se você não tem visibilidade de onde os grandes participantes institucionais estão
+posicionados, para onde o 'Gamma' está empurrando a volatilidade do preço e qual a
+real saúde contábil normalizada de uma companhia, você está operando em extrema
+desvantagem.
+
+Seja muito bem-vindo à apresentação oficial do RADAR PRO QUANT, a mais avançada
+plataforma de inteligência de mercado unificada, integrada diretamente aos dados
+institucionais da Tastytrade e ao rigoroso motor de auditoria contábil e técnica
+CNPI."
+
+[CENA 2: O ERRO DOS SISTEMAS TRADICIONAIS]
+TELA: Comparativo visual na tela mostrando um relatório tradicional com erro de
+leitura contábil vs. o motor analítico corrigido do RADAR.
+
+LOCUÇÃO:
+"A maioria das ferramentas do mercado comete dois erros capitais:
+Primeiro: aplicam regras contábeis cegas. Reprovam empresas excelentes que passaram
+por eventos não-caixa (como baixas de impairment) ou distorcem a dívida ao somar
+passivos de arrendamento IFRS-16 e provisões socioambientais como se fossem dívida
+financeira bancária.
+Segundo: tratam ações e opções como mundos isolados, ignorando que o fluxo de
+derivativos dita o suporte e a resistência do ativo à vista.
+
+O RADAR resolve isso integrando quatro camadas rigorosas e determinísticas de
+decisão. Vamos conhecer cada uma delas agora."
+
+
+================================================================================
+BLOCO 2: A ARQUITETURA EM 4 CAMADAS DE DECISÃO (02:30 - 09:30)
+================================================================================
+
+--- 1. CAMADA 1: CRIVO FUNDAMENTALISTA CNPI-P NORMALIZADO (02:30 - 04:45) ---
+TELA: Navegação na aba 'Fundamentos', destacando a nota Score de 0 a 100, os 3
+pilares e o painel de 'Auditoria Metodológica e Normalização de Sanidade'.
+
+LOCUÇÃO:
+"Nossa primeira camada de proteção é o Crivo Fundamentalista oficial com pesos da
+metodologia CNPI-P. O algoritmo avalia três pilares fundamentais:
+• 35% de peso para Rentabilidade (ROE, Margem Líquida e Margem EBITDA)
+• 35% de peso para Solvência (Dívida Líquida / EBITDA e Liquidez Corrente)
+• 30% de peso para Valuation (P/L, P/VP e Dividend Yield)
+
+Para ser aprovada para operações direcionais ou estruturas compradas, a empresa
+precisa atingir um Score mínimo de 45 pontos em 100.
+
+Mas o grande diferencial do RADAR é o seu Motor de Sanidade Contábil:
+1. Normalização de Itens Não-Recorrentes (DRE cruzado com DFC):
+Quando uma empresa como a VALE3 sofre uma baixa contábil não-caixa de R$ 25,1
+bilhões no período, o seu lucro contábil cai artificialmente. Enquanto sistemas
+amadores reprovam o ativo com ROE distorcido de 4%, o RADAR cruza o DRE com o Fluxo
+de Caixa Operacional (FCO robusto de mais de R$ 50 bilhões). O motor normaliza o
+lucro e pontua a rentabilidade real ex-impairment (~16,5%), mantendo o valor bruto
+visível para auditoria.
+
+2. Reconciliação de Solvência e Dívida Financeira Real:
+Muitas empresas carregam passivos de arrendamento (IFRS-16) e provisões de longo
+prazo (como descomissionamento ou acordos socioambientais) que não representam
+dívida financeira bancária. O RADAR isola os empréstimos e financiamentos,
+reconciliando o indicador de Dívida Líquida/EBITDA para o dado oficial do release
+(0,8x na VALE3 vs 3,09x no balanço bruto não ajustado).
+
+3. Rigor Semântico de Dados:
+Quando um dado não existe na fonte, o sistema exibe a badge cinza 'N/D' (Dado não
+disponível), eliminando o falso status 'NEUTRO' e garantindo que o investidor nunca
+confunda falta de dados com estabilidade financeira."
+
+
+--- 2. CAMADA 2: PRICE ACTION QUANTITATIVO & ANÁLISE TÉCNICA CNPI-T (04:45 - 06:15) ---
+TELA: Gráfico de Candlesticks profissional com Médias Móveis Exponenciais (9, 21 e
+200 períodos), linha de Stop Loss em vermelho e linhas de Alvos em verde.
+
+LOCUÇÃO:
+"Aprovado o fundamento, entramos na Camada Técnica. Aqui aplicamos as diretrizes
+estritas de Price Action e análise gráfica CNPI-T:
+• Avaliamos o alinhamento das Médias Móveis Exponenciais de 9, 21 e 200 períodos.
+• Identificamos pivôs de alta, rompimentos de consolidação e zonas de acumulação.
+• Para cada oportunidade, o sistema calcula matematicamente:
+  - O Preço de Entrada (Spot Price)
+  - O Stop Loss Técnico Obrigatório
+  - O Alvo 1 (Primeira resistência técnica, onde realizamos 50% do trade e
+    deslocamos o stop para o ponto de entrada / Breakeven)
+  - O Alvo 2 (Alvo final da projeção de Fibonacci ou expansão de canal)
+  - Relação Risco x Retorno mínima calibrada em 2.0 para 1."
+
+
+--- 3. CAMADA 3: ESTRUTURA INSTITUCIONAL & GAMMA EXPOSURE (GEX) (06:15 - 08:00) ---
+TELA: Tela de Barreiras GEX, mostrando gráficos de barras de Call GEX, Put GEX,
+Net GEX por strike e o nível de Zero Gamma Flip.
+
+LOCUÇÃO:
+"A terceira camada é onde a mágica dos fundos quantitativos acontece: o motor de
+Gamma Exposure (GEX), integrado diretamente à API da Tastytrade.
+
+Nós calculamos o 'Dollar Gamma' de cada strike em aberto no mercado:
+• Zero Gamma Flip Point: O divisor de águas da volatilidade.
+  - Acima do Flip (+GEX): Os Market Makers atuam contra a tendência (compram na
+    queda e vendem na alta para calibrar o delta), amortecendo o mercado e gerando
+    baixa volatilidade. É o cenário perfeito para venda de opções e estratégias de renda.
+  - Abaixo do Flip (-GEX): Os Market Makers atuam a favor da tendência (vendem na
+    queda e compram na alta), gerando aceleração direcional e volatilidade explosiva.
+
+• Call Wall: O strike com maior concentração de gama em Calls, atuando como teto
+  institucional e forte ímã de atração de preços até o vencimento.
+• Put Wall: O strike com maior concentração de gama em Puts, funcionando como piso
+  de proteção institucional."
+
+
+--- 4. CAMADA 4: ENGENHARIA DE OPÇÕES & CATÁLOGO CME 25 (08:00 - 09:30) ---
+TELA: Simulador de Payoff de Opções com gráfico interativo de lucros/perdas e
+gaveta com o Catálogo oficial das 25 Estratégias do CME Group.
+
+LOCUÇÃO:
+"Com o viés direcional, o fundamento e o regime de volatilidade definidos, a quarta
+camada seleciona a melhor estratégia de opções do Catálogo Oficial de 25
+Estratégias do CME Group:
+
+• Para Ativos em Alta (+GEX / Tendência Compradora):
+  Travas de Alta com Call (Bull Call Spread), Compra de Call a Seco ou Risk Reversals.
+• Para Ativos em Baixa (-GEX / Tendência Vendedora):
+  Travas de Baixa com Put (Bear Put Spread) e Long Puts estruturadas.
+• Para Ativos Laterais com IV Rank Elevado:
+  Venda de Volatilidade via Iron Condor #20 a Crédito, Strangles, Straddles, Iron
+  Butterfly e Jade Lizard.
+
+O investidor tem à disposição o simulador visual de Payoff com cálculo exato de
+Delta, Gamma, Theta, Vega, pontos de Breakeven, risco máximo e lucro máximo antes de
+enviar a ordem para a corretora."
+
+
+================================================================================
+BLOCO 3: TOUR PRÁTICO PELOS MÓDULOS DO SISTEMA (09:30 - 16:30)
+================================================================================
+
+TELA: Demonstração da navegação na barra superior da aplicação (Navbar).
+
+LOCUÇÃO:
+"Vamos agora fazer um tour completo pela interface do RADAR PRO QUANT. A aplicação
+é dividida em cinco grandes módulos operacionais:
+
+1. MÓDULO PANORAMA:
+O termômetro macroeconômico em tempo real. Exibe as taxas de juros (Fed Funds Rate
+nos EUA e Selic no Brasil), a curva do DI Futuro, os índices S&P 500, Nasdaq, VIX,
+Ibovespa, Dólar e a distribuição percentual do sentimento do mercado (Quant Bull/Bear).
+
+2. MÓDULO RASTREADOR (SCREENER INTELIGENTE):
+Uma central de varredura que monitora centenas de ativos do mercado americano e
+brasileiro simultaneamente.
+Você pode filtrar em um clique por:
+• Oportunidades de Compra (Ativos de Alta)
+• Oportunidades de Venda / Trava (Ativos de Baixa)
+• Estruturas de Renda com Opções (Ativos Laterais em Consolidação)
+Ao clicar em qualquer ação, todo o sistema — cotação, gráfico, opções, fundamentos e
+a IA — é sincronizado instantaneamente com o ticker escolhido.
+
+3. MÓDULO CONSULTA GRÁFICA (O CORAÇÃO DO SISTEMA):
+Reúne cinco visões aprofundadas em abas:
+• Aba 1 - Análise Técnica: Gráfico candlestick completo com histórico e parâmetros.
+• Aba 2 - Crivo Fundamentalista: Score CNPI-P, os 3 pilares e a caixa de auditoria
+  de normalização contábil.
+• Aba 3 - Opções & GEX: Métricas de IV Rank, volatilidade atual (30 DTE), Put/Call
+  Ratio e regime de mercado.
+• Aba 4 - Recomendações de Estudo: Alternador interativo entre o estudo da Ação à
+  Vista e a Estratégia Eleita de Opções com gráfico de Payoff e acesso ao Catálogo CME.
+• Aba 5 - Consultor Quantitativo IA: Nosso assistente inteligente integrado.
+
+4. MÓDULO BARREIRAS GEX:
+Painel unificado com visualização tridimensional da distribuição de Gamma por
+Strike, Call Walls, Put Walls, níveis de Open Interest e a zona de Pin Risk (onde o
+preço tende a ficar 'preso' no dia do vencimento).
+
+5. MÓDULO MANUAL & SUPORTE CNPI:
+Base de documentação educativa completa explicando a matemática de cada métrica, o
+cálculo de gregas e os checklists de conformidade."
+
+
+================================================================================
+BLOCO 4: O CONSULTOR QUANTITATIVO IA ESPECIALISTA (16:30 - 19:30)
+================================================================================
+
+TELA: Demonstração da aba 'Consultor IA', clicando nos chips de perguntas rápidas
+e exibindo as respostas formatadas em tempo real.
+
+LOCUÇÃO:
+"Um dos recursos mais poderosos do RADAR é o Consultor Quantitativo IA.
+Diferente de chatbots genéricos que apenas dão respostas vagas, nossa IA é um
+motor especialista alimentado com 100% da base de dados e do conhecimento do
+ecossistema RADAR.
+
+Ela entende com precisão cirúrgica:
+• O posicionamento dos Market Makers e a leitura de GEX do ativo.
+• Se os fundamentos contábeis foram normalizados por FCO ou se a dívida líquida foi
+  reconciliada.
+• Como montar as pernas exatas da estratégia de opções eleita, quais strikes
+  escolher, qual delta utilizar e quando encerrar a operação (ex: realizar lucro com
+  50% do prêmio máximo no Iron Condor).
+• Onde posicionar o Stop Loss e os Alvos técnicos calculados pelo crivo CNPI-T.
+
+A interface conta com Chips Rápidos de um clique:
+• '📊 GEX & Barreiras' -> Traz o diagnóstico imediato de volatilidade e Gamma Flip.
+• '🏛️ Crivo Fundamentalista CNPI-P' -> Explica a nota, pilares e ajustes não-caixa.
+• '⚡ Estrutura de Opções Eleita' -> Detalha os strikes e a gestão do trade.
+• '🎯 Parâmetros de Stop & Alvos' -> Mostra a gestão de saída.
+• '🌐 Resumo Executivo 4 Camadas' -> Gera uma síntese estratégica completa em
+  segundos para tomada de decisão."
+
+
+================================================================================
+BLOCO 5: GESTÃO DE RISCO CNPI & ENCERRAMENTO (19:30 - 22:00)
+================================================================================
+
+TELA: Checklist de Gestão de Risco com gráficos de proteção de capital e tela de
+encerramento com a identidade visual do RADAR PRO QUANT.
+
+LOCUÇÃO:
+"Para finalizar, lembre-se: no mercado financeiro, a estratégia mais brilhante
+fracassa se não houver um gerenciamento de risco implacável.
+O RADAR PRO QUANT foi construído sob três pilares inegociáveis de preservação de
+capital:
+
+1. Limite de Alocação por Ativo:
+   Nunca comprometa mais de 2% a 5% do seu capital total em uma única operação.
+2. Limite Máximo de Risco por Trade:
+   A perda máxima (Stop Loss) deve ser calibrada para no máximo 1% do patrimônio
+   líquido global.
+3. Condução Disciplinada para o Breakeven:
+   Atingido o Alvo 1, realize 50% dos lucros imediatamente e desloque o Stop Loss
+   para o ponto de entrada. A partir desse momento, o trade torna-se livre de risco.
+
+O RADAR PRO QUANT coloca nas suas mãos o mesmo arsenal de dados, ferramentas de
+derivativos e inteligência analítica utilizado pelas maiores mesas proprietárias e
+fundos quantitativos do mundo.
+
+Decida com dados matemáticos. Opere com vantagem estatística.
+Muito obrigado por assistir, e bons trades!"
+
+================================================================================
+FIM DO ROTEIRO MESTRE
+================================================================================
