@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { BookOpen, ChevronDown, Bot, Send, PlayCircle, Play, Loader2, Sparkles, Shield, HelpCircle } from 'lucide-react';
+import { BookOpen, ChevronDown, Bot, Send, PlayCircle, Play, Loader2, Sparkles, Shield, HelpCircle, Video, Mic, MicOff } from 'lucide-react';
 import { aiConsultantEngine } from '@/lib/domain/ai-consultant';
 
 export function HelpSupportView() {
@@ -14,6 +14,82 @@ export function HelpSupportView() {
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [generatingVideoIndex, setGeneratingVideoIndex] = useState<number | null>(null);
+  const [generatedVideos, setGeneratedVideos] = useState<{ [msgIndex: number]: string }>({});
+  const [isListening, setIsListening] = useState(false);
+
+  const toggleVoiceInput = () => {
+    if (typeof window === 'undefined') return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Reconhecimento de voz não suportado neste navegador. Recomendamos Google Chrome ou Microsoft Edge.');
+      return;
+    }
+
+    if (isListening) {
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'pt-BR';
+      recognition.interimResults = true;
+      recognition.continuous = false;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        let currentTranscript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          currentTranscript += event.results[i][0].transcript;
+        }
+        setInputMessage(currentTranscript);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.start();
+    } catch (e) {
+      console.error(e);
+      setIsListening(false);
+    }
+  };
+
+  const handleGenerateVideo = async (index: number, text: string) => {
+    if (generatingVideoIndex !== null) return;
+    setGeneratingVideoIndex(index);
+
+    try {
+      const response = await fetch('/api/avatar/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+
+      const data = await response.json();
+      if (data.success && data.videoUrl) {
+        setGeneratedVideos((prev) => ({ ...prev, [index]: data.videoUrl }));
+      } else {
+        alert(`Aviso D-ID: ${data.error || 'Não foi possível renderizar o vídeo no momento.'}`);
+      }
+    } catch (err: any) {
+      alert(`Erro na chamada ao serviço D-ID: ${err.message}`);
+    } finally {
+      setGeneratingVideoIndex(null);
+    }
+  };
+
+
 
   const topics = [
     {
@@ -227,8 +303,43 @@ export function HelpSupportView() {
                     }
                     return <p key={lineIdx} className="leading-relaxed">{line}</p>;
                   })}
+
+                  {/* Botão e Player de Vídeo D-ID da Analista */}
+                  {msg.role === 'assistant' && (
+                    <div className="pt-2 border-t border-gray-800/80 flex flex-col gap-2">
+                      {generatedVideos[i] ? (
+                        <div className="rounded-xl overflow-hidden border border-purple-500/40 bg-black aspect-video relative shadow-lg">
+                          <video
+                            src={generatedVideos[i]}
+                            controls
+                            autoPlay
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleGenerateVideo(i, msg.text)}
+                          disabled={generatingVideoIndex !== null}
+                          className="self-start px-2.5 py-1 rounded-lg bg-purple-950/40 hover:bg-purple-900/60 text-purple-300 border border-purple-700/50 text-[10px] font-mono transition flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          {generatingVideoIndex === i ? (
+                            <>
+                              <Loader2 className="w-3 h-3 animate-spin text-purple-400" />
+                              <span>Gerando Vídeo com a Analista D-ID...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Video className="w-3 h-3 text-purple-400" />
+                              <span>Assistir com a Analista Virtual (D-ID)</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
+
               {isAiLoading && (
                 <div className="p-3 rounded-xl max-w-[80%] bg-[#0f172a] text-purple-300 border border-gray-800 flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
@@ -237,24 +348,50 @@ export function HelpSupportView() {
               )}
             </div>
 
-            {/* Input e Botão de Envio */}
-            <div className="relative pt-1">
-              <input
-                type="text"
-                value={inputMessage}
-                disabled={isAiLoading}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="Faça uma pergunta sobre o manual ou GEX (ex: o que é GEX ?)..."
-                className="w-full bg-[#070b14] border border-gray-700 rounded-xl pl-4 pr-12 py-3 text-xs font-sans text-white focus:outline-none focus:border-purple-500 disabled:opacity-50"
-              />
-              <button
-                onClick={() => handleSendMessage()}
-                disabled={isAiLoading || !inputMessage.trim()}
-                className="absolute right-2 top-3 p-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-purple-600/20 flex items-center justify-center"
-              >
-                {isAiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-              </button>
+            {/* Input e Botão de Envio com Microfone */}
+            <div className="flex flex-col gap-2 pt-1">
+              {isListening && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-mono animate-pulse">
+                  <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+                  <span>Ouvindo sua voz em português... Pode falar a sua pergunta.</span>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={inputMessage}
+                  disabled={isAiLoading}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                  placeholder={isListening ? "Ouvindo... fale agora..." : "Faça uma pergunta sobre o manual ou GEX (ex: o que é GEX ?)..."}
+                  className={`flex-1 bg-[#070b14] border ${isListening ? 'border-rose-500' : 'border-gray-700'} rounded-xl pl-4 pr-4 py-2.5 text-xs font-sans text-white focus:outline-none focus:border-purple-500 disabled:opacity-50 transition`}
+                />
+
+                {/* Botão de Microfone */}
+                <button
+                  type="button"
+                  onClick={toggleVoiceInput}
+                  disabled={isAiLoading}
+                  title={isListening ? "Parar gravação" : "Falar pergunta pelo microfone"}
+                  className={`px-3 py-2.5 rounded-xl text-xs font-mono font-bold transition flex items-center justify-center border ${
+                    isListening
+                      ? 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-600/30 animate-pulse'
+                      : 'bg-[#0f172a] hover:bg-purple-950/40 text-purple-300 border-gray-700 hover:border-purple-500/40'
+                  } disabled:opacity-50`}
+                >
+                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+
+                {/* Botão de Envio */}
+                <button
+                  onClick={() => handleSendMessage()}
+                  disabled={isAiLoading || !inputMessage.trim()}
+                  className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-purple-600/20 flex items-center gap-1.5 text-xs font-mono font-bold"
+                >
+                  {isAiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  <span>Enviar</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
