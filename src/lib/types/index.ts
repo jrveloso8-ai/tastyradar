@@ -27,10 +27,17 @@ export interface GexByStrike {
   callGex: number;
   putGex: number;
   netGex: number;
+  absoluteGex: number;
   callOi: number;
   putOi: number;
+  callOpenInterest: number;
+  putOpenInterest: number;
   callVolume: number;
   putVolume: number;
+  callIv: number;
+  putIv: number;
+  callDelta: number;
+  putDelta: number;
 }
 
 export interface GexAnalysisResult {
