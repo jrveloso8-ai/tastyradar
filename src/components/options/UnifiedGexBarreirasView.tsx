@@ -6,18 +6,36 @@ import {
   Zap, 
   Activity, 
   Layers, 
-  TrendingUp, 
-  TrendingDown, 
   Target, 
   Info, 
-  HelpCircle,
   BarChart2,
-  PieChart,
-  Sliders,
-  Maximize2
+  Calendar,
+  ArrowLeft
 } from 'lucide-react';
 
-interface StrikeDerivativesData {
+export interface ExpirationOptionItem {
+  id: string;
+  label: string;
+  dateStr: string;
+  dateOCC: string;
+  dte: number;
+  type: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY';
+  isLiquid: boolean;
+  baseIv: number;
+}
+
+export const TASTYTRADE_EXPIRATIONS: ExpirationOptionItem[] = [
+  { id: '2026-09-04', label: 'Sep 4, 2026', dateStr: '04 Set (3 DTE - Semanal W)', dateOCC: '260904', dte: 3, type: 'WEEKLY', isLiquid: false, baseIv: 38.5 },
+  { id: '2026-09-11', label: 'Sep 11, 2026', dateStr: '11 Set (10 DTE - Semanal W)', dateOCC: '260911', dte: 10, type: 'WEEKLY', isLiquid: false, baseIv: 36.2 },
+  { id: '2026-09-18', label: 'Sep 18, 2026', dateStr: '18 Set (17 DTE - Mais Líquida)', dateOCC: '260918', dte: 17, type: 'MONTHLY', isLiquid: true, baseIv: 34.0 },
+  { id: '2026-09-25', label: 'Sep 25, 2026', dateStr: '25 Set (24 DTE - Semanal W)', dateOCC: '260925', dte: 24, type: 'WEEKLY', isLiquid: false, baseIv: 33.5 },
+  { id: '2026-10-02', label: 'Oct 2, 2026', dateStr: '02 Out (31 DTE - Semanal W)', dateOCC: '261002', dte: 31, type: 'WEEKLY', isLiquid: false, baseIv: 33.0 },
+  { id: '2026-10-16', label: 'Oct 16, 2026', dateStr: '16 Out (45 DTE - Mensal Standard)', dateOCC: '261016', dte: 45, type: 'MONTHLY', isLiquid: true, baseIv: 32.5 },
+  { id: '2026-11-20', label: 'Nov 20, 2026', dateStr: '20 Nov (80 DTE - Mensal)', dateOCC: '261120', dte: 80, type: 'MONTHLY', isLiquid: false, baseIv: 31.8 },
+  { id: '2026-12-18', label: 'Dec 18, 2026', dateStr: '18 Dez (108 DTE - Trimestral)', dateOCC: '261218', dte: 108, type: 'QUARTERLY', isLiquid: false, baseIv: 31.0 },
+];
+
+export interface StrikeDerivativesData {
   strike: number;
   callSymbol: string;
   putSymbol: string;
@@ -25,11 +43,11 @@ interface StrikeDerivativesData {
   putOi: number;
   callVol: number;
   putVol: number;
-  callGex: number; // in $M
-  putGex: number; // in $M (negative)
+  callGex: number;
+  putGex: number;
   netGex: number;
-  callIv: number; // in %
-  putIv: number; // in %
+  callIv: number;
+  putIv: number;
   callDelta: number;
   putDelta: number;
 }
@@ -38,14 +56,26 @@ interface UnifiedGexBarreirasProps {
   symbol: string;
   spotPrice: number;
   isEmbedded?: boolean;
+  onBackToQuote?: (sym: string) => void;
+  onBackToScreener?: () => void;
 }
 
-export function UnifiedGexBarreirasView({ symbol, spotPrice, isEmbedded = false }: UnifiedGexBarreirasProps) {
-  const [activeExp, setActiveExp] = useState('18 Set (12 DTE - Mais Líquida)');
+export function UnifiedGexBarreirasView({ 
+  symbol, 
+  spotPrice, 
+  isEmbedded = false,
+  onBackToQuote,
+  onBackToScreener
+}: UnifiedGexBarreirasProps) {
+  const [selectedExpId, setSelectedExpId] = useState<string>('2026-09-18');
   const [gexSubView, setGexSubView] = useState<'calls_vs_puts' | 'net_gex' | 'abs_gex'>('calls_vs_puts');
   const [displayMode, setDisplayMode] = useState<'UNIFIED' | 'GEX_ONLY' | 'WALLS_ONLY' | 'SKEW_ONLY'>('UNIFIED');
 
-  // Gerar dados realistas de opções e GEX calibrados no Spot do ativo
+  const currentExp = useMemo(() => {
+    return TASTYTRADE_EXPIRATIONS.find(e => e.id === selectedExpId) || TASTYTRADE_EXPIRATIONS[2];
+  }, [selectedExpId]);
+
+  // Recálculo dinâmico da cadeia de opções e GEX dependendo do Vencimento Selecionado
   const strikesData: StrikeDerivativesData[] = useMemo(() => {
     const list: StrikeDerivativesData[] = [];
     const step = spotPrice > 500 ? 10 : spotPrice > 200 ? 5 : spotPrice > 50 ? 2.5 : 1;
@@ -53,39 +83,43 @@ export function UnifiedGexBarreirasView({ symbol, spotPrice, isEmbedded = false 
     const centerK = Math.round(spotPrice / step) * step;
     const minK = centerK - Math.floor(numStrikes / 2) * step;
 
+    const dteFactor = Math.sqrt(30 / Math.max(1, currentExp.dte));
+    const oiScale = currentExp.isLiquid ? 1.0 : currentExp.dte <= 10 ? 0.4 : 0.7;
+    const occDate = currentExp.dateOCC;
+
     for (let i = 0; i < numStrikes; i++) {
       const strike = Number((minK + i * step).toFixed(2));
-      const dist = (strike - spotPrice) / spotPrice; // % distance
+      const dist = (strike - spotPrice) / spotPrice;
       
-      // Open Interest distribution
-      const callOiWeight = Math.exp(-Math.pow(dist - 0.04, 2) / 0.008);
-      const putOiWeight = Math.exp(-Math.pow(dist + 0.04, 2) / 0.008);
-      const callOi = Math.round((2000 + callOiWeight * 45000 + (strike === centerK + step ? 28000 : 0)));
-      const putOi = Math.round((1800 + putOiWeight * 42000 + (strike === centerK - step ? 25000 : 0)));
+      const callOiWeight = Math.exp(-Math.pow(dist - (0.03 * (currentExp.dte / 17)), 2) / 0.008);
+      const putOiWeight = Math.exp(-Math.pow(dist + (0.03 * (currentExp.dte / 17)), 2) / 0.008);
+      
+      const callOi = Math.round((1500 + callOiWeight * 42000 + (strike === centerK + step ? 22000 : 0)) * oiScale);
+      const putOi = Math.round((1400 + putOiWeight * 39000 + (strike === centerK - step ? 20000 : 0)) * oiScale);
 
-      const callVol = Math.round(callOi * (0.2 + Math.random() * 0.3));
-      const putVol = Math.round(putOi * (0.2 + Math.random() * 0.3));
+      const callVol = Math.round(callOi * (0.2 + (1 / Math.max(2, currentExp.dte)) * 0.4));
+      const putVol = Math.round(putOi * (0.2 + (1 / Math.max(2, currentExp.dte)) * 0.4));
 
-      // Gamma calculation (peak ATM)
-      const gamma = Math.exp(-Math.pow(dist, 2) / 0.004) / (spotPrice * 0.15);
-      const callGex = Number((callOi * 100 * spotPrice * gamma * 0.0001).toFixed(2)); // in $M
-      const putGex = Number((-putOi * 100 * spotPrice * gamma * 0.0001).toFixed(2)); // in $M (negative)
+      const gamma = (Math.exp(-Math.pow(dist, 2) / (0.003 / dteFactor)) / (spotPrice * 0.15)) * dteFactor;
+      const dollarGexCall = (callOi * 100 * (spotPrice * spotPrice) * gamma * 0.00000001);
+      const dollarGexPut = (-putOi * 100 * (spotPrice * spotPrice) * gamma * 0.00000001);
+
+      const callGex = Number(dollarGexCall.toFixed(2));
+      const putGex = Number(dollarGexPut.toFixed(2));
       const netGex = Number((callGex + putGex).toFixed(2));
 
-      // IV Skew curve (smile/smirk)
-      const baseIv = 35 + Math.pow(dist * 10, 2) * 1.5;
-      const callIv = Number((baseIv - dist * 8 + (Math.random() - 0.5) * 0.8).toFixed(1));
-      const putIv = Number((baseIv - dist * 14 + (Math.random() - 0.5) * 0.8).toFixed(1));
+      const baseIv = currentExp.baseIv + Math.pow(dist * 8, 2) * 1.8;
+      const callIv = Number((baseIv - dist * 6).toFixed(1));
+      const putIv = Number((baseIv - dist * 12).toFixed(1));
 
-      // Deltas
-      const callDelta = Number((Math.max(0.01, Math.min(0.99, 0.5 + (spotPrice - strike) / (spotPrice * 0.15)))).toFixed(2));
+      const callDelta = Number((Math.max(0.01, Math.min(0.99, 0.5 + (spotPrice - strike) / (spotPrice * 0.18)))).toFixed(2));
       const putDelta = Number((callDelta - 1).toFixed(2));
 
       const symClean = symbol.toUpperCase().trim();
       list.push({
         strike,
-        callSymbol: `.${symClean}260918C${Math.round(strike)}`,
-        putSymbol: `.${symClean}260918P${Math.round(strike)}`,
+        callSymbol: `.${symClean}${occDate}C${Math.round(strike)}`,
+        putSymbol: `.${symClean}${occDate}P${Math.round(strike)}`,
         callOi,
         putOi,
         callVol,
@@ -101,14 +135,12 @@ export function UnifiedGexBarreirasView({ symbol, spotPrice, isEmbedded = false 
     }
 
     return list;
-  }, [symbol, spotPrice]);
+  }, [symbol, spotPrice, currentExp]);
 
-  // Totals & Institutional Metrics
   const totalCallGex = useMemo(() => Number(strikesData.reduce((acc, s) => acc + s.callGex, 0).toFixed(2)), [strikesData]);
   const totalPutGex = useMemo(() => Number(Math.abs(strikesData.reduce((acc, s) => acc + s.putGex, 0)).toFixed(2)), [strikesData]);
   const netGexTotal = useMemo(() => Number((totalCallGex - totalPutGex).toFixed(2)), [totalCallGex, totalPutGex]);
 
-  // Max GEX Strike & Zero Gamma Flip
   const maxGexStrike = useMemo(() => {
     let maxS = strikesData[0].strike;
     let maxVal = -Infinity;
@@ -122,645 +154,625 @@ export function UnifiedGexBarreirasView({ symbol, spotPrice, isEmbedded = false 
   }, [strikesData]);
 
   const zeroGammaFlip = useMemo(() => {
-    return Number((spotPrice * (netGexTotal >= 0 ? 0.985 : 1.015)).toFixed(2));
-  }, [spotPrice, netGexTotal]);
+    for (let i = 0; i < strikesData.length - 1; i++) {
+      const s1 = strikesData[i];
+      const s2 = strikesData[i + 1];
+      if ((s1.netGex <= 0 && s2.netGex >= 0) || (s1.netGex >= 0 && s2.netGex <= 0)) {
+        return Number(((s1.strike + s2.strike) / 2).toFixed(2));
+      }
+    }
+    return Number((spotPrice * 0.985).toFixed(2));
+  }, [strikesData, spotPrice]);
 
   const maxPain = useMemo(() => {
-    return Number((spotPrice * 0.99).toFixed(2));
-  }, [spotPrice]);
+    let minLoss = Infinity;
+    let bestK = spotPrice;
+    strikesData.forEach(target => {
+      let totalLoss = 0;
+      strikesData.forEach(s => {
+        if (target.strike > s.strike) {
+          totalLoss += (target.strike - s.strike) * s.callOi;
+        } else if (target.strike < s.strike) {
+          totalLoss += (s.strike - target.strike) * s.putOi;
+        }
+      });
+      if (totalLoss < minLoss) {
+        minLoss = totalLoss;
+        bestK = target.strike;
+      }
+    });
+    return bestK;
+  }, [strikesData, spotPrice]);
 
   const topCallWalls = useMemo(() => {
-    return [...strikesData].sort((a, b) => b.callOi - a.callOi).slice(0, 5);
+    return [...strikesData].sort((a, b) => b.callGex - a.callGex).slice(0, 5);
   }, [strikesData]);
 
   const topPutWalls = useMemo(() => {
-    return [...strikesData].sort((a, b) => b.putOi - a.putOi).slice(0, 5);
+    return [...strikesData].sort((a, b) => Math.abs(b.putGex) - Math.abs(a.putGex)).slice(0, 5);
   }, [strikesData]);
 
-  // Max scale for horizontal bar chart
-  const maxOi = Math.max(...strikesData.map(s => Math.max(s.callOi, s.putOi)));
-  const maxGexBar = Math.max(...strikesData.map(s => Math.max(s.callGex, Math.abs(s.putGex), Math.abs(s.netGex))));
+  const chartW = 850;
+  const chartH = 260;
+  const padL = 45;
+  const padR = 25;
+  const padT = 30;
+  const padB = 40;
+  const graphW = chartW - padL - padR;
+  const graphH = chartH - padT - padB;
+
+  const minStrike = strikesData[0]?.strike || 100;
+  const maxStrike = strikesData[strikesData.length - 1]?.strike || 200;
+  const strikeRange = Math.max(1, maxStrike - minStrike);
+
+  const getX = (strike: number) => padL + ((strike - minStrike) / strikeRange) * graphW;
+
+  const maxGexAbs = useMemo(() => {
+    let m = 0.5;
+    strikesData.forEach(s => {
+      m = Math.max(m, Math.abs(s.callGex), Math.abs(s.putGex), Math.abs(s.netGex));
+    });
+    return m * 1.15;
+  }, [strikesData]);
+
+  const getY_Gex = (val: number) => {
+    const yCenter = padT + graphH / 2;
+    return yCenter - (val / maxGexAbs) * (graphH / 2);
+  };
+
+  const spotX = getX(spotPrice);
+  const flipX = getX(zeroGammaFlip);
 
   return (
     <div className="space-y-6">
-      {/* 1. Header de Vencimentos & Seleção de Visualização */}
-      <div className="bg-[#0c1322] border border-gray-800 p-5 rounded-2xl space-y-4 shadow-xl">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b border-gray-800 pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
-              <h2 className="text-base font-bold text-white font-mono uppercase tracking-tight">
-                Painel Unificado: Barreiras de OI & Motor GEX (Tastytrade)
-              </h2>
-              <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold">
-                PRO-GEX v3.0
-              </span>
+      
+      {/* Top Back Navigation Bar */}
+      {!isEmbedded && (onBackToQuote || onBackToScreener) && (
+        <div className="bg-[#0c1322] border border-gray-800 p-3.5 rounded-2xl flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            {onBackToQuote && (
+              <button
+                onClick={() => onBackToQuote(symbol)}
+                className="px-3.5 py-1.5 bg-[#070b14] hover:bg-gray-800 text-cyan-400 border border-cyan-500/30 rounded-xl text-xs font-mono font-bold transition flex items-center gap-1.5 shadow-sm"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Voltar para Consulta ({symbol})</span>
+              </button>
+            )}
+
+            {onBackToScreener && (
+              <button
+                onClick={onBackToScreener}
+                className="px-3.5 py-1.5 bg-[#070b14] hover:bg-gray-800 text-gray-300 border border-gray-800 rounded-xl text-xs font-mono transition flex items-center gap-1.5"
+              >
+                <span>Rastreador de Tendências</span>
+              </button>
+            )}
+          </div>
+
+          <div className="text-xs font-mono text-gray-400">
+            Ativo em Análise: <strong className="text-white">{symbol}</strong> • Spot: <strong className="text-cyan-400">${spotPrice.toFixed(2)}</strong>
+          </div>
+        </div>
+      )}
+
+      {/* 1. Header do Painel Unificado & Grade de Vencimentos */}
+      <div className="bg-[#0c1322] border border-cyan-500/30 p-5 rounded-2xl space-y-4 shadow-xl">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-gray-800 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center">
+              <Layers className="w-4 h-4 text-cyan-300" />
             </div>
-            <p className="text-xs text-gray-400 mt-1">
-              Visualização simultânea da exposição gama dos formadores de mercado (MM), barreiras de Open Interest e Volatility Skew.
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-white font-mono uppercase tracking-tight">
+                  PAINEL UNIFICADO: BARREIRAS DE OI & MOTOR GEX (TASTYTRADE)
+                </h3>
+                <span className="px-1.5 py-0.5 text-[9px] font-bold font-mono rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  PRO-GEX v3.0
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Visualização simultânea da exposição gama dos formadores de mercado (MM), barreiras de Open Interest e Volatility Skew.
+              </p>
+            </div>
           </div>
 
-          {/* Seletor de Modo de Exibição */}
-          <div className="flex items-center gap-1 bg-[#070b14] p-1 rounded-xl border border-gray-800 text-xs font-mono">
-            {[
-              { id: 'UNIFIED', label: 'Tudo Unificado', icon: Maximize2 },
-              { id: 'GEX_ONLY', label: 'Motor GEX', icon: Zap },
-              { id: 'WALLS_ONLY', label: 'Barreiras (OI)', icon: Shield },
-              { id: 'SKEW_ONLY', label: 'Vol Skew', icon: Activity },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setDisplayMode(tab.id as any)}
-                className={`px-3 py-1.5 rounded-lg transition font-bold flex items-center gap-1.5 ${
-                  displayMode === tab.id
-                    ? 'bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                <tab.icon className="w-3.5 h-3.5" />
-                <span>{tab.label}</span>
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-1 bg-[#070b14] p-1 rounded-xl border border-gray-800 text-xs font-mono">
+            <button
+              onClick={() => setDisplayMode('UNIFIED')}
+              className={`px-2.5 py-1 rounded-lg transition ${
+                displayMode === 'UNIFIED' ? 'bg-cyan-600 text-white font-bold shadow' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Tudo Unificado
+            </button>
+            <button
+              onClick={() => setDisplayMode('GEX_ONLY')}
+              className={`px-2.5 py-1 rounded-lg transition ${
+                displayMode === 'GEX_ONLY' ? 'bg-cyan-600 text-white font-bold shadow' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Motor GEX
+            </button>
+            <button
+              onClick={() => setDisplayMode('WALLS_ONLY')}
+              className={`px-2.5 py-1 rounded-lg transition ${
+                displayMode === 'WALLS_ONLY' ? 'bg-cyan-600 text-white font-bold shadow' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Barreiras (OI)
+            </button>
+            <button
+              onClick={() => setDisplayMode('SKEW_ONLY')}
+              className={`px-2.5 py-1 rounded-lg transition ${
+                displayMode === 'SKEW_ONLY' ? 'bg-cyan-600 text-white font-bold shadow' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Vol Skew
+            </button>
           </div>
         </div>
 
-        {/* Grade de Vencimentos Oficiais */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+        {/* Grade de Vencimentos Oficiais Tastytrade */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5 text-xs text-gray-300 font-mono">
+            <Calendar className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-gray-400">Grade de Vencimentos Oficiais (DTEs Reais Tastytrade):</span>
+          </div>
+
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-gray-400 font-mono font-bold">Grade de Vencimentos:</span>
-            {[
-              '18 Set (12 DTE - Mais Líquida)',
-              '25 Set (19 DTE - Semanal)',
-              '16 Out (40 DTE - Mensal)',
-              '20 Nov (75 DTE - Mensal)',
-            ].map(exp => (
+            {TASTYTRADE_EXPIRATIONS.map((exp) => (
               <button
-                key={exp}
-                onClick={() => setActiveExp(exp)}
-                className={`px-3 py-1 rounded-lg text-xs font-mono transition ${
-                  activeExp === exp
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold'
-                    : 'bg-[#070b14] text-gray-400 hover:text-white border border-gray-800'
+                key={exp.id}
+                onClick={() => setSelectedExpId(exp.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-mono font-medium transition-all flex items-center gap-1.5 border ${
+                  selectedExpId === exp.id
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/60 shadow-md font-bold'
+                    : 'bg-[#070b14] text-gray-400 border-gray-800 hover:text-white hover:border-gray-700'
                 }`}
               >
-                {exp}
+                <span>{exp.dateStr}</span>
+                {exp.isLiquid && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                )}
               </button>
             ))}
           </div>
 
-          <span className="text-xs font-mono text-cyan-300">
-            Série Ativa: <strong>{activeExp}</strong>
-          </span>
+          <div className="text-[11px] font-mono text-cyan-400 pt-1">
+            Série Ativa: <strong>{currentExp.dateStr}</strong> • Base IV: <strong>{currentExp.baseIv}%</strong> • Tipo: <strong>{currentExp.type}</strong>
+          </div>
+        </div>
+
+        {/* 6 Cartões Métricos */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs font-mono">
+          <div className="p-3 bg-[#070b14] border border-gray-800 rounded-xl space-y-1">
+            <span className="text-[10px] text-gray-400 block font-sans">Spot Atual</span>
+            <span className="text-base font-bold text-white block">${spotPrice.toFixed(2)}</span>
+            <span className="text-[10px] text-cyan-400 font-bold">{symbol}</span>
+          </div>
+
+          <div className="p-3 bg-[#070b14] border border-gray-800 rounded-xl space-y-1">
+            <span className="text-[10px] text-gray-400 block font-sans">Total Call GEX</span>
+            <span className="text-base font-bold text-emerald-400 block">+$${totalCallGex}M</span>
+            <span className="text-[10px] text-emerald-400/80 font-sans">Força Compradora MM</span>
+          </div>
+
+          <div className="p-3 bg-[#070b14] border border-gray-800 rounded-xl space-y-1">
+            <span className="text-[10px] text-gray-400 block font-sans">Total Put GEX</span>
+            <span className="text-base font-bold text-rose-400 block">-$${totalPutGex}M</span>
+            <span className="text-[10px] text-rose-400/80 font-sans">Hedge Vendedor MM</span>
+          </div>
+
+          <div className="p-3 bg-[#070b14] border border-gray-800 rounded-xl space-y-1">
+            <span className="text-[10px] text-gray-400 block font-sans">Net GEX Regime</span>
+            <span className={`text-base font-bold block ${netGexTotal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {netGexTotal >= 0 ? '+GEX' : '-GEX'} ($${netGexTotal}M)
+            </span>
+            <span className="text-[10px] text-gray-400 font-sans">
+              {netGexTotal >= 0 ? 'Vol Suprimida' : 'Vol Acelerada'}
+            </span>
+          </div>
+
+          <div className="p-3 bg-[#070b14] border border-gray-800 rounded-xl space-y-1">
+            <span className="text-[10px] text-gray-400 block font-sans">Zero Gamma Flip</span>
+            <span className="text-base font-bold text-purple-400 block">\$${zeroGammaFlip.toFixed(2)}</span>
+            <span className="text-[10px] text-purple-400/80 font-sans">Ponto de Transição</span>
+          </div>
+
+          <div className="p-3 bg-[#070b14] border border-gray-800 rounded-xl space-y-1">
+            <span className="text-[10px] text-gray-400 block font-sans">Max GEX Magnet</span>
+            <span className="text-base font-bold text-cyan-400 block">\$${maxGexStrike.toFixed(2)}</span>
+            <span className="text-[10px] text-cyan-400/80 font-sans">Ímã de Pinning</span>
+          </div>
         </div>
       </div>
 
-      {/* 2. Cartões de Métricas Financeiras & GEX Totais */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono text-xs">
-        <div className="p-4 bg-[#0c1322] border border-gray-800 rounded-xl">
-          <span className="text-[10px] text-gray-400 block font-sans">Spot Atual</span>
-          <span className="text-lg font-bold text-white mt-1 block">${spotPrice.toFixed(2)}</span>
-          <span className="text-[10px] text-cyan-400">Tempo Real</span>
-        </div>
-
-        <div className="p-4 bg-[#0c1322] border border-emerald-500/30 rounded-xl">
-          <span className="text-[10px] text-emerald-400 block font-sans">Total Call GEX</span>
-          <span className="text-lg font-bold text-emerald-400 mt-1 block">+${totalCallGex}M</span>
-          <span className="text-[10px] text-gray-400">Resistência MM</span>
-        </div>
-
-        <div className="p-4 bg-[#0c1322] border border-rose-500/30 rounded-xl">
-          <span className="text-[10px] text-rose-400 block font-sans">Total Put GEX</span>
-          <span className="text-lg font-bold text-rose-400 mt-1 block">-${totalPutGex}M</span>
-          <span className="text-[10px] text-gray-400">Suporte MM</span>
-        </div>
-
-        <div className="p-4 bg-[#0c1322] border border-cyan-500/30 rounded-xl">
-          <span className="text-[10px] text-cyan-300 block font-sans">Net GEX Regime</span>
-          <span className={`text-lg font-bold mt-1 block ${netGexTotal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {netGexTotal >= 0 ? '+' : ''}${netGexTotal}M
-          </span>
-          <span className="text-[10px] text-emerald-400 font-bold">{netGexTotal >= 0 ? '+GEX (Suprime Vol)' : '-GEX (Expande Vol)'}</span>
-        </div>
-
-        <div className="p-4 bg-[#0c1322] border border-amber-500/30 rounded-xl">
-          <span className="text-[10px] text-amber-400 block font-sans">Zero Gamma Flip</span>
-          <span className="text-lg font-bold text-amber-300 mt-1 block">${zeroGammaFlip.toFixed(2)}</span>
-          <span className="text-[10px] text-gray-400">Gatilho de Regime</span>
-        </div>
-
-        <div className="p-4 bg-[#0c1322] border border-purple-500/30 rounded-xl">
-          <span className="text-[10px] text-purple-300 block font-sans">Max GEX Magnet</span>
-          <span className="text-lg font-bold text-purple-300 mt-1 block">${maxGexStrike.toFixed(2)}</span>
-          <span className="text-[10px] text-gray-400">Atração de Pinning</span>
-        </div>
-      </div>
-
-      {/* 3. GRÁFICO 1: GAMMA EXPOSURE DASHBOARD (BAR CHART CALLS VS PUTS GEX) */}
+      {/* 2. GRÁFICO DE GAMMA EXPOSURE (GEX POR STRIKE) */}
       {(displayMode === 'UNIFIED' || displayMode === 'GEX_ONLY') && (
-        <div className="bg-[#0c1322] border border-purple-500/30 rounded-2xl p-5 space-y-4 shadow-2xl">
+        <div className="bg-[#0c1322] border border-gray-800 p-5 rounded-2xl space-y-4 shadow-xl">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-800 pb-3">
             <div>
-              <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-purple-400" />
-                <h3 className="text-sm font-bold text-white font-mono uppercase tracking-wide">
-                  {symbol.toUpperCase()} Gamma Exposure by Strike (Exp: {activeExp.slice(0, 6)})
-                </h3>
-              </div>
+              <h4 className="text-sm font-bold text-white font-mono uppercase flex items-center gap-2">
+                <Zap className="w-4 h-4 text-cyan-400" />
+                <span>DASHBOARD DE GAMMA EXPOSURE (GEX POR STRIKE)</span>
+              </h4>
               <p className="text-xs text-gray-400 mt-0.5">
-                Exposição gama por strike. Barras Verdes = Call GEX (lucro dos formadores na alta) | Barras Vermelhas = Put GEX.
+                Exposição gama institucional em $ Milhões por strike para o vencimento de <strong>{currentExp.label}</strong> ({currentExp.dte} DTE).
               </p>
             </div>
 
-            {/* Sub-selector de GEX View */}
-            <div className="flex items-center gap-2 text-xs font-mono">
-              <span className="text-gray-400">Visualização GEX:</span>
-              {(['calls_vs_puts', 'net_gex', 'abs_gex'] as const).map(mode => (
-                <button
-                  key={mode}
-                  onClick={() => setGexSubView(mode)}
-                  className={`px-2.5 py-1 rounded-lg transition ${
-                    gexSubView === mode
-                      ? 'bg-purple-500/25 text-purple-300 border border-purple-500/50 font-bold'
-                      : 'bg-[#070b14] text-gray-400 hover:text-white border border-gray-800'
-                  }`}
-                >
-                  {mode === 'calls_vs_puts' ? 'Calls vs Puts' : mode === 'net_gex' ? 'Net GEX' : 'Absolute GEX'}
-                </button>
-              ))}
+            <div className="flex items-center gap-1.5 bg-[#070b14] p-1 rounded-xl border border-gray-800 text-xs font-mono">
+              <button
+                onClick={() => setGexSubView('calls_vs_puts')}
+                className={`px-2 py-0.5 rounded-lg ${gexSubView === 'calls_vs_puts' ? 'bg-cyan-600 text-white font-bold' : 'text-gray-400 hover:text-white'}`}
+              >
+                Calls vs Puts
+              </button>
+              <button
+                onClick={() => setGexSubView('net_gex')}
+                className={`px-2 py-0.5 rounded-lg ${gexSubView === 'net_gex' ? 'bg-cyan-600 text-white font-bold' : 'text-gray-400 hover:text-white'}`}
+              >
+                Net GEX
+              </button>
+              <button
+                onClick={() => setGexSubView('abs_gex')}
+                className={`px-2 py-0.5 rounded-lg ${gexSubView === 'abs_gex' ? 'bg-cyan-600 text-white font-bold' : 'text-gray-400 hover:text-white'}`}
+              >
+                Absolute GEX
+              </button>
             </div>
           </div>
 
-          {/* SVG Vertical Bar Chart for GEX */}
-          <div className="w-full bg-[#040711] p-4 rounded-xl border border-gray-900 relative overflow-x-auto">
-            {(() => {
-              const width = 860;
-              const height = 320;
-              const padL = 60;
-              const padR = 40;
-              const padT = 40;
-              const padB = 45;
-              const chartW = width - padL - padR;
-              const chartH = height - padT - padB;
-              const yZero = padT + chartH / 2;
+          {/* SVG Vertical Bars GEX Chart */}
+          <div className="w-full bg-[#040711] p-3 rounded-xl border border-gray-900 overflow-hidden relative">
+            <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full h-auto">
+              <line
+                x1={padL}
+                y1={getY_Gex(0)}
+                x2={chartW - padR}
+                y2={getY_Gex(0)}
+                stroke="#334155"
+                strokeWidth="1.5"
+              />
 
-              const barStep = chartW / strikesData.length;
-              const barWidth = Math.max(3, barStep * 0.65);
+              <line
+                x1={spotX}
+                y1={padT}
+                x2={spotX}
+                y2={chartH - padB}
+                stroke="#06b6d4"
+                strokeWidth="1.5"
+                strokeDasharray="4 4"
+              />
+              <text
+                x={spotX}
+                y={padT - 6}
+                textAnchor="middle"
+                fill="#22d3ee"
+                fontSize="9"
+                fontWeight="bold"
+                fontFamily="monospace"
+              >
+                Spot $${spotPrice.toFixed(2)}
+              </text>
 
-              // Spot X and Flip X
-              const minK = strikesData[0].strike;
-              const maxK = strikesData[strikesData.length - 1].strike;
-              const getX = (k: number) => padL + ((k - minK) / (maxK - minK)) * chartW;
-              const spotX = getX(spotPrice);
-              const flipX = getX(zeroGammaFlip);
+              <line
+                x1={flipX}
+                y1={padT + 12}
+                x2={flipX}
+                y2={chartH - padB}
+                stroke="#c084fc"
+                strokeWidth="1.5"
+                strokeDasharray="3 3"
+              />
+              <text
+                x={flipX}
+                y={padT + 8}
+                textAnchor="middle"
+                fill="#c084fc"
+                fontSize="8.5"
+                fontWeight="bold"
+                fontFamily="monospace"
+              >
+                Flip $${zeroGammaFlip.toFixed(2)}
+              </text>
 
-              return (
-                <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">
-                  {/* Grid Lines */}
-                  {[-1, -0.5, 0, 0.5, 1].map(ratio => {
-                    const y = yZero - ratio * (chartH / 2);
-                    const val = (ratio * maxGexBar).toFixed(1);
-                    return (
-                      <g key={ratio}>
-                        <line
-                          x1={padL}
-                          y1={y}
-                          x2={width - padR}
-                          y2={y}
-                          stroke={ratio === 0 ? '#475569' : '#1e293b'}
-                          strokeWidth={ratio === 0 ? 1.5 : 1}
-                          strokeDasharray={ratio === 0 ? undefined : '2 2'}
+              {strikesData.map((s) => {
+                const x = getX(s.strike);
+                const barWidth = Math.max(6, graphW / strikesData.length - 4);
+
+                if (gexSubView === 'calls_vs_puts') {
+                  const yCall = getY_Gex(s.callGex);
+                  const yZero = getY_Gex(0);
+                  const hCall = Math.max(2, yZero - yCall);
+
+                  const yPut = getY_Gex(0);
+                  const hPut = Math.max(2, getY_Gex(s.putGex) - yZero);
+
+                  return (
+                    <g key={s.strike} className="transition-all hover:opacity-80">
+                      {s.callGex > 0 && (
+                        <rect
+                          x={x - barWidth / 2}
+                          y={yCall}
+                          width={barWidth}
+                          height={hCall}
+                          fill="#10b981"
+                          rx="2"
                         />
-                        <text
-                          x={padL - 8}
-                          y={y + 3}
-                          fill="#64748b"
-                          fontSize="9"
-                          fontFamily="monospace"
-                          textAnchor="end"
-                        >
-                          {val}M
-                        </text>
-                      </g>
-                    );
-                  })}
+                      )}
+                      {s.putGex < 0 && (
+                        <rect
+                          x={x - barWidth / 2}
+                          y={yPut}
+                          width={barWidth}
+                          height={hPut}
+                          fill="#f43f5e"
+                          rx="2"
+                        />
+                      )}
+                      <text
+                        x={x}
+                        y={chartH - padB + 14}
+                        textAnchor="middle"
+                        fill="#64748b"
+                        fontSize="7.5"
+                        fontFamily="monospace"
+                      >
+                        {s.strike}
+                      </text>
+                    </g>
+                  );
+                } else if (gexSubView === 'net_gex') {
+                  const isPos = s.netGex >= 0;
+                  const yBar = isPos ? getY_Gex(s.netGex) : getY_Gex(0);
+                  const hBar = Math.max(2, Math.abs(getY_Gex(s.netGex) - getY_Gex(0)));
 
-                  {/* Spot Price Dashed Vertical Line */}
-                  <line
-                    x1={spotX}
-                    y1={padT - 15}
-                    x2={spotX}
-                    y2={height - padB}
-                    stroke="#f59e0b"
-                    strokeWidth="1.5"
-                    strokeDasharray="4 4"
-                  />
-                  <text
-                    x={spotX}
-                    y={padT - 20}
-                    fill="#fbbf24"
-                    fontSize="9"
-                    fontWeight="bold"
-                    fontFamily="monospace"
-                    textAnchor="middle"
-                  >
-                    Spot ${spotPrice.toFixed(2)}
-                  </text>
+                  return (
+                    <g key={s.strike}>
+                      <rect
+                        x={x - barWidth / 2}
+                        y={yBar}
+                        width={barWidth}
+                        height={hBar}
+                        fill={isPos ? '#10b981' : '#f43f5e'}
+                        rx="2"
+                      />
+                      <text
+                        x={x}
+                        y={chartH - padB + 14}
+                        textAnchor="middle"
+                        fill="#64748b"
+                        fontSize="7.5"
+                        fontFamily="monospace"
+                      >
+                        {s.strike}
+                      </text>
+                    </g>
+                  );
+                } else {
+                  const absVal = Math.abs(s.callGex) + Math.abs(s.putGex);
+                  const yBar = getY_Gex(absVal);
+                  const hBar = Math.max(2, getY_Gex(0) - yBar);
 
-                  {/* Zero Gamma Flip Line */}
-                  <line
-                    x1={flipX}
-                    y1={padT - 15}
-                    x2={flipX}
-                    y2={height - padB}
-                    stroke="#a855f7"
-                    strokeWidth="1.5"
-                    strokeDasharray="3 3"
-                  />
-                  <text
-                    x={flipX}
-                    y={height - padB + 28}
-                    fill="#c084fc"
-                    fontSize="9"
-                    fontWeight="bold"
-                    fontFamily="monospace"
-                    textAnchor="middle"
-                  >
-                    Zero Γ: ${zeroGammaFlip.toFixed(2)}
-                  </text>
+                  return (
+                    <g key={s.strike}>
+                      <rect
+                        x={x - barWidth / 2}
+                        y={yBar}
+                        width={barWidth}
+                        height={hBar}
+                        fill="#06b6d4"
+                        rx="2"
+                      />
+                      <text
+                        x={x}
+                        y={chartH - padB + 14}
+                        textAnchor="middle"
+                        fill="#64748b"
+                        fontSize="7.5"
+                        fontFamily="monospace"
+                      >
+                        {s.strike}
+                      </text>
+                    </g>
+                  );
+                }
+              })}
+            </svg>
 
-                  {/* Bars for Each Strike */}
-                  {strikesData.map((s, idx) => {
-                    const xCenter = padL + idx * barStep + barStep / 2;
-
-                    if (gexSubView === 'calls_vs_puts') {
-                      const callH = (s.callGex / maxGexBar) * (chartH / 2);
-                      const putH = (Math.abs(s.putGex) / maxGexBar) * (chartH / 2);
-
-                      return (
-                        <g key={s.strike}>
-                          {/* Call GEX Bar (Green, Above 0) */}
-                          <rect
-                            x={xCenter - barWidth / 2}
-                            y={yZero - callH}
-                            width={barWidth}
-                            height={Math.max(1, callH)}
-                            fill="#10b981"
-                            rx="1"
-                          />
-                          {/* Put GEX Bar (Red, Below 0) */}
-                          <rect
-                            x={xCenter - barWidth / 2}
-                            y={yZero}
-                            width={barWidth}
-                            height={Math.max(1, putH)}
-                            fill="#ef4444"
-                            rx="1"
-                          />
-                          {/* Strike Label every few bars */}
-                          {idx % 3 === 0 && (
-                            <text
-                              x={xCenter}
-                              y={height - padB + 14}
-                              fill="#64748b"
-                              fontSize="8"
-                              fontFamily="monospace"
-                              textAnchor="middle"
-                            >
-                              ${s.strike.toFixed(0)}
-                            </text>
-                          )}
-                        </g>
-                      );
-                    } else if (gexSubView === 'net_gex') {
-                      const isPos = s.netGex >= 0;
-                      const barH = (Math.abs(s.netGex) / maxGexBar) * (chartH / 2);
-                      const y = isPos ? yZero - barH : yZero;
-
-                      return (
-                        <g key={s.strike}>
-                          <rect
-                            x={xCenter - barWidth / 2}
-                            y={y}
-                            width={barWidth}
-                            height={Math.max(1, barH)}
-                            fill={isPos ? '#06b6d4' : '#f43f5e'}
-                            rx="1"
-                          />
-                          {idx % 3 === 0 && (
-                            <text
-                              x={xCenter}
-                              y={height - padB + 14}
-                              fill="#64748b"
-                              fontSize="8"
-                              fontFamily="monospace"
-                              textAnchor="middle"
-                            >
-                              ${s.strike.toFixed(0)}
-                            </text>
-                          )}
-                        </g>
-                      );
-                    } else {
-                      // Absolute GEX
-                      const absVal = s.callGex + Math.abs(s.putGex);
-                      const barH = (absVal / (maxGexBar * 2)) * chartH;
-
-                      return (
-                        <g key={s.strike}>
-                          <rect
-                            x={xCenter - barWidth / 2}
-                            y={height - padB - barH}
-                            width={barWidth}
-                            height={Math.max(1, barH)}
-                            fill="#8b5cf6"
-                            rx="1"
-                          />
-                          {idx % 3 === 0 && (
-                            <text
-                              x={xCenter}
-                              y={height - padB + 14}
-                              fill="#64748b"
-                              fontSize="8"
-                              fontFamily="monospace"
-                              textAnchor="middle"
-                            >
-                              ${s.strike.toFixed(0)}
-                            </text>
-                          )}
-                        </g>
-                      );
-                    }
-                  })}
-                </svg>
-              );
-            })()}
-
-            <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono pt-2 border-t border-gray-800/80">
-              <div className="flex items-center gap-4">
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-emerald-500 rounded-sm"></span> Call GEX (+)</span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-rose-500 rounded-sm"></span> Put GEX (-)</span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-0.5 bg-amber-400"></span> Linha de Spot</span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-0.5 bg-purple-400"></span> Zero Gamma Flip</span>
-              </div>
-              <span>Fonte: Tastytrade Market Engine</span>
+            <div className="flex justify-between items-center text-[10px] text-gray-400 font-mono px-2 pt-1 border-t border-gray-900">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-sm bg-emerald-500"></span> Call GEX (Exposição Positiva)
+                <span className="w-2 h-2 rounded-sm bg-rose-500 ml-2"></span> Put GEX (Exposição Negativa)
+              </span>
+              <span className="text-gray-400">Strikes ($)</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* 4. GRÁFICO 2: DISTRIBUIÇÃO DE VOLUME E OPEN INTEREST (BARREIRAS BI-DIRECIONAIS B3/US) */}
+      {/* 3. DISTRIBUIÇÃO DE VOLUME & OPEN INTEREST */}
       {(displayMode === 'UNIFIED' || displayMode === 'WALLS_ONLY') && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* Gráfico Bi-direcional de Volume / OI */}
-          <div className="lg:col-span-1 bg-[#0c1322] border border-gray-800 rounded-2xl p-5 space-y-3 shadow-xl">
-            <div className="flex justify-between items-center border-b border-gray-800 pb-2">
-              <h4 className="text-xs font-bold font-mono text-white flex items-center gap-2">
-                <BarChart2 className="w-3.5 h-3.5 text-cyan-400" />
-                DISTRIBUIÇÃO DE VOLUME POR STRIKE
+        <div className="bg-[#0c1322] border border-gray-800 p-5 rounded-2xl space-y-4 shadow-xl">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-800 pb-3">
+            <div>
+              <h4 className="text-sm font-bold text-white font-mono uppercase flex items-center gap-2">
+                <BarChart2 className="w-4 h-4 text-emerald-400" />
+                <span>DISTRIBUIÇÃO DE VOLUME & OPEN INTEREST POR STRIKE</span>
               </h4>
-              <span className="text-[10px] font-mono text-amber-400">Max Pain: ${maxPain.toFixed(2)}</span>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Paredes de contratos institucionais abertos para {currentExp.dateStr} (Puts em Rosa, Calls em Ciano).
+              </p>
             </div>
 
-            <div className="space-y-1 text-[11px] font-mono max-h-[460px] overflow-y-auto pr-1">
-              {strikesData.slice(3, 22).map((s) => {
-                const putPct = (s.putOi / maxOi) * 100;
-                const callPct = (s.callOi / maxOi) * 100;
-                const isAtm = Math.abs(s.strike - spotPrice) <= (spotPrice * 0.02);
+            <div className="text-xs font-mono text-cyan-300 bg-[#070b14] px-3 py-1 rounded-lg border border-gray-800">
+              Max Pain: <strong>$${maxPain.toFixed(2)}</strong>
+            </div>
+          </div>
 
-                return (
-                  <div
-                    key={s.strike}
-                    className={`flex items-center justify-between p-1 rounded transition ${
-                      isAtm ? 'bg-cyan-950/40 border border-cyan-500/30' : 'hover:bg-[#111827]'
-                    }`}
-                  >
-                    {/* Put Side (Left - Magenta/Rose) */}
-                    <div className="flex items-center gap-1.5 w-2/5 justify-end">
-                      <span className="text-[9px] text-rose-300 font-semibold">{s.putOi.toLocaleString()}</span>
-                      <div className="w-16 bg-gray-900 h-2 rounded-full overflow-hidden flex justify-end">
-                        <div className="bg-rose-500 h-full rounded-full" style={{ width: `${putPct}%` }}></div>
-                      </div>
-                    </div>
+          {/* Gráfico Bi-direcional Espelhado Horizontal */}
+          <div className="space-y-1 bg-[#040711] p-4 rounded-xl border border-gray-900">
+            <div className="grid grid-cols-12 text-[10px] font-mono text-gray-400 pb-2 border-b border-gray-800 text-center">
+              <div className="col-span-5 text-right pr-4 text-rose-400 font-bold">PUT OPEN INTEREST (CONTRATOS)</div>
+              <div className="col-span-2 text-center text-white font-bold">STRIKE</div>
+              <div className="col-span-5 text-left pl-4 text-emerald-400 font-bold">CALL OPEN INTEREST (CONTRATOS)</div>
+            </div>
 
-                    {/* Strike Center */}
-                    <span className={`w-1/5 text-center font-bold text-[10px] px-1 rounded ${
-                      isAtm ? 'bg-cyan-500 text-slate-950 font-black' : 'text-gray-200'
-                    }`}>
-                      ${s.strike.toFixed(1)}
-                    </span>
+            {strikesData.slice(4, 21).map((s) => {
+              const maxOiForScale = 55000;
+              const putPct = Math.min(100, (s.putOi / maxOiForScale) * 100);
+              const callPct = Math.min(100, (s.callOi / maxOiForScale) * 100);
+              const isAtm = Math.abs(s.strike - spotPrice) < 2.5;
+              const isMaxPain = s.strike === maxPain;
 
-                    {/* Call Side (Right - Emerald/Cyan) */}
-                    <div className="flex items-center gap-1.5 w-2/5 justify-start">
-                      <div className="w-16 bg-gray-900 h-2 rounded-full overflow-hidden">
-                        <div className="bg-emerald-400 h-full rounded-full" style={{ width: `${callPct}%` }}></div>
-                      </div>
-                      <span className="text-[9px] text-emerald-300 font-semibold">{s.callOi.toLocaleString()}</span>
+              return (
+                <div key={s.strike} className={`grid grid-cols-12 items-center text-xs font-mono py-1 rounded ${isAtm ? 'bg-cyan-950/30' : ''}`}>
+                  <div className="col-span-5 flex items-center justify-end gap-2 pr-4">
+                    <span className="text-[10px] text-gray-400">{s.putOi.toLocaleString()}</span>
+                    <div className="w-32 bg-[#0d1527] h-3 rounded overflow-hidden flex justify-end">
+                      <div
+                        className="bg-gradient-to-l from-rose-500 to-rose-700 h-full rounded-l"
+                        style={{ width: `${putPct}%` }}
+                      ></div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+
+                  <div className="col-span-2 text-center">
+                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                      isAtm 
+                        ? 'bg-cyan-500 text-slate-950 shadow-sm' 
+                        : isMaxPain
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                        : 'text-gray-300'
+                    }`}>
+                      $${s.strike.toFixed(1)}
+                    </span>
+                  </div>
+
+                  <div className="col-span-5 flex items-center justify-start gap-2 pl-4">
+                    <div className="w-32 bg-[#0d1527] h-3 rounded overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-emerald-500 to-cyan-500 h-full rounded-r"
+                        style={{ width: `${callPct}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-[10px] text-gray-400">{s.callOi.toLocaleString()}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
-          {/* Top 5 Call Walls & Top 5 Put Walls */}
-          <div className="lg:col-span-2 space-y-4">
-            {/* Top 5 Call Walls */}
-            <div className="bg-[#0c1322] border border-emerald-500/30 rounded-2xl p-5 space-y-3 shadow-xl">
-              <div className="flex justify-between items-center border-b border-gray-800 pb-2">
-                <h4 className="text-xs font-bold font-mono text-emerald-400 flex items-center gap-2">
-                  <Shield className="w-3.5 h-3.5" />
-                  TOP 5 CALL WALLS (RESISTÊNCIA INSTITUCIONAL)
-                </h4>
-                <span className="text-[10px] font-mono text-gray-400">VOLUME / OI</span>
+          {/* Tabelas de Top 5 Call Walls e Put Walls */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs font-mono">
+            <div className="bg-[#070b14] border border-emerald-500/20 rounded-xl p-3.5 space-y-2">
+              <div className="flex justify-between items-center text-emerald-400 font-bold border-b border-gray-800 pb-1.5">
+                <span>Top 5 Call Walls (Resistência Institucional)</span>
+                <span className="text-[10px] text-gray-400">Total OI</span>
               </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left font-mono text-xs">
-                  <thead>
-                    <tr className="text-gray-500 border-b border-gray-800/80 text-[10px]">
-                      <th className="pb-2">STRIKE</th>
-                      <th className="pb-2">SÍMBOLO OCC</th>
-                      <th className="pb-2 text-right">CONTRATOS (OI)</th>
-                      <th className="pb-2 text-right">IV ATM</th>
-                      <th className="pb-2 text-right">DELTA</th>
-                      <th className="pb-2 text-right">DIST. SPOT</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-800/50">
-                    {topCallWalls.map((w) => {
-                      const dist = ((w.strike - spotPrice) / spotPrice) * 100;
-                      return (
-                        <tr key={w.strike} className="hover:bg-[#111827]/60">
-                          <td className="py-2 text-emerald-400 font-bold">${w.strike.toFixed(2)}</td>
-                          <td className="py-2 text-gray-300">{w.callSymbol}</td>
-                          <td className="py-2 text-right text-white font-bold">{w.callOi.toLocaleString()}</td>
-                          <td className="py-2 text-right text-purple-300">{w.callIv}%</td>
-                          <td className="py-2 text-right text-gray-300">{w.callDelta}</td>
-                          <td className="py-2 text-right text-emerald-400 font-bold">+{dist.toFixed(1)}%</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div className="space-y-1.5">
+                {topCallWalls.map((w, idx) => (
+                  <div key={w.strike} className="flex justify-between items-center text-gray-300 bg-[#0c1322] p-2 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <span className="text-emerald-400 font-bold">#{idx + 1}</span>
+                      <span>$${w.strike.toFixed(2)}</span>
+                      <span className="text-[10px] text-gray-400">{w.callSymbol}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-emerald-400 font-bold">{w.callOi.toLocaleString()} OI</span>
+                      <span className="text-[10px] text-gray-400">IV: {w.callIv}%</span>
+                      <span className="text-[10px] text-cyan-400">+{(((w.strike - spotPrice) / spotPrice) * 100).toFixed(1)}%</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Top 5 Put Walls */}
-            <div className="bg-[#0c1322] border border-rose-500/30 rounded-2xl p-5 space-y-3 shadow-xl">
-              <div className="flex justify-between items-center border-b border-gray-800 pb-2">
-                <h4 className="text-xs font-bold font-mono text-rose-400 flex items-center gap-2">
-                  <Shield className="w-3.5 h-3.5" />
-                  TOP 5 PUT WALLS (SUPORTE INSTITUCIONAL)
-                </h4>
-                <span className="text-[10px] font-mono text-gray-400">VOLUME / OI</span>
+            <div className="bg-[#070b14] border border-rose-500/20 rounded-xl p-3.5 space-y-2">
+              <div className="flex justify-between items-center text-rose-400 font-bold border-b border-gray-800 pb-1.5">
+                <span>Top 5 Put Walls (Suporte Institucional)</span>
+                <span className="text-[10px] text-gray-400">Total OI</span>
               </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left font-mono text-xs">
-                  <thead>
-                    <tr className="text-gray-500 border-b border-gray-800/80 text-[10px]">
-                      <th className="pb-2">STRIKE</th>
-                      <th className="pb-2">SÍMBOLO OCC</th>
-                      <th className="pb-2 text-right">CONTRATOS (OI)</th>
-                      <th className="pb-2 text-right">IV ATM</th>
-                      <th className="pb-2 text-right">DELTA</th>
-                      <th className="pb-2 text-right">DIST. SPOT</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-800/50">
-                    {topPutWalls.map((w) => {
-                      const dist = ((w.strike - spotPrice) / spotPrice) * 100;
-                      return (
-                        <tr key={w.strike} className="hover:bg-[#111827]/60">
-                          <td className="py-2 text-rose-400 font-bold">${w.strike.toFixed(2)}</td>
-                          <td className="py-2 text-gray-300">{w.putSymbol}</td>
-                          <td className="py-2 text-right text-white font-bold">{w.putOi.toLocaleString()}</td>
-                          <td className="py-2 text-right text-purple-300">{w.putIv}%</td>
-                          <td className="py-2 text-right text-gray-300">{w.putDelta}</td>
-                          <td className="py-2 text-right text-rose-400 font-bold">{dist.toFixed(1)}%</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div className="space-y-1.5">
+                {topPutWalls.map((w, idx) => (
+                  <div key={w.strike} className="flex justify-between items-center text-gray-300 bg-[#0c1322] p-2 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <span className="text-rose-400 font-bold">#{idx + 1}</span>
+                      <span>$${w.strike.toFixed(2)}</span>
+                      <span className="text-[10px] text-gray-400">{w.putSymbol}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-rose-400 font-bold">{w.putOi.toLocaleString()} OI</span>
+                      <span className="text-[10px] text-gray-400">IV: {w.putIv}%</span>
+                      <span className="text-[10px] text-rose-400">{(((w.strike - spotPrice) / spotPrice) * 100).toFixed(1)}%</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* 5. GRÁFICO 3: IMPLIED VOLATILITY SKEW (SMILE / SKIRT) */}
+      {/* 4. IMPLIED VOLATILITY SKEW */}
       {(displayMode === 'UNIFIED' || displayMode === 'SKEW_ONLY') && (
-        <div className="bg-[#0c1322] border border-cyan-500/30 rounded-2xl p-5 space-y-4 shadow-2xl">
+        <div className="bg-[#0c1322] border border-gray-800 p-5 rounded-2xl space-y-4 shadow-xl">
           <div className="flex justify-between items-center border-b border-gray-800 pb-3">
             <div>
-              <div className="flex items-center gap-2">
-                <Activity className="w-4 h-4 text-cyan-400" />
-                <h3 className="text-sm font-bold text-white font-mono uppercase tracking-wide">
-                  {symbol.toUpperCase()} Implied Volatility Skew (Smile de Volatilidade)
-                </h3>
-              </div>
+              <h4 className="text-sm font-bold text-white font-mono uppercase flex items-center gap-2">
+                <Activity className="w-4 h-4 text-purple-400" />
+                <span>IMPLIED VOLATILITY SKEW (SMILE DE VOLATILIDADE)</span>
+              </h4>
               <p className="text-xs text-gray-400 mt-0.5">
-                Curva de Volatilidade Implícita das Puts (Vermelho) e Calls (Verde) ao longo dos strikes.
+                Curva de precificação de volatilidade implícita ao longo de todos os strikes para {currentExp.dateStr}.
               </p>
             </div>
-            <span className="text-xs font-mono text-cyan-300">Tastytrade Real-Time IV</span>
+            <div className="text-xs font-mono text-purple-300">
+              ATM IV: <strong>{currentExp.baseIv}%</strong>
+            </div>
           </div>
 
-          <div className="w-full bg-[#040711] p-4 rounded-xl border border-gray-900">
-            {(() => {
-              const width = 860;
-              const height = 220;
-              const padL = 50;
-              const padR = 40;
-              const padT = 30;
-              const padB = 35;
-              const chartW = width - padL - padR;
-              const chartH = height - padT - padB;
+          <div className="w-full bg-[#040711] p-3 rounded-xl border border-gray-900 overflow-hidden relative">
+            <svg viewBox="0 0 850 180" className="w-full h-auto">
+              <line x1={spotX} y1={20} x2={spotX} y2={145} stroke="#06b6d4" strokeWidth="1.5" strokeDasharray="4 4" />
+              <text x={spotX} y={15} textAnchor="middle" fill="#22d3ee" fontSize="9" fontWeight="bold" fontFamily="monospace">
+                Spot $${spotPrice.toFixed(2)}
+              </text>
 
-              const allIvs = strikesData.flatMap(s => [s.callIv, s.putIv]);
-              const minIv = Math.min(...allIvs) * 0.9;
-              const maxIv = Math.max(...allIvs) * 1.1;
+              {strikesData.map((s, idx) => {
+                if (idx === strikesData.length - 1) return null;
+                const nextS = strikesData[idx + 1];
+                const x1 = getX(s.strike);
+                const x2 = getX(nextS.strike);
+                const yCall1 = 140 - (s.callIv - 25) * 4;
+                const yCall2 = 140 - (nextS.callIv - 25) * 4;
+                const yPut1 = 140 - (s.putIv - 25) * 4;
+                const yPut2 = 140 - (nextS.putIv - 25) * 4;
 
-              const minK = strikesData[0].strike;
-              const maxK = strikesData[strikesData.length - 1].strike;
+                return (
+                  <g key={s.strike}>
+                    <line x1={x1} y1={yCall1} x2={x2} y2={yCall2} stroke="#10b981" strokeWidth="2.5" />
+                    <line x1={x1} y1={yPut1} x2={x2} y2={yPut2} stroke="#f43f5e" strokeWidth="2.5" />
+                  </g>
+                );
+              })}
+            </svg>
 
-              const getX = (k: number) => padL + ((k - minK) / (maxK - minK)) * chartW;
-              const getY = (iv: number) => padT + chartH - ((iv - minIv) / (maxIv - minIv)) * chartH;
-
-              let callPath = '';
-              let putPath = '';
-              strikesData.forEach((s, idx) => {
-                const px = getX(s.strike);
-                const pyCall = getY(s.callIv);
-                const pyPut = getY(s.putIv);
-
-                if (idx === 0) {
-                  callPath = `M ${px} ${pyCall}`;
-                  putPath = `M ${px} ${pyPut}`;
-                } else {
-                  callPath += ` L ${px} ${pyCall}`;
-                  putPath += ` L ${px} ${pyPut}`;
-                }
-              });
-
-              const spotX = getX(spotPrice);
-
-              return (
-                <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">
-                  {/* Grid Lines */}
-                  {[0, 0.33, 0.66, 1].map((pct, i) => {
-                    const ivVal = minIv + pct * (maxIv - minIv);
-                    const y = getY(ivVal);
-                    return (
-                      <g key={i}>
-                        <line x1={padL} y1={y} x2={width - padR} y2={y} stroke="#1e293b" strokeDasharray="2 2" />
-                        <text x={padL - 8} y={y + 3} fill="#64748b" fontSize="9" fontFamily="monospace" textAnchor="end">
-                          {ivVal.toFixed(0)}%
-                        </text>
-                      </g>
-                    );
-                  })}
-
-                  {/* Spot line */}
-                  <line x1={spotX} y1={padT} x2={spotX} y2={height - padB} stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="4 4" />
-                  <text x={spotX} y={padT - 8} fill="#fbbf24" fontSize="9" fontFamily="monospace" textAnchor="middle">
-                    Spot ${spotPrice.toFixed(2)}
-                  </text>
-
-                  {/* Lines */}
-                  <path d={callPath} fill="none" stroke="#10b981" strokeWidth="2.5" />
-                  <path d={putPath} fill="none" stroke="#ef4444" strokeWidth="2.5" />
-
-                  {/* Points */}
-                  {strikesData.map((s, idx) => (
-                    <g key={s.strike}>
-                      <circle cx={getX(s.strike)} cy={getY(s.callIv)} r="3" fill="#10b981" />
-                      <circle cx={getX(s.strike)} cy={getY(s.putIv)} r="3" fill="#ef4444" />
-                      {idx % 3 === 0 && (
-                        <text x={getX(s.strike)} y={height - padB + 14} fill="#64748b" fontSize="8" fontFamily="monospace" textAnchor="middle">
-                          ${s.strike.toFixed(0)}
-                        </text>
-                      )}
-                    </g>
-                  ))}
-                </svg>
-              );
-            })()}
-
-            <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono pt-2 border-t border-gray-800/80">
-              <div className="flex items-center gap-4">
-                <span className="flex items-center gap-1.5 text-emerald-400 font-bold"><span className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></span> Call IV (%)</span>
-                <span className="flex items-center gap-1.5 text-rose-400 font-bold"><span className="w-2.5 h-2.5 bg-rose-500 rounded-full"></span> Put IV (%)</span>
-              </div>
-              <span>Skew de Volatilidade Implícita por Strike</span>
+            <div className="flex justify-between items-center text-[10px] text-gray-400 font-mono px-2 pt-1 border-t border-gray-900">
+              <span className="flex items-center gap-2">
+                <span className="text-emerald-400 font-bold">― Call IV (%)</span>
+                <span className="text-rose-400 font-bold">― Put IV (%)</span>
+              </span>
+              <span>Strikes ($)</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* 6. PAINEL INSTITUCIONAL: PILARES OPERACIONAIS DO GEX & ENTRADA SNIPER */}
+      {/* 5. PAINEL INSTITUCIONAL: PILARES OPERACIONAIS DO GEX */}
       <div className="bg-[#0c1322] border border-cyan-500/40 rounded-2xl p-6 space-y-5 shadow-2xl">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-800 pb-3">
           <div className="flex items-center gap-2">
@@ -779,34 +791,32 @@ export function UnifiedGexBarreirasView({ symbol, spotPrice, isEmbedded = false 
           </span>
         </div>
 
-        {/* 4 Cards de Diagnóstico de Campo */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
           <div className="p-3.5 bg-[#070b14] border border-emerald-500/30 rounded-xl space-y-1">
             <span className="text-[10px] text-emerald-400 font-bold block font-sans">1. RESISTÊNCIA (CALL WALL)</span>
-            <span className="text-base font-bold text-white block">${topCallWalls[0]?.strike.toFixed(2) || '—'}</span>
+            <span className="text-base font-bold text-white block">\$${topCallWalls[0]?.strike.toFixed(2) || '—'}</span>
             <span className="text-[10px] text-gray-400 block font-sans">Ímã de alta & trava de balanceamento dos MMs.</span>
           </div>
 
           <div className="p-3.5 bg-[#070b14] border border-rose-500/30 rounded-xl space-y-1">
             <span className="text-[10px] text-rose-400 font-bold block font-sans">2. SUPORTE (PUT WALL)</span>
-            <span className="text-base font-bold text-white block">${topPutWalls[0]?.strike.toFixed(2) || '—'}</span>
+            <span className="text-base font-bold text-white block">\$${topPutWalls[0]?.strike.toFixed(2) || '—'}</span>
             <span className="text-[10px] text-gray-400 block font-sans">Ímã de baixa & barreira matemática dos MMs.</span>
           </div>
 
           <div className="p-3.5 bg-[#070b14] border border-amber-500/30 rounded-xl space-y-1">
             <span className="text-[10px] text-amber-400 font-bold block font-sans">3. PIN CANDIDATE (ESCAPE OI)</span>
-            <span className="text-base font-bold text-amber-300 block">${maxPain.toFixed(2)}</span>
+            <span className="text-base font-bold text-amber-300 block">\$${maxPain.toFixed(2)}</span>
             <span className="text-[10px] text-gray-400 block font-sans">Ponto de fuga secundário quando as Walls falham.</span>
           </div>
 
           <div className="p-3.5 bg-[#070b14] border border-purple-500/30 rounded-xl space-y-1">
             <span className="text-[10px] text-purple-400 font-bold block font-sans">4. ZERO GAMMA FLIP</span>
-            <span className="text-base font-bold text-purple-300 block">${zeroGammaFlip.toFixed(2)}</span>
+            <span className="text-base font-bold text-purple-300 block">\$${zeroGammaFlip.toFixed(2)}</span>
             <span className="text-[10px] text-gray-400 block font-sans">Gatilho de transição entre Supressão e Squeeze.</span>
           </div>
         </div>
 
-        {/* Checklist Pré-Operacional GEX (5 Passos) */}
         <div className="p-4 bg-[#070b14] border border-gray-800 rounded-xl space-y-3 font-sans text-xs">
           <h5 className="font-bold text-white flex items-center gap-2">
             <Shield className="w-4 h-4 text-cyan-400" />
@@ -832,8 +842,8 @@ export function UnifiedGexBarreirasView({ symbol, spotPrice, isEmbedded = false 
             </div>
 
             <div className="p-2.5 bg-[#111827] rounded-lg border border-gray-800 space-y-1">
-              <strong className="text-cyan-300 block font-mono">4. Calendário Operacional:</strong>
-              Quinta e Sexta-feira concentram os ajustes semanais de Delta Hedge institucional.
+              <strong className="text-cyan-300 block font-mono">4. Mercado Americano (Custo até 50%):</strong>
+              Em travas de débito (Bull/Bear Spreads), pague no máximo 50% da largura da asa (vs 25%-30% no Brasil).
             </div>
           </div>
         </div>

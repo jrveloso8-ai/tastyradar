@@ -23,6 +23,15 @@ export default function HomePage() {
     setActiveTab('barreiras');
   };
 
+  const handleBackToQuote = (symbol?: string) => {
+    if (symbol) setSelectedSymbol(symbol);
+    setActiveTab('consulta');
+  };
+
+  const handleBackToScreener = () => {
+    setActiveTab('rastreador');
+  };
+
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-[#070b14] text-gray-100 selection:bg-emerald-500/30 selection:text-emerald-300">
       <Navbar activeTab={activeTab} onTabChange={setActiveTab} uniqueVisitors={3} />
@@ -33,7 +42,13 @@ export default function HomePage() {
         </div>
 
         <div id="panel-consulta" role="tabpanel" className={activeTab === 'consulta' ? 'block' : 'hidden'}>
-          {activeTab === 'consulta' && <QuoteView initialSymbol={selectedSymbol} onNavigateToGex={handleNavigateToGex} />}
+          {activeTab === 'consulta' && (
+            <QuoteView 
+              initialSymbol={selectedSymbol} 
+              onNavigateToGex={handleNavigateToGex}
+              onBackToScreener={handleBackToScreener}
+            />
+          )}
         </div>
 
         <div id="panel-rastreador" role="tabpanel" className={activeTab === 'rastreador' ? 'block' : 'hidden'}>
@@ -41,7 +56,14 @@ export default function HomePage() {
         </div>
 
         <div id="panel-barreiras" role="tabpanel" className={activeTab === 'barreiras' ? 'block' : 'hidden'}>
-          {activeTab === 'barreiras' && <BarreirasGexView initialSymbol={selectedSymbol} />}
+          {activeTab === 'barreiras' && (
+            <BarreirasGexView 
+              initialSymbol={selectedSymbol} 
+              onSelectSymbol={(sym) => setSelectedSymbol(sym)}
+              onBackToQuote={handleBackToQuote}
+              onBackToScreener={handleBackToScreener}
+            />
+          )}
         </div>
 
         <div id="panel-manual" role="tabpanel" className={activeTab === 'manual' ? 'block' : 'hidden'}>

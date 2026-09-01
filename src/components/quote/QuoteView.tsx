@@ -32,9 +32,10 @@ interface QuoteViewProps {
   symbol?: string;
   onNavigateToGex?: (sym: string) => void;
   onNavigateToBarreiras?: (sym: string) => void;
+  onBackToScreener?: () => void;
 }
 
-export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, onNavigateToBarreiras }: QuoteViewProps) {
+export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, onNavigateToBarreiras, onBackToScreener }: QuoteViewProps) {
   const symbol = initialSymbol || propSymbol || 'NVDA';
   const navGexFn = onNavigateToGex || onNavigateToBarreiras;
   const [activeTab, setActiveTab] = useState<'tecnico' | 'fundamentos' | 'opcoes' | 'recomendacoes' | 'ia'>('tecnico');
@@ -108,7 +109,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
         category: 'Precisão',
         underlyingSymbol: currentStock.symbol,
         underlyingPrice: spot,
-        dte: 12,
+        dte: 17,
         expirationDate: '2026-09-18',
         status: 'AUTORIZADA',
         isCredit: true,
@@ -130,7 +131,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
           isAdequate: true,
           statusLabel: '✓ Crédito Balanceado',
           ratioToWidthPct: Number(((netCredit / spreadWidth) * 100).toFixed(1)),
-          recommendationRule: 'Iron Condor: Capturar entre 30% e 40% da largura mínima da asa.',
+          recommendationRule: 'Iron Condor (EUA): Capturar entre 33% (1/3) a 50% da largura da asa (vs 25%-30% no Brasil devido à inflação e juros).',
         },
         takeProfitRule: {
           profitGoal: `50% a 60% do crédito recebido (+$${(netCredit * 55).toFixed(2)})`,
@@ -180,7 +181,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
           isAdequate: true,
           statusLabel: '✓ Custo Otimizado',
           ratioToWidthPct: Number(((netDebit / spreadWidth) * 100).toFixed(1)),
-          recommendationRule: 'Bull Call: Custo de montagem ideal abaixo de 45% da largura do spread.',
+          recommendationRule: 'Bull Call (EUA): Pagar até 50% da largura da asa no débito (máximo aceitável no mercado americano).',
         },
         takeProfitRule: {
           profitGoal: `70% a 80% do ganho máximo (+$${((spreadWidth - netDebit) * 75).toFixed(2)})`,
