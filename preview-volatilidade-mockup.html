@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MOCKUP: Analista de Volatilidade & Opções US — RADAR TASTYTRADE PRO</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            radar: {
+              bg: '#070b14',
+              header: '#090e18',
+              card: '#0c1322',
+              cardInner: '#10192e',
+              border: '#1f293d',
+              emerald: '#10b981',
+              cyan: '#06b6d4',
+              purple: '#8b5cf6',
+              rose: '#f43f5e',
+              amber: '#f59e0b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #070b14;
+      color: #f3f4f6;
+      font-family: 'Inter', sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #090e18;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #1f293d;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #374151;
+    }
+    .active-nav-tab {
+      background: rgba(139, 92, 246, 0.15) !important;
+      color: #c084fc !important;
+      border-color: rgba(168, 85, 247, 0.45) !important;
+    }
+    .row-selected {
+      background: rgba(139, 92, 246, 0.12) !important;
+      border-color: rgba(168, 85, 247, 0.6) !important;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-purple-500/30 selection:text-purple-300">
+
+  <!-- ================= TOP HEADER / NAVBAR ================= -->
+  <header class="sticky top-0 z-50 bg-[#090e18]/95 backdrop-blur border-b border-gray-800 shadow-xl">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        
+        <!-- Logo -->
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-500 to-cyan-500 flex items-center justify-center shadow-md shadow-purple-500/20">
+            <i data-lucide="gauge" class="w-5 h-5 text-slate-950 stroke-[2.5]"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="font-black text-base tracking-wider text-white font-mono">RADAR</span>
+              <span class="px-1.5 py-0.5 text-[10px] font-bold font-mono rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">QUANT VOL</span>
+              <span class="px-1.5 py-0.5 text-[9px] font-bold font-mono rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">TASTYTRADE API</span>
+            </div>
+            <p class="text-[10px] text-gray-400 font-mono">Módulo Autônomo de Volatilidade, Gregas e Estruturas US</p>
+          </div>
+        </div>
+
+        <!-- Navigation Tabs (Mostrando a nova aba isolada 'Analista de Volatilidade') -->
+        <nav class="hidden md:flex items-center gap-1 bg-[#070b14] p-1 rounded-xl border border-gray-800 text-xs font-mono">
+          <button class="px-3 py-1.5 rounded-lg text-gray-400 hover:text-white transition flex items-center gap-1.5">
+            <i data-lucide="compass" class="w-3.5 h-3.5"></i>
+            Panorama
+          </button>
+          <button class="px-3 py-1.5 rounded-lg text-gray-400 hover:text-white transition flex items-center gap-1.5">
+            <i data-lucide="search" class="w-3.5 h-3.5"></i>
+            Consulta
+          </button>
+          <button class="px-3 py-1.5 rounded-lg text-gray-400 hover:text-white transition flex items-center gap-1.5">
+            <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+            Rastreador Ações
+          </button>
+          <button class="px-3 py-1.5 rounded-lg text-gray-400 hover:text-white transition flex items-center gap-1.5">
+            <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+            Barreiras GEX
+          </button>
+          <!-- NOVA ABA DESTACADA -->
+          <button class="px-3.5 py-1.5 rounded-lg active-nav-tab border font-bold text-white transition flex items-center gap-1.5 shadow-sm">
+            <i data-lucide="gauge" class="w-3.5 h-3.5 text-purple-400"></i>
+            Analista de Volatilidade
+            <span class="w-1.5 h-1.5 rounded-full bg-purple-400 animate-ping"></span>
+          </button>
+          <button class="px-3 py-1.5 rounded-lg text-gray-400 hover:text-white transition flex items-center gap-1.5">
+            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+            Manual
+          </button>
+        </nav>
+
+        <!-- Status Pill -->
+        <div class="flex items-center gap-3">
+          <div class="hidden sm:flex items-center gap-2 bg-[#070b14] px-3 py-1 rounded-lg border border-gray-800 text-[11px] font-mono">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-gray-300">Tastytrade DXLink: <strong class="text-emerald-400 font-bold">Conectado</strong></span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= MAIN CONTAINER ================= -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- 1. BARRA MACRO DO MERCADO AMERICANO (VIX, SKEW, GEX GERAL) -->
+    <section class="bg-[#0c1322] border border-gray-800/90 rounded-2xl p-4 shadow-xl">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-2">
+          <div class="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400">
+            <i data-lucide="activity" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h1 class="text-sm font-bold text-white font-mono tracking-tight flex items-center gap-2">
+              Termômetro Macro de Volatilidade & Riscos Institucionais
+              <span class="text-[10px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">US MARKETS</span>
+            </h1>
+            <p class="text-[11px] text-gray-400 font-sans">Condições gerais do complexo VIX e posicionamento agregado dos Market Makers</p>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 font-mono text-xs">
+          <!-- VIX -->
+          <div class="bg-[#070b14] px-3 py-1.5 rounded-xl border border-gray-800 flex items-center gap-2">
+            <span class="text-gray-400">VIX (Spot):</span>
+            <span class="font-bold text-emerald-400">15.42</span>
+            <span class="text-[9px] px-1 py-0.2 rounded bg-emerald-500/10 text-emerald-300">CONTANGO</span>
+          </div>
+          <!-- VIX9D / VIX3M -->
+          <div class="bg-[#070b14] px-3 py-1.5 rounded-xl border border-gray-800 flex items-center gap-2">
+            <span class="text-gray-400">VIX9D/VIX3M:</span>
+            <span class="font-bold text-cyan-300">0.86</span>
+            <span class="text-[9px] text-gray-400">(Calmo &lt; 1.0)</span>
+          </div>
+          <!-- SKEW -->
+          <div class="bg-[#070b14] px-3 py-1.5 rounded-xl border border-gray-800 flex items-center gap-2">
+            <span class="text-gray-400">CBOE SKEW:</span>
+            <span class="font-bold text-amber-400">138.2</span>
+            <span class="text-[9px] text-amber-300/80">Tail Risk Alto</span>
+          </div>
+          <!-- GEX SPX -->
+          <div class="bg-[#070b14] px-3 py-1.5 rounded-xl border border-emerald-500/30 flex items-center gap-2">
+            <span class="text-gray-400">SPX Net GEX:</span>
+            <span class="font-bold text-emerald-400">+$3.82 B</span>
+            <span class="text-[9px] px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300">+GEX AMORTECIDO</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. SCANNER & RADAR + PAINEL DE DIAGNÓSTICO (LAYOUT LADO A LADO) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- COLUNA DA ESQUERDA: GRADE SCANNER DE VOLATILIDADE (7 colunas no desktop) -->
+      <div class="lg:col-span-7 space-y-4">
+        
+        <div class="bg-[#0c1322] border border-gray-800 rounded-2xl p-4 space-y-3 shadow-lg">
+          
+          <!-- Filtros de Estratégia / Postura -->
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 pb-3">
+            <div class="flex items-center gap-1.5 bg-[#070b14] p-1 rounded-xl border border-gray-800 text-xs font-mono">
+              <button onclick="setFilter('ALL')" id="btn-all" class="px-3 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/40 font-bold transition">
+                Todos (10)
+              </button>
+              <button onclick="setFilter('SELL_VOL')" id="btn-sell" class="px-3 py-1 rounded-lg text-gray-400 hover:text-white transition">
+                ⚡ Venda de Vol (IVR &gt; 50)
+              </button>
+              <button onclick="setFilter('BUY_VOL')" id="btn-buy" class="px-3 py-1 rounded-lg text-gray-400 hover:text-white transition">
+                🎯 Compra de Vol (IVR &lt; 30)
+              </button>
+              <button onclick="setFilter('WALL_SNIPER')" id="btn-sniper" class="px-3 py-1 rounded-lg text-gray-400 hover:text-white transition">
+                🛡️ Próximo às Walls
+              </button>
+            </div>
+
+            <div class="text-[11px] font-mono text-gray-400">
+              Ordenado por: <strong class="text-white">IV Rank (Decrescente)</strong>
+            </div>
+          </div>
+
+          <!-- Tabela com Heatmap -->
+          <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-left font-mono text-xs">
+              <thead>
+                <tr class="text-[10px] text-gray-400 border-b border-gray-800 uppercase tracking-wider bg-[#070b14]/50">
+                  <th class="py-2.5 px-3">Ativo</th>
+                  <th class="py-2.5 px-2 text-right">Spot</th>
+                  <th class="py-2.5 px-2 text-center">IV Rank</th>
+                  <th class="py-2.5 px-2 text-center">IV Perc</th>
+                  <th class="py-2.5 px-2 text-center">VRP (YZ)</th>
+                  <th class="py-2.5 px-2 text-center">GEX</th>
+                  <th class="py-2.5 px-3 text-right">Setup Eleito</th>
+                </tr>
+              </thead>
+              <tbody id="assets-tbody" class="divide-y divide-gray-800/60">
+                <!-- Preenchido via JavaScript -->
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pt-2 text-[10px] font-mono text-gray-500 flex justify-between items-center">
+            <span>💡 Clique em qualquer ativo para ver a ficha operacional e os strikes da estrutura.</span>
+            <span>VRP = IV30d - RV20d (Yang-Zhang)</span>
+          </div>
+
+        </div>
+
+        <!-- Mini-gráfico de Série Temporal IV vs HV (TradingView style via Chart.js) -->
+        <div class="bg-[#0c1322] border border-gray-800 rounded-2xl p-4 shadow-lg space-y-3">
+          <div class="flex justify-between items-center border-b border-gray-800 pb-2.5">
+            <div class="flex items-center gap-2">
+              <i data-lucide="trending-up" class="w-4 h-4 text-cyan-400"></i>
+              <h3 class="text-xs font-bold font-mono text-white">
+                Histórico Temporal: Volatilidade Implícita (IV) vs Realizada (HV Yang-Zhang) — <span id="chart-symbol" class="text-purple-400">NVDA</span>
+              </h3>
+            </div>
+            <div class="flex items-center gap-4 text-[10px] font-mono">
+              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> IV 30d</span>
+              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span> HV 20d (YZ)</span>
+            </div>
+          </div>
+          <div class="h-44 w-full">
+            <canvas id="volChart"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- COLUNA DA DIREITA: FICHA OPERACIONAL DO ATIVO SELECIONADO (5 colunas no desktop) -->
+      <div class="lg:col-span-5 space-y-4">
+        
+        <div class="bg-[#0c1322] border border-purple-500/40 rounded-2xl p-5 shadow-2xl space-y-5 relative overflow-hidden">
+          
+          <div class="absolute -right-12 -top-12 w-36 h-36 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <!-- Cabeçalho do Ativo -->
+          <div class="flex items-start justify-between border-b border-gray-800 pb-4">
+            <div>
+              <div class="flex items-center gap-2">
+                <h2 id="detail-symbol" class="text-2xl font-black font-mono text-white">NVDA</h2>
+                <span id="detail-name" class="text-xs text-gray-400 font-sans">NVIDIA Corporation</span>
+                <span class="px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono">Líquido 5/5</span>
+              </div>
+              <div class="flex items-center gap-3 font-mono text-xs mt-1">
+                <span>Spot: <strong id="detail-spot" class="text-white">$142.50</strong></span>
+                <span id="detail-change" class="text-emerald-400 font-semibold">+2.84%</span>
+                <span class="text-gray-500">|</span>
+                <span class="text-gray-400">SOFR: <strong class="text-gray-200">5.32%</strong></span>
+              </div>
+            </div>
+
+            <div class="text-right">
+              <span id="detail-badge-gex" class="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                +GEX ESTÁVEL
+              </span>
+              <div class="text-[10px] text-gray-400 font-mono mt-1">Dealers Amortecem</div>
+            </div>
+          </div>
+
+          <!-- Métricas de Volatilidade & Barreiras de GEX -->
+          <div class="grid grid-cols-3 gap-2 text-center font-mono text-xs">
+            <div class="bg-[#070b14] p-2.5 rounded-xl border border-gray-800">
+              <div class="text-[10px] text-gray-400">IV Rank (252d)</div>
+              <div id="detail-ivr" class="text-base font-bold text-rose-400 mt-0.5">74.2%</div>
+              <div class="text-[9px] text-rose-300/70">Prêmios Inflados</div>
+            </div>
+            <div class="bg-[#070b14] p-2.5 rounded-xl border border-gray-800">
+              <div class="text-[10px] text-gray-400">VRP (Prêmio Risco)</div>
+              <div id="detail-vrp" class="text-base font-bold text-emerald-400 mt-0.5">+12.4 pts</div>
+              <div class="text-[9px] text-emerald-300/70">IV &gt; Realizado</div>
+            </div>
+            <div class="bg-[#070b14] p-2.5 rounded-xl border border-gray-800">
+              <div class="text-[10px] text-gray-400">Zero Gamma Flip</div>
+              <div id="detail-flip" class="text-base font-bold text-cyan-300 mt-0.5">$138.00</div>
+              <div class="text-[9px] text-gray-400">Divisor de Águas</div>
+            </div>
+          </div>
+
+          <!-- Paredes Institucionais de Gamma (Walls) -->
+          <div class="bg-[#070b14] p-3 rounded-xl border border-gray-800 font-mono text-xs space-y-2">
+            <div class="flex justify-between items-center text-[10px] text-gray-400">
+              <span>CANAL INSTITUCIONAL DE MARKET MAKERS</span>
+              <span>Distância entre Walls: 14.8%</span>
+            </div>
+            <div class="flex justify-between items-center text-xs">
+              <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+                <span class="text-gray-300">Put Wall (Piso):</span>
+                <strong id="detail-putwall" class="text-rose-400">$135.00</strong>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span class="text-gray-300">Call Wall (Teto):</span>
+                <strong id="detail-callwall" class="text-emerald-400">$155.00</strong>
+              </div>
+            </div>
+            <!-- Barra visual do spot entre as paredes -->
+            <div class="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden flex">
+              <div class="bg-rose-500/60 h-full w-[35%]"></div>
+              <div class="bg-cyan-400 h-full w-[4px]"></div>
+              <div class="bg-emerald-500/60 h-full flex-1"></div>
+            </div>
+          </div>
+
+          <!-- ESTRUTURA ELEITA CONFORME SKILL analista-senior-opcoes-us -->
+          <div class="bg-gradient-to-b from-[#10192e] to-[#0a1020] border border-purple-500/30 rounded-xl p-4 space-y-3">
+            <div class="flex justify-between items-center">
+              <div class="flex items-center gap-2">
+                <span class="p-1.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                  <i data-lucide="shield-check" class="w-4 h-4"></i>
+                </span>
+                <div>
+                  <div class="text-[10px] font-mono text-purple-300 uppercase tracking-wide">Estratégia Recomendada</div>
+                  <h3 id="detail-strat-title" class="text-sm font-bold font-mono text-white">Iron Condor a Crédito #20</h3>
+                </div>
+              </div>
+              <span id="detail-dte" class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono text-[11px] font-bold">
+                35 DTE (Tasty Sweet Spot)
+              </span>
+            </div>
+
+            <!-- Pernas da Estrutura -->
+            <div class="space-y-1.5 font-mono text-xs pt-1">
+              <div class="flex justify-between items-center p-2 rounded bg-[#070b14] border border-gray-800/80">
+                <span class="text-rose-400 font-bold">Vende Put $135 (Put Wall)</span>
+                <span class="text-gray-400">Delta ~16 | IV 44%</span>
+                <span class="text-emerald-400 font-bold">+$1.45</span>
+              </div>
+              <div class="flex justify-between items-center p-2 rounded bg-[#070b14] border border-gray-800/80">
+                <span class="text-emerald-400 font-bold">Vende Call $155 (Call Wall)</span>
+                <span class="text-gray-400">Delta ~16 | IV 39%</span>
+                <span class="text-emerald-400 font-bold">+$1.35</span>
+              </div>
+              <div class="flex justify-between items-center p-2 rounded bg-[#070b14] border border-gray-800/80">
+                <span class="text-gray-400">Compra Asas de Proteção ($130P / $160C)</span>
+                <span class="text-gray-500">Risco Definido</span>
+                <span class="text-rose-400 font-bold">-$0.95</span>
+              </div>
+            </div>
+
+            <!-- Payoff & Regra de Ouro do Crédito -->
+            <div class="pt-2 border-t border-gray-800 flex justify-between items-center font-mono text-xs">
+              <div>
+                <span class="text-gray-400">Crédito Líquido:</span>
+                <strong id="detail-credit" class="text-emerald-400 font-bold text-sm ml-1">$1.85</strong>
+                <span class="text-[10px] text-emerald-300/80 ml-1">(&ge; 1/3 da largura: OK)</span>
+              </div>
+              <div>
+                <span class="text-gray-400">Prob. Lucro (POP):</span>
+                <strong class="text-cyan-300 font-bold ml-1">72%</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- PLAYBOOK TASTYTRADE (§8 DA SKILL) -->
+          <div class="bg-[#070b14] p-3.5 rounded-xl border border-gray-800 font-mono text-xs space-y-2">
+            <div class="text-[10px] text-purple-300 font-bold uppercase flex items-center gap-1.5">
+              <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+              Mecânica Operacional Tastytrade (Ciclo de Vida)
+            </div>
+            <ul class="text-[11px] text-gray-300 space-y-1.5 list-disc list-inside">
+              <li><strong>Take Profit:</strong> Fechar a ordem com 50% do lucro (<span class="text-emerald-400 font-bold">$0.92</span>).</li>
+              <li><strong>Gatilho de Defesa aos 21 DTE:</strong> Encerrar ou rolar para o mês seguinte para evitar aceleração de Gamma e Zomma.</li>
+              <li><strong>Untested Side:</strong> Rolar no máximo 1x por ciclo se um dos lados for pressionado.</li>
+              <li class="text-emerald-400"><strong>Teste de Dividendo:</strong> Seguro (Dividendo $0.04 &lt; Extrínseco $1.35).</li>
+            </ul>
+          </div>
+
+          <!-- Botões de Ação -->
+          <div class="flex gap-2 font-mono text-xs pt-1">
+            <button class="flex-1 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold transition shadow-lg shadow-purple-600/25 flex items-center justify-center gap-2">
+              <i data-lucide="terminal" class="w-4 h-4"></i>
+              Copiar Ordem Formatada (Tastytrade)
+            </button>
+            <button class="px-4 py-2 rounded-xl bg-[#070b14] hover:bg-gray-800 text-gray-300 border border-gray-700 transition flex items-center justify-center">
+              <i data-lucide="share-2" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ================= JAVASCRIPT LOGIC & DADOS ================= -->
+  <script>
+    // Dataset de Ativos US com Métricas Reais da Skill
+    const US_ASSETS = [
+      {
+        symbol: 'NVDA',
+        name: 'NVIDIA Corporation',
+        spot: 142.50,
+        change: 2.84,
+        ivr: 74.2,
+        ivp: 81.0,
+        iv30: 44.5,
+        rv20: 32.1,
+        vrp: 12.4,
+        gexRegime: '+GEX',
+        gexText: '+GEX ESTÁVEL',
+        flip: 138.00,
+        putWall: 135.00,
+        callWall: 155.00,
+        setup: 'Iron Condor #20',
+        setupCategory: 'SELL_VOL',
+        credit: 1.85,
+        targetDte: '35 DTE',
+        hvHistory: [38, 35, 33, 31, 32, 32.1],
+        ivHistory: [52, 48, 46, 43, 45, 44.5],
+      },
+      {
+        symbol: 'TSLA',
+        name: 'Tesla Inc.',
+        spot: 248.30,
+        change: -1.15,
+        ivr: 22.4,
+        ivp: 26.0,
+        iv30: 36.2,
+        rv20: 39.4,
+        vrp: -3.2,
+        gexRegime: '-GEX',
+        gexText: '-GEX EXPLOSIVO',
+        flip: 252.00,
+        putWall: 235.00,
+        callWall: 265.00,
+        setup: 'Bear Put Spread #2',
+        setupCategory: 'BUY_VOL',
+        credit: -2.10,
+        targetDte: '21 DTE',
+        hvHistory: [44, 42, 41, 40, 39, 39.4],
+        ivHistory: [41, 38, 36, 35, 36, 36.2],
+      },
+      {
+        symbol: 'AAPL',
+        name: 'Apple Inc.',
+        spot: 238.10,
+        change: 0.65,
+        ivr: 68.0,
+        ivp: 72.0,
+        iv30: 24.5,
+        rv20: 16.2,
+        vrp: 8.3,
+        gexRegime: '+GEX',
+        gexText: '+GEX ESTÁVEL',
+        flip: 234.00,
+        putWall: 230.00,
+        callWall: 245.00,
+        setup: 'Bull Put Spread #6',
+        setupCategory: 'SELL_VOL',
+        credit: 1.25,
+        targetDte: '42 DTE',
+        hvHistory: [18, 17, 17, 16, 16, 16.2],
+        ivHistory: [28, 26, 25, 24, 25, 24.5],
+      },
+      {
+        symbol: 'SPY',
+        name: 'SPDR S&P 500 ETF',
+        spot: 598.80,
+        change: 0.78,
+        ivr: 18.5,
+        ivp: 21.0,
+        iv30: 13.2,
+        rv20: 11.5,
+        vrp: 1.7,
+        gexRegime: '+GEX',
+        gexText: '+GEX ESTÁVEL',
+        flip: 592.00,
+        putWall: 590.00,
+        callWall: 605.00,
+        setup: 'Double Calendar #14',
+        setupCategory: 'BUY_VOL',
+        credit: -3.40,
+        targetDte: '30 / 60 DTE',
+        hvHistory: [12, 11.8, 11.6, 11.5, 11.5, 11.5],
+        ivHistory: [15, 14.5, 14, 13.5, 13.4, 13.2],
+      },
+      {
+        symbol: 'QQQ',
+        name: 'Invesco QQQ Trust',
+        spot: 518.20,
+        change: 1.22,
+        ivr: 24.0,
+        ivp: 28.0,
+        iv30: 18.4,
+        rv20: 17.1,
+        vrp: 1.3,
+        gexRegime: '+GEX',
+        gexText: '+GEX ESTÁVEL',
+        flip: 512.00,
+        putWall: 510.00,
+        callWall: 525.00,
+        setup: 'Calendar Spread #14',
+        setupCategory: 'BUY_VOL',
+        credit: -2.85,
+        targetDte: '30 / 60 DTE',
+        hvHistory: [18, 17.5, 17.2, 17.0, 17.1, 17.1],
+        ivHistory: [21, 20.2, 19.5, 18.8, 18.6, 18.4],
+      },
+      {
+        symbol: 'META',
+        name: 'Meta Platforms Inc.',
+        spot: 612.40,
+        change: 1.45,
+        ivr: 71.5,
+        ivp: 78.0,
+        iv30: 38.0,
+        rv20: 27.5,
+        vrp: 10.5,
+        gexRegime: '+GEX',
+        gexText: '+GEX ESTÁVEL',
+        flip: 600.00,
+        putWall: 590.00,
+        callWall: 630.00,
+        setup: 'Iron Condor #20',
+        setupCategory: 'SELL_VOL',
+        credit: 2.30,
+        targetDte: '38 DTE',
+        hvHistory: [32, 30, 29, 28, 27.8, 27.5],
+        ivHistory: [44, 42, 40, 39, 38.5, 38.0],
+      },
+      {
+        symbol: 'AMD',
+        name: 'Advanced Micro Devices',
+        spot: 156.80,
+        change: 3.12,
+        ivr: 62.0,
+        ivp: 66.0,
+        iv30: 48.0,
+        rv20: 39.2,
+        vrp: 8.8,
+        gexRegime: '+GEX',
+        gexText: '+GEX ESTÁVEL',
+        flip: 152.00,
+        putWall: 148.00,
+        callWall: 165.00,
+        setup: 'Jade Lizard #22',
+        setupCategory: 'SELL_VOL',
+        credit: 2.10,
+        targetDte: '45 DTE',
+        hvHistory: [42, 41, 40, 39.5, 39.3, 39.2],
+        ivHistory: [55, 52, 50, 49, 48.5, 48.0],
+      },
+      {
+        symbol: 'AMZN',
+        name: 'Amazon.com Inc.',
+        spot: 198.40,
+        change: -0.42,
+        ivr: 42.0,
+        ivp: 45.0,
+        iv30: 29.5,
+        rv20: 26.8,
+        vrp: 2.7,
+        gexRegime: '+GEX',
+        gexText: '+GEX ESTÁVEL',
+        flip: 195.00,
+        putWall: 190.00,
+        callWall: 205.00,
+        setup: 'Bull Call Spread #1',
+        setupCategory: 'WALL_SNIPER',
+        credit: -1.45,
+        targetDte: '30 DTE',
+        hvHistory: [28, 27.5, 27.1, 26.9, 26.8, 26.8],
+        ivHistory: [33, 32, 31, 30.2, 29.8, 29.5],
+      },
+      {
+        symbol: 'MSFT',
+        name: 'Microsoft Corporation',
+        spot: 432.10,
+        change: 0.35,
+        ivr: 54.0,
+        ivp: 58.0,
+        iv30: 22.0,
+        rv20: 17.5,
+        vrp: 4.5,
+        gexRegime: '+GEX',
+        gexText: '+GEX ESTÁVEL',
+        flip: 428.00,
+        putWall: 425.00,
+        callWall: 440.00,
+        setup: 'Iron Condor #20',
+        setupCategory: 'SELL_VOL',
+        credit: 1.65,
+        targetDte: '35 DTE',
+        hvHistory: [20, 19, 18.5, 18, 17.6, 17.5],
+        ivHistory: [26, 25, 24, 23, 22.5, 22.0],
+      },
+      {
+        symbol: 'IWM',
+        name: 'iShares Russell 2000 ETF',
+        spot: 224.50,
+        change: -0.85,
+        ivr: 31.0,
+        ivp: 35.0,
+        iv30: 21.5,
+        rv20: 20.8,
+        vrp: 0.7,
+        gexRegime: '-GEX',
+        gexText: '-GEX EXPLOSIVO',
+        flip: 226.00,
+        putWall: 220.00,
+        callWall: 230.00,
+        setup: 'Bear Put Spread #2',
+        setupCategory: 'BUY_VOL',
+        credit: -1.60,
+        targetDte: '25 DTE',
+        hvHistory: [22, 21.5, 21.2, 21.0, 20.9, 20.8],
+        ivHistory: [24, 23.2, 22.5, 22.0, 21.8, 21.5],
+      }
+    ];
+
+    let currentSelectedSymbol = 'NVDA';
+    let currentFilter = 'ALL';
+    let volChartInstance = null;
+
+    function renderTable() {
+      const tbody = document.getElementById('assets-tbody');
+      tbody.innerHTML = '';
+
+      const filtered = US_ASSETS.filter(item => {
+        if (currentFilter === 'ALL') return true;
+        if (currentFilter === 'SELL_VOL') return item.ivr >= 50;
+        if (currentFilter === 'BUY_VOL') return item.ivr < 35;
+        if (currentFilter === 'WALL_SNIPER') return Math.abs(item.spot - item.putWall) / item.spot < 0.03;
+        return true;
+      });
+
+      filtered.forEach(item => {
+        const isSelected = item.symbol === currentSelectedSymbol;
+        const tr = document.createElement('tr');
+        tr.className = `cursor-pointer transition hover:bg-[#10192e] ${isSelected ? 'row-selected font-bold' : ''}`;
+        tr.onclick = () => selectAsset(item.symbol);
+
+        // Heatmap IV Rank
+        let ivrBadge = 'text-gray-300';
+        if (item.ivr >= 65) ivrBadge = 'text-rose-400 font-bold bg-rose-500/10 px-1.5 py-0.5 rounded';
+        else if (item.ivr <= 30) ivrBadge = 'text-cyan-400 font-bold bg-cyan-500/10 px-1.5 py-0.5 rounded';
+
+        // GEX Badge
+        const gexClass = item.gexRegime === '+GEX' ? 'text-emerald-400' : 'text-rose-400 font-bold';
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-3">
+            <div class="font-bold text-white flex items-center gap-1">
+              ${item.symbol}
+              ${isSelected ? '<i data-lucide="check" class="w-3 h-3 text-purple-400"></i>' : ''}
+            </div>
+            <div class="text-[9px] text-gray-500 font-sans truncate w-24">${item.name}</div>
+          </td>
+          <td class="py-2.5 px-2 text-right">
+            <div class="text-gray-200">$${item.spot.toFixed(2)}</div>
+            <div class="text-[10px] ${item.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${item.change >= 0 ? '+' : ''}${item.change.toFixed(2)}%</div>
+          </td>
+          <td class="py-2.5 px-2 text-center">
+            <span class="${ivrBadge}">${item.ivr.toFixed(1)}%</span>
+          </td>
+          <td class="py-2.5 px-2 text-center text-gray-400">${item.ivp.toFixed(0)}%</td>
+          <td class="py-2.5 px-2 text-center font-semibold ${item.vrp >= 5 ? 'text-emerald-400' : item.vrp < 0 ? 'text-rose-400' : 'text-gray-300'}">
+            ${item.vrp >= 0 ? '+' : ''}${item.vrp.toFixed(1)}
+          </td>
+          <td class="py-2.5 px-2 text-center text-[10px]">
+            <span class="${gexClass}">${item.gexRegime}</span>
+          </td>
+          <td class="py-2.5 px-3 text-right">
+            <span class="px-2 py-0.5 rounded text-[10px] bg-purple-500/15 text-purple-300 border border-purple-500/30">
+              ${item.setup}
+            </span>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      lucide.createIcons();
+    }
+
+    function selectAsset(symbol) {
+      currentSelectedSymbol = symbol;
+      const asset = US_ASSETS.find(a => a.symbol === symbol);
+      if (!asset) return;
+
+      document.getElementById('detail-symbol').innerText = asset.symbol;
+      document.getElementById('detail-name').innerText = asset.name;
+      document.getElementById('detail-spot').innerText = `$${asset.spot.toFixed(2)}`;
+      document.getElementById('detail-change').innerText = `${asset.change >= 0 ? '+' : ''}${asset.change.toFixed(2)}%`;
+      document.getElementById('detail-change').className = asset.change >= 0 ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
+
+      document.getElementById('detail-ivr').innerText = `${asset.ivr.toFixed(1)}%`;
+      document.getElementById('detail-vrp').innerText = `${asset.vrp >= 0 ? '+' : ''}${asset.vrp.toFixed(1)} pts`;
+      document.getElementById('detail-vrp').className = asset.vrp >= 5 ? 'text-base font-bold text-emerald-400 mt-0.5' : 'text-base font-bold text-rose-400 mt-0.5';
+
+      document.getElementById('detail-flip').innerText = `$${asset.flip.toFixed(2)}`;
+      document.getElementById('detail-putwall').innerText = `$${asset.putWall.toFixed(2)}`;
+      document.getElementById('detail-callwall').innerText = `$${asset.callWall.toFixed(2)}`;
+
+      document.getElementById('detail-badge-gex').innerText = asset.gexText;
+      document.getElementById('detail-badge-gex').className = asset.gexRegime === '+GEX'
+        ? 'px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+        : 'px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40';
+
+      document.getElementById('detail-strat-title').innerText = asset.setup;
+      document.getElementById('detail-dte').innerText = asset.targetDte;
+      document.getElementById('detail-credit').innerText = asset.credit > 0 ? `+$${asset.credit.toFixed(2)}` : `-$${Math.abs(asset.credit).toFixed(2)}`;
+      document.getElementById('detail-credit').className = asset.credit > 0 ? 'text-emerald-400 font-bold text-sm ml-1' : 'text-rose-400 font-bold text-sm ml-1';
+
+      document.getElementById('chart-symbol').innerText = asset.symbol;
+
+      renderTable();
+      updateChart(asset);
+    }
+
+    function setFilter(filterType) {
+      currentFilter = filterType;
+      ['btn-all', 'btn-sell', 'btn-buy', 'btn-sniper'].forEach(id => {
+        const btn = document.getElementById(id);
+        btn.className = 'px-3 py-1 rounded-lg text-gray-400 hover:text-white transition';
+      });
+
+      if (filterType === 'ALL') {
+        document.getElementById('btn-all').className = 'px-3 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/40 font-bold transition';
+      } else if (filterType === 'SELL_VOL') {
+        document.getElementById('btn-sell').className = 'px-3 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/40 font-bold transition';
+      } else if (filterType === 'BUY_VOL') {
+        document.getElementById('btn-buy').className = 'px-3 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/40 font-bold transition';
+      } else if (filterType === 'WALL_SNIPER') {
+        document.getElementById('btn-sniper').className = 'px-3 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/40 font-bold transition';
+      }
+
+      renderTable();
+    }
+
+    function initChart() {
+      const ctx = document.getElementById('volChart').getContext('2d');
+      const asset = US_ASSETS[0];
+
+      volChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ['Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set'],
+          datasets: [
+            {
+              label: 'IV 30d (Vol Implícita)',
+              data: asset.ivHistory,
+              borderColor: '#f43f5e',
+              backgroundColor: 'rgba(244, 63, 94, 0.1)',
+              borderWidth: 2,
+              tension: 0.35,
+              fill: false,
+              pointRadius: 3,
+            },
+            {
+              label: 'HV 20d (Vol Realizada Yang-Zhang)',
+              data: asset.hvHistory,
+              borderColor: '#22d3ee',
+              backgroundColor: 'rgba(34, 211, 238, 0.1)',
+              borderWidth: 2,
+              tension: 0.35,
+              fill: false,
+              pointRadius: 3,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0c1322',
+              borderColor: '#1f293d',
+              borderWidth: 1,
+              titleFont: { family: 'JetBrains Mono', size: 11 },
+              bodyFont: { family: 'JetBrains Mono', size: 11 },
+              callbacks: {
+                label: (ctx) => `${ctx.dataset.label}: ${ctx.raw.toFixed(1)}%`
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(31, 41, 61, 0.5)' },
+              ticks: { color: '#6b7280', font: { family: 'JetBrains Mono', size: 10 } }
+            },
+            y: {
+              grid: { color: 'rgba(31, 41, 61, 0.5)' },
+              ticks: { 
+                color: '#6b7280', 
+                font: { family: 'JetBrains Mono', size: 10 },
+                callback: (val) => `${val}%`
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function updateChart(asset) {
+      if (!volChartInstance) return;
+      volChartInstance.data.datasets[0].data = asset.ivHistory;
+      volChartInstance.data.datasets[1].data = asset.hvHistory;
+      volChartInstance.update();
+    }
+
+    // Inicialização
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      renderTable();
+      initChart();
+    });
+  </script>
+</body>
+</html>

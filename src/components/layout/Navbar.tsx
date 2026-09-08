@@ -11,10 +11,11 @@ import {
   Users, 
   Menu, 
   X,
-  Zap
+  Zap,
+  Gauge
 } from 'lucide-react';
 
-export type ActiveTab = 'panorama' | 'consulta' | 'rastreador' | 'barreiras' | 'manual';
+export type ActiveTab = 'panorama' | 'consulta' | 'rastreador' | 'barreiras' | 'analista-vol' | 'manual';
 
 interface NavbarProps {
   activeTab: ActiveTab;
@@ -36,11 +37,12 @@ export function Navbar({
     setMobileMenuOpen(false);
   };
 
-  const navItems: Array<{ id: ActiveTab; label: string; icon: any; isGex?: boolean }> = [
+  const navItems: Array<{ id: ActiveTab; label: string; icon: any; isGex?: boolean; isVol?: boolean }> = [
     { id: 'panorama', label: 'Panorama Geral', icon: LayoutGrid },
     { id: 'consulta', label: 'Consulta & Gráfico 12M', icon: Search },
     { id: 'rastreador', label: 'Rastreador de Tendências', icon: TrendingUp },
     { id: 'barreiras', label: 'Barreiras & Motor GEX', icon: Target, isGex: true },
+    { id: 'analista-vol', label: 'Analista de Volatilidade', icon: Gauge, isVol: true },
     { id: 'manual', label: 'Manual & Ajuda IA', icon: BookOpen },
   ];
 
@@ -73,13 +75,15 @@ export function Navbar({
                 onClick={() => handleTabClick(item.id)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all flex items-center gap-1.5 border ${
                   activeTab === item.id
-                    ? item.isGex
+                    ? item.isVol
+                      ? 'bg-purple-500/15 text-purple-300 border-purple-500/40 shadow-sm font-bold'
+                      : item.isGex
                       ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/40 shadow-sm font-bold'
                       : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-sm font-bold'
                     : 'border-transparent text-gray-400 hover:text-gray-200'
                 }`}
               >
-                <item.icon className={`w-3.5 h-3.5 ${item.isGex ? 'text-cyan-400' : ''}`} />
+                <item.icon className={`w-3.5 h-3.5 ${item.isVol ? 'text-purple-400' : item.isGex ? 'text-cyan-400' : ''}`} />
                 <span>{item.label}</span>
               </button>
             ))}
@@ -118,7 +122,7 @@ export function Navbar({
         <div className="md:hidden bg-[#070b14] border-b border-gray-800/90 px-4 pt-3 pb-5 space-y-2 shadow-2xl animate-in slide-in-from-top-2 duration-200">
           <div className="text-[10px] font-mono uppercase text-gray-400 px-2 pb-1 border-b border-gray-800/60 flex justify-between items-center">
             <span>Navegação do Radar</span>
-            <span className="text-cyan-400">5 Módulos</span>
+            <span className="text-purple-400">6 Módulos</span>
           </div>
 
           <div className="grid grid-cols-1 gap-1.5 pt-1">
@@ -128,20 +132,28 @@ export function Navbar({
                 onClick={() => handleTabClick(item.id)}
                 className={`w-full px-4 py-3 rounded-xl text-xs font-mono font-medium transition-all flex items-center justify-between border text-left ${
                   activeTab === item.id
-                    ? item.isGex
+                    ? item.isVol
+                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/50 shadow-md font-bold'
+                      : item.isGex
                       ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-md font-bold'
                       : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/50 shadow-md font-bold'
                     : 'bg-[#090e18] border-gray-800/80 text-gray-300 hover:bg-[#0f172a] hover:text-white'
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className={`p-1.5 rounded-lg ${activeTab === item.id ? 'bg-cyan-500/20 text-cyan-300' : 'bg-gray-800/50 text-gray-400'}`}>
+                  <div className={`p-1.5 rounded-lg ${
+                    activeTab === item.id 
+                      ? item.isVol 
+                        ? 'bg-purple-500/20 text-purple-300' 
+                        : 'bg-cyan-500/20 text-cyan-300' 
+                      : 'bg-gray-800/50 text-gray-400'
+                  }`}>
                     <item.icon className="w-4 h-4" />
                   </div>
                   <span>{item.label}</span>
                 </div>
                 {activeTab === item.id && (
-                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                  <span className={`w-2 h-2 rounded-full animate-pulse ${item.isVol ? 'bg-purple-400' : 'bg-cyan-400'}`}></span>
                 )}
               </button>
             ))}

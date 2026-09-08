@@ -7,6 +7,7 @@ import { PanoramaView } from '@/components/panorama/PanoramaView';
 import { QuoteView } from '@/components/quote/QuoteView';
 import { ScreenerView } from '@/components/screener/ScreenerView';
 import { BarreirasGexView } from '@/components/options/BarreirasGexView';
+import { VolatilityAnalystView } from '@/components/volatility/VolatilityAnalystView';
 import { HelpSupportView } from '@/components/help/HelpSupportView';
 
 export default function HomePage() {
@@ -62,6 +63,15 @@ export default function HomePage() {
               onSelectSymbol={(sym) => setSelectedSymbol(sym)}
               onBackToQuote={handleBackToQuote}
               onBackToScreener={handleBackToScreener}
+            />
+          )}
+        </div>
+
+        <div id="panel-analista-vol" role="tabpanel" className={activeTab === 'analista-vol' ? 'block' : 'hidden'}>
+          {activeTab === 'analista-vol' && (
+            <VolatilityAnalystView 
+              onNavigateToQuote={handleSelectSymbolFromScreener}
+              onNavigateToGex={handleNavigateToGex}
             />
           )}
         </div>

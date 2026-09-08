@@ -271,7 +271,7 @@ ${stock.category === 'LATERAL'
 • **Relação Risco:Retorno:** Projeção média de 2.0:1 com proteção contra expansão de cauda.`
 }
 
-**Catálogo CME:** O RADAR conta com suporte nativo às **25 Estratégias Oficiais CME Group** (Direcionais, Precisão de Renda e Arbitragem de Volatilidade).`;
+**Catálogo CME & Playbook Tastytrade:** O RADAR conta com suporte nativo a **32 Estratégias Oficiais** (Direcionais, Precisão de Renda e Arbitragem de Volatilidade, incluindo Iron Condor, Short Strangle Δ16, Double Calendar e PMCC) governado pela skill institucional 'analista-senior-opcoes-us'.`;
     }
 
     // =========================================================================
