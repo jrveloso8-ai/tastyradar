@@ -1,48 +1,58 @@
 # 🚀 RADAR TASTYTRADE PRO IA + GEX ENGINE
 
-> **Terminal Quantitativo Institucional para o Mercado Americano (S&P 500, Nasdaq 100 & Opções Tastytrade)**
-> Desenvolvido com Next.js 14, TypeScript, Tailwind CSS e Algoritmo Puro de Gamma Exposure (GEX).
+> **Terminal Quantitativo Institucional para o Mercado Americano (S&P 500, Nasdaq 100 & Opções Tastytrade)**  
+> Desenvolvido com Next.js 14, TypeScript, Tailwind CSS, Integração Tastytrade Open API e Motor Algorítmico de Gamma Exposure (GEX).
+
+## 🛡️ Governança e Proveniência de Dados (REGRA 00)
+
+O sistema segue rigorosamente o princípio da **transparência e integridade do dado exibido**: nenhum número sintético é mascarado como dado de mercado em tempo real.
+
+| Componente | Fonte do Dado | Marcação na UI | Descrição / Limitação Atual |
+|---|---|---|---|
+| **IV Rank, IV 30d, IV Percentil** | Tastytrade Open API (`/market-metrics`) | 🟢 **MEDIDO (AO VIVO)** | Dados reais consumidos via sessão OAuth2 oficial. |
+| **Apreçamento de Opções e POP** | Motor BSM puro (`bsm-pricer.ts`) | 🟣 **DERIVADO** | Prêmios de pernas e POP dinâmico calculados analiticamente via Black-Scholes a partir do spot e da IV30 medida. |
+| **Breakeven e Perda Máxima** | Parâmetros contratuais dos strikes | 🟣 **DERIVADO** | Cálculo exato: `strike - crédito` (puts) e `strike + crédito` (calls); sem aproximações lineares. |
+| **GEX e Barreiras de Strike** | Modelo Paramétrico Calibrado | 🟡 **ESTIMADO (MODELO)** | A API REST `/nested` entrega a grade de strikes e símbolos OCC, mas não entrega Open Interest. O GEX é estimado analiticamente até a conexão do streamer WebSocket DXLink. |
+| **Série de Candlesticks** | Gerador Determinístico | 🟡 **DIDÁTICA MODELADA** | Série sintética determinística para visualização gráfica e cálculo de indicadores canônicos (SMA, RSI de Wilder, MACD de Gerald Appel). |
 
 ---
 
-## 📑 Principais Funcionalidades
+## 📑 Principais Módulos
 
-1. **📊 Panorama Geral do Mercado:**
-   * Termômetro de Sentimento Institucional & Velocímetro Gauge (Alta / Neutro / Baixa).
-   * Painel de volatilidade VIX, juros do FED e fluxo de capital.
+1. **📊 Panorama Geral de Volatilidade & S&P 500:**
+   * Monitoramento contínuo de **IV Rank (252d)**, **IV % (30d)**, **IV Percentil**, **VRP Yang-Zhang** e **Zero Gamma Flip**.
+   * Filtros dinâmicos: **Top 50 Mais Líquidas com Preço < US$ 150** (gestão de risco e margem para contas moderadas), Top 50, Top 100, Top 250 e Todos.
+   * Campo de busca universal permitindo pesquisar qualquer ticker listado.
 
-2. **🕯️ Consulta Técnica CNPI-T com Candlesticks Diários:**
-   * Gráfico completo em SVG com médias móveis (MA20, MA50, MA200), suporte e resistência automáticos.
-   * Sub-painéis integrados de Volume (com média de 20 períodos), RSI(14) e MACD Histograma.
-   * Checklist técnico de 5 itens e matriz risco/retorno (R:R).
+2. **🕯️ Consulta Técnica com Candlesticks & Indicadores Canônicos:**
+   * Gráfico em SVG com Médias Móveis Simples (SMA 20, 50, 200).
+   * **RSI(14) canônico de J. Welles Wilder Jr.** com suavização exponencial (Modified MA, $\alpha = 1/14$).
+   * **MACD completo de Gerald Appel** (EMA12, EMA26, Linha de Sinal EMA9 e Histograma).
+   * Sinalização visual explícita de série didática modelada.
 
-3. **💎 Recomendações de Estudo Estruturadas (Paridade Radar B3):**
-   * **Modo Opções Eleita:** Estruturas automatizadas (#20 Iron Condor a Crédito, #01 Bull Call Spread, #02 Bear Put Spread).
-   * **Gráfico Matemático de Payoff SVG:** Visualização interativa da curva de rendimento, ponto de equilíbrio (Break-Even) e zonas de lucro/prejuízo.
-   * **Composição das Pernas:** Detalhamento com strikes, símbolos OCC, prêmio e Open Interest.
-   * **Gatilhos Teóricos de Saída:** Regras claras de Take Profit (50%-60%), Stop Loss e Time Stop (7 DTE).
-   * **Catálogo Oficial das 25 Estratégias (CME & OCC).**
+3. **💎 Recomendações Estruturadas de Volatilidade (Playbook Tastytrade):**
+   * Estruturas mecânicas: Iron Condor (#20), Bull Put Spread (#01), Bear Call Spread (#02) e Calendars (#04).
+   * **Motor Black-Scholes-Merton Puro:** Apreçamento analítico por perna, deltas reais e POP dinâmico.
+   * **Regra do Crédito Mínimo:** Exige crédito $\ge 1/3$ da largura da asa.
+   * **Simbologia OCC Oficial:** 8 dígitos decimais (`.SYMBOLYYMMDDC00000000`).
 
-4. **⚡ Painel Unificado: Barreiras de OI & Motor GEX:**
-   * **Gamma Exposure Dashboard:** Barras de Call GEX (+) e Put GEX (-) por strike com linhas de Spot, Zero Gamma Flip e Max GEX Magnet.
-   * **Distribuição de Volume & OI:** Gráfico espelhado horizontal de Puts vs Calls e tabelas das Top 5 Call/Put Walls.
-   * **Smile de Volatilidade (IV Skew):** Curva de volatilidade implícita em tempo real.
+4. **⚡ Barreiras de Strike & Motor GEX:**
+   * Visualização de Call GEX (+) e Put GEX (-) por strike, Spot e Zero Gamma Flip.
+   * Rotulagem honesta como modelo paramétrico calibrado.
 
-5. **🔍 Rastreador de Tendências do S&P 500:**
-   * Filtros dinâmicos por quantidade (Top 50, Top 100, Top 250, Todos) e por setor da economia.
-   * Classificação em ALTA, BAIXA e LATERAL com busca instantânea.
-
-6. **🤖 Consultor IA em Tempo Real:**
-   * Chat integrado para tirar dúvidas técnicas, de fundamentos e de opções sobre qualquer ativo.
+5. **🤖 Consultor Quantitativo IA:**
+   * Análise assistida de fundamentos sob crivo contábil (normalização de baixas não-caixa e reconciliação financeira).
+   * Rotas de API protegidas com rate limiter delimitado (LRU/TTL) e validação de origem.
 
 ---
 
-## 🛠️ Tecnologias Utilizadas
+## 🛠️ Stack Tecnológico
 
 * **Framework:** [Next.js 14](https://nextjs.org/) (App Router, React 18, TypeScript)
 * **Estilização:** Tailwind CSS & Lucide React Icons
-* **Testes:** Vitest (100% de cobertura nos motores de cálculo)
-* **API de Derivativos:** Tastytrade API (OAuth2 / DXLink Streamer)
+* **Testes:** Vitest (43 testes unitários e golden tests cobrindo motores matemáticos, BSM, Wilder RSI, MACD, GEX, OCC e regras de negócio)
+* **Integração com Mercado:** Tastytrade Open API (OAuth2 / market-metrics / option-chains)
+* **CI/CD:** GitHub Actions (`.github/workflows/ci.yml`) com execução de lint (ESLint), typecheck (tsc), testes unitários (Vitest) e build de produção Next.js
 
 ---
 
@@ -74,16 +84,13 @@ ENVIRONMENT=production
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-### 4. Iniciar o Sistema:
-No Windows, execute diretamente o arquivo `iniciar.bat` ou via terminal:
+### 4. Executar Testes Automatizados:
+```bash
+npx vitest run
+```
+
+### 5. Iniciar o Sistema em Desenvolvimento:
 ```bash
 npm run dev
 ```
 Acesse [http://localhost:3000](http://localhost:3000) no seu navegador.
-
----
-
-## 🔒 Segurança e Privacidade
-
-* Nenhuma chave de API ou credencial sensível é versionada no repositório.
-* Todas as variáveis de ambiente (`.env*`, tokens de sessão e certificados) estão estritamente protegidas no `.gitignore`.

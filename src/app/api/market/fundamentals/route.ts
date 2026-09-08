@@ -6,7 +6,14 @@ import { RawFundamentalData } from '@/lib/types/financial';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const rawSymbol = searchParams.get('symbol') || 'VALE3';
+  const rawSymbol = searchParams.get('symbol');
+  const SYMBOL_REGEX = /^[A-Z0-9.]{1,10}$/;
+  if (!rawSymbol || !rawSymbol.trim() || !SYMBOL_REGEX.test(rawSymbol.trim().toUpperCase())) {
+    return NextResponse.json(
+      { success: false, error: 'Parâmetro symbol inválido (ex: ?symbol=AAPL ou ?symbol=VALE3)' },
+      { status: 400 }
+    );
+  }
   const symbol = rawSymbol.trim().toUpperCase();
 
   try {

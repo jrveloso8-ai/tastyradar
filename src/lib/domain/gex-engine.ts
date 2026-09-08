@@ -24,7 +24,8 @@ export interface GexOperationalDiagnostics {
 export function calculateGex(
   symbol: string,
   spotPrice: number,
-  options: RawOptionData[]
+  options: RawOptionData[],
+  source: 'tastytrade-live' | 'calibrated-model' = 'calibrated-model'
 ): GexAnalysisResult & { diagnostics: GexOperationalDiagnostics } {
   if (!options || options.length === 0 || spotPrice <= 0) {
     return {
@@ -42,6 +43,7 @@ export function calculateGex(
       callWalls: [],
       putWalls: [],
       calculatedAt: new Date().toISOString(),
+      source,
       diagnostics: {
         isClustered: false,
         clusteringDistancePct: 0,
@@ -128,23 +130,29 @@ export function calculateGex(
   const topCallStrikes = [...sortedStrikes].sort((a, b) => b.callGex - a.callGex).slice(0, 5);
   const topPutStrikes = [...sortedStrikes].sort((a, b) => Math.abs(b.putGex) - Math.abs(a.putGex)).slice(0, 5);
 
-  const callWalls = topCallStrikes.map(s => ({
-    strike: s.strike,
-    symbol: `.${symbol.toUpperCase()}260918C${Math.round(s.strike)}`,
-    contracts: s.callOi || s.callOpenInterest || 0,
-    delta: s.callDelta || 0.5,
-    iv: s.callIv || 35,
-    distancePct: Number((((s.strike - spotPrice) / spotPrice) * 100).toFixed(1)),
-  }));
+  const callWalls = topCallStrikes.map(s => {
+    const strikeStr = String(Math.round(s.strike * 1000)).padStart(8, '0');
+    return {
+      strike: s.strike,
+      symbol: `.${symbol.toUpperCase()}260918C${strikeStr}`,
+      contracts: s.callOi || s.callOpenInterest || 0,
+      delta: s.callDelta || 0.5,
+      iv: s.callIv || 35,
+      distancePct: Number((((s.strike - spotPrice) / spotPrice) * 100).toFixed(1)),
+    };
+  });
 
-  const putWalls = topPutStrikes.map(s => ({
-    strike: s.strike,
-    symbol: `.${symbol.toUpperCase()}260918P${Math.round(s.strike)}`,
-    contracts: s.putOi || s.putOpenInterest || 0,
-    delta: s.putDelta || -0.5,
-    iv: s.putIv || 35,
-    distancePct: Number((((s.strike - spotPrice) / spotPrice) * 100).toFixed(1)),
-  }));
+  const putWalls = topPutStrikes.map(s => {
+    const strikeStr = String(Math.round(s.strike * 1000)).padStart(8, '0');
+    return {
+      strike: s.strike,
+      symbol: `.${symbol.toUpperCase()}260918P${strikeStr}`,
+      contracts: s.putOi || s.putOpenInterest || 0,
+      delta: s.putDelta || -0.5,
+      iv: s.putIv || 35,
+      distancePct: Number((((s.strike - spotPrice) / spotPrice) * 100).toFixed(1)),
+    };
+  });
 
   const topCallWall = topCallStrikes[0]?.strike || spotPrice * 1.05;
   const topPutWall = topPutStrikes[0]?.strike || spotPrice * 0.95;
@@ -184,6 +192,7 @@ export function calculateGex(
     callWalls,
     putWalls,
     calculatedAt: new Date().toISOString(),
+    source,
     diagnostics: {
       isClustered,
       clusteringDistancePct: wallDistancePct,

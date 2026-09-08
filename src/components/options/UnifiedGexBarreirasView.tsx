@@ -116,10 +116,11 @@ export function UnifiedGexBarreirasView({
       const putDelta = Number((callDelta - 1).toFixed(2));
 
       const symClean = symbol.toUpperCase().trim();
+      const strikeStr = String(Math.round(strike * 1000)).padStart(8, '0');
       list.push({
         strike,
-        callSymbol: `.${symClean}${occDate}C${Math.round(strike)}`,
-        putSymbol: `.${symClean}${occDate}P${Math.round(strike)}`,
+        callSymbol: `.${symClean}${occDate}C${strikeStr}`,
+        putSymbol: `.${symClean}${occDate}P${strikeStr}`,
         callOi,
         putOi,
         callVol,
@@ -270,6 +271,9 @@ export function UnifiedGexBarreirasView({
                 </h3>
                 <span className="px-1.5 py-0.5 text-[9px] font-bold font-mono rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
                   PRO-GEX v3.0
+                </span>
+                <span className="px-1.5 py-0.5 text-[9px] font-bold font-mono rounded bg-amber-500/20 text-amber-300 border border-amber-500/40" title="Cadeia de opções calculada via modelo paramétrico calibrado">
+                  MODELO CALIBRADO
                 </span>
               </div>
               <p className="text-xs text-gray-400 mt-0.5">

@@ -91,23 +91,19 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
   }, [symbol]);
 
   const fundResult = useMemo(() => {
-    const isVale = currentStock.symbol.toUpperCase() === 'VALE3';
     const rawData: RawFundamentalData = {
       symbol: currentStock.symbol,
       shortName: currentStock.name,
       regularMarketPrice: currentStock.spot,
-      returnOnEquity: isVale ? 0.0442 : (currentStock.roe !== undefined ? currentStock.roe / 100 : null),
-      netMargin: isVale ? 0.0399 : (currentStock.netMargin !== undefined ? currentStock.netMargin / 100 : null),
-      debtToEbitda: isVale ? 3.09 : (currentStock.debtToEbitda ?? null),
-      financialDebtToEbitda: isVale ? 0.8 : (currentStock.debtToEbitda !== undefined ? Math.min(currentStock.debtToEbitda, 1.2) : null),
-      priceEarnings: isVale ? 32.29 : (currentStock.peRatio ?? null),
+      returnOnEquity: currentStock.roe !== undefined ? currentStock.roe / 100 : null,
+      netMargin: currentStock.netMargin !== undefined ? currentStock.netMargin / 100 : null,
+      debtToEbitda: currentStock.debtToEbitda ?? null,
+      financialDebtToEbitda: currentStock.debtToEbitda !== undefined ? Math.min(currentStock.debtToEbitda, 1.2) : null,
+      priceEarnings: currentStock.peRatio ?? null,
       dividendYield: currentStock.dividendYield !== undefined ? currentStock.dividendYield / 100 : null,
-      currentRatio: isVale ? 1.19 : 1.45,
-      ebitdaMargin: isVale ? 0.2381 : 0.28,
-      priceToBook: isVale ? 1.76 : (currentStock.peRatio ? Number((currentStock.peRatio / 18).toFixed(2)) : null),
-      operatingCashFlow: isVale ? 50600000000 : null,
-      netIncome: isVale ? 11800000000 : null,
-      nonRecurringImpairment: isVale ? 25100000000 : null,
+      currentRatio: 1.45,
+      ebitdaMargin: 0.28,
+      priceToBook: currentStock.peRatio ? Number((currentStock.peRatio / 18).toFixed(2)) : null,
     };
     return fundamentalsEngine.evaluate(rawData);
   }, [currentStock]);

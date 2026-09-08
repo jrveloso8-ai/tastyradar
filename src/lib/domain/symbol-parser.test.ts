@@ -20,6 +20,16 @@ describe('SymbolParser Domain', () => {
     expect(res?.expiration).toBe('2026-09-18');
   });
 
+  it('should parse 8-digit standard OCC strike correctly (.SPY260918C00595000 and .SPY260918C595000)', () => {
+    const res8 = parseOptionSymbol('.SPY260918C00595000');
+    expect(res8).not.toBeNull();
+    expect(res8?.strike).toBe(595);
+
+    const res6 = parseOptionSymbol('.SPY260918C595000');
+    expect(res6).not.toBeNull();
+    expect(res6?.strike).toBe(595);
+  });
+
   it('should return null for invalid symbol format', () => {
     const res = parseOptionSymbol('INVALID_TICKER');
     expect(res).toBeNull();

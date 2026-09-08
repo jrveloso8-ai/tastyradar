@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Gauge, 
   Activity, 
@@ -24,281 +24,149 @@ import {
   ShieldAlert,
   Percent,
   Compass,
-  Sparkles
+  Sparkles,
+  RefreshCw,
+  Wifi,
+  Radio
 } from 'lucide-react';
 import { volatilityEngine, VolatilityAssetInput, VolatilityRecommendation } from '@/lib/domain/volatility-engine';
 import { generateCandlesticks, CandleDataPoint } from '@/lib/domain/us-market-data';
+
+import { 
+  SP500_DATASET, 
+  getTop50LiquidUnder150, 
+  searchSP500, 
+  getSP500Asset, 
+  SP500StockData 
+} from '@/lib/domain/sp500-dataset';
 
 interface VolatilityAnalystViewProps {
   onNavigateToQuote?: (symbol: string) => void;
   onNavigateToGex?: (symbol: string) => void;
 }
 
-interface AssetDatasetItem extends VolatilityAssetInput {
-  hvHistory: number[];
-  ivHistory: number[];
-  iv52wMin: number;
-  iv52wMax: number;
-}
-
-const DEFAULT_ASSETS: AssetDatasetItem[] = [
-  {
-    symbol: 'NVDA',
-    name: 'NVIDIA Corporation',
-    spot: 142.50,
-    change: 2.84,
-    ivr: 74.2,
-    ivp: 81.0,
-    iv30: 44.5,
-    rv20: 32.1,
-    skew25: 4.8,
-    netGex: 120.5,
-    zeroGammaFlip: 138.00,
-    putWall: 135.00,
-    callWall: 155.00,
-    dividendAmount: 0.04,
-    callExtrinsic: 1.35,
-    iv52wMin: 26.0,
-    iv52wMax: 51.0,
-    hvHistory: [38, 35, 33, 31, 32, 32.1],
-    ivHistory: [52, 48, 46, 43, 45, 44.5],
-  },
-  {
-    symbol: 'TSLA',
-    name: 'Tesla Inc.',
-    spot: 248.30,
-    change: -1.15,
-    ivr: 22.4,
-    ivp: 26.0,
-    iv30: 36.2,
-    rv20: 39.4,
-    skew25: 5.5,
-    netGex: -45.0,
-    zeroGammaFlip: 252.00,
-    putWall: 235.00,
-    callWall: 265.00,
-    dividendAmount: 0.00,
-    callExtrinsic: 2.10,
-    iv52wMin: 31.0,
-    iv52wMax: 54.0,
-    hvHistory: [44, 42, 41, 40, 39, 39.4],
-    ivHistory: [41, 38, 36, 35, 36, 36.2],
-  },
-  {
-    symbol: 'AAPL',
-    name: 'Apple Inc.',
-    spot: 238.10,
-    change: 0.65,
-    ivr: 68.0,
-    ivp: 72.0,
-    iv30: 24.5,
-    rv20: 16.2,
-    skew25: 4.2,
-    netGex: 85.0,
-    zeroGammaFlip: 234.00,
-    putWall: 230.00,
-    callWall: 245.00,
-    dividendAmount: 0.25,
-    callExtrinsic: 1.15,
-    iv52wMin: 16.0,
-    iv52wMax: 28.5,
-    hvHistory: [18, 17, 17, 16, 16, 16.2],
-    ivHistory: [28, 26, 25, 24, 25, 24.5],
-  },
-  {
-    symbol: 'SPY',
-    name: 'SPDR S&P 500 ETF Trust',
-    spot: 598.80,
-    change: 0.78,
-    ivr: 18.5,
-    ivp: 21.0,
-    iv30: 13.2,
-    rv20: 11.5,
-    skew25: 6.8,
-    netGex: 450.0,
-    zeroGammaFlip: 592.00,
-    putWall: 590.00,
-    callWall: 605.00,
-    dividendAmount: 1.85,
-    callExtrinsic: 2.80,
-    iv52wMin: 11.5,
-    iv52wMax: 20.7,
-    hvHistory: [12, 11.8, 11.6, 11.5, 11.5, 11.5],
-    ivHistory: [15, 14.5, 14, 13.5, 13.4, 13.2],
-  },
-  {
-    symbol: 'QQQ',
-    name: 'Invesco QQQ Trust',
-    spot: 518.20,
-    change: 1.22,
-    ivr: 24.0,
-    ivp: 28.0,
-    iv30: 18.4,
-    rv20: 17.1,
-    skew25: 6.2,
-    netGex: 210.0,
-    zeroGammaFlip: 512.00,
-    putWall: 510.00,
-    callWall: 525.00,
-    dividendAmount: 0.75,
-    callExtrinsic: 2.40,
-    iv52wMin: 15.0,
-    iv52wMax: 29.2,
-    hvHistory: [18, 17.5, 17.2, 17.0, 17.1, 17.1],
-    ivHistory: [21, 20.2, 19.5, 18.8, 18.6, 18.4],
-  },
-  {
-    symbol: 'META',
-    name: 'Meta Platforms Inc.',
-    spot: 612.40,
-    change: 1.45,
-    ivr: 71.5,
-    ivp: 78.0,
-    iv30: 38.0,
-    rv20: 27.5,
-    skew25: 4.5,
-    netGex: 95.0,
-    zeroGammaFlip: 600.00,
-    putWall: 590.00,
-    callWall: 630.00,
-    dividendAmount: 0.50,
-    callExtrinsic: 3.10,
-    iv52wMin: 24.0,
-    iv52wMax: 43.6,
-    hvHistory: [32, 30, 29, 28, 27.8, 27.5],
-    ivHistory: [44, 42, 40, 39, 38.5, 38.0],
-  },
-  {
-    symbol: 'AMD',
-    name: 'Advanced Micro Devices',
-    spot: 156.80,
-    change: 3.12,
-    ivr: 62.0,
-    ivp: 66.0,
-    iv30: 48.0,
-    rv20: 39.2,
-    skew25: 4.9,
-    netGex: 45.0,
-    zeroGammaFlip: 152.00,
-    putWall: 148.00,
-    callWall: 165.00,
-    dividendAmount: 0.00,
-    callExtrinsic: 2.45,
-    iv52wMin: 33.0,
-    iv52wMax: 57.2,
-    hvHistory: [42, 41, 40, 39.5, 39.3, 39.2],
-    ivHistory: [55, 52, 50, 49, 48.5, 48.0],
-  },
-  {
-    symbol: 'AMZN',
-    name: 'Amazon.com Inc.',
-    spot: 198.40,
-    change: -0.42,
-    ivr: 42.0,
-    ivp: 45.0,
-    iv30: 29.5,
-    rv20: 26.8,
-    skew25: 4.4,
-    netGex: 60.0,
-    zeroGammaFlip: 195.00,
-    putWall: 190.00,
-    callWall: 205.00,
-    dividendAmount: 0.00,
-    callExtrinsic: 1.80,
-    iv52wMin: 22.0,
-    iv52wMax: 39.8,
-    hvHistory: [28, 27.5, 27.1, 26.9, 26.8, 26.8],
-    ivHistory: [33, 32, 31, 30.2, 29.8, 29.5],
-  },
-  {
-    symbol: 'MSFT',
-    name: 'Microsoft Corporation',
-    spot: 432.10,
-    change: 0.35,
-    ivr: 54.0,
-    ivp: 58.0,
-    iv30: 22.0,
-    rv20: 17.5,
-    skew25: 4.1,
-    netGex: 140.0,
-    zeroGammaFlip: 428.00,
-    putWall: 425.00,
-    callWall: 440.00,
-    dividendAmount: 0.83,
-    callExtrinsic: 1.95,
-    iv52wMin: 16.5,
-    iv52wMax: 26.7,
-    hvHistory: [20, 19, 18.5, 18, 17.6, 17.5],
-    ivHistory: [26, 25, 24, 23, 22.5, 22.0],
-  },
-  {
-    symbol: 'IWM',
-    name: 'iShares Russell 2000 ETF',
-    spot: 224.50,
-    change: -0.85,
-    ivr: 31.0,
-    ivp: 35.0,
-    iv30: 21.5,
-    rv20: 20.8,
-    skew25: 5.8,
-    netGex: -30.0,
-    zeroGammaFlip: 226.00,
-    putWall: 220.00,
-    callWall: 230.00,
-    dividendAmount: 0.70,
-    callExtrinsic: 1.40,
-    iv52wMin: 17.0,
-    iv52wMax: 31.5,
-    hvHistory: [22, 21.5, 21.2, 21.0, 20.9, 20.8],
-    ivHistory: [24, 23.2, 22.5, 22.0, 21.8, 21.5],
-  }
-];
-
 export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: VolatilityAnalystViewProps) {
   const [selectedSymbol, setSelectedSymbol] = useState<string>('NVDA');
-  const [activeFilter, setActiveFilter] = useState<'ALL' | 'SELL_VOL' | 'BUY_VOL' | 'WALL_SNIPER'>('ALL');
+  const [activeFilter, setActiveFilter] = useState<'TOP_50_UNDER_150' | 'ALL' | 'SELL_VOL' | 'BUY_VOL' | 'WALL_SNIPER'>('TOP_50_UNDER_150');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
   const [activeChartTab, setActiveChartTab] = useState<'PRICE_OI' | 'VOL_HISTORIC' | 'VOL_SMILE'>('PRICE_OI');
   const [showDidacticModal, setShowDidacticModal] = useState<boolean>(false);
 
-  // Avaliação do motor para cada ativo
-  const evaluatedAssets = useMemo(() => {
-    return DEFAULT_ASSETS.map(asset => {
-      const evaluation = volatilityEngine.evaluate(asset);
+  // Estados de conexão Live com a API Oficial da Tastytrade
+  const [liveMetricsMap, setLiveMetricsMap] = useState<Record<string, any>>({});
+  const [isLiveConnected, setIsLiveConnected] = useState<boolean>(false);
+  const [isRefreshingLive, setIsRefreshingLive] = useState<boolean>(false);
+
+  // Lista base pelo filtro selecionado
+  const baseList = useMemo(() => {
+    if (activeFilter === 'TOP_50_UNDER_150') return getTop50LiquidUnder150();
+    if (activeFilter === 'SELL_VOL') return SP500_DATASET.filter(s => s.ivr >= 50);
+    if (activeFilter === 'BUY_VOL') return SP500_DATASET.filter(s => s.ivr < 35);
+    if (activeFilter === 'WALL_SNIPER') {
+      return SP500_DATASET.filter(s => {
+        const distToPut = Math.abs(s.spot - s.putWall) / s.spot;
+        const distToCall = Math.abs(s.spot - s.callWall) / s.spot;
+        return distToPut < 0.03 || distToCall < 0.03;
+      });
+    }
+    return SP500_DATASET;
+  }, [activeFilter]);
+
+  // Efeito de sincronização em tempo real com a API da Tastytrade
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function syncLiveMetrics() {
+      try {
+        setIsRefreshingLive(true);
+        // Busca métricas para o ativo selecionado + os primeiros da grade visível
+        const symbolsToFetch = Array.from(new Set([
+          selectedSymbol.toUpperCase(),
+          ...baseList.slice(0, 15).map(s => s.symbol.toUpperCase())
+        ])).join(',');
+
+        const res = await fetch(`/api/market/metrics?symbols=${symbolsToFetch}`);
+        if (!res.ok) return;
+        const json = await res.json();
+
+        if (!isCancelled && json.success && json.data) {
+          setLiveMetricsMap(prev => ({ ...prev, ...json.data }));
+          if (json.live) {
+            setIsLiveConnected(true);
+          }
+        }
+      } catch (err) {
+        console.warn('[VolatilityAnalystView] Não foi possível obter live metrics:', err);
+      } finally {
+        if (!isCancelled) setIsRefreshingLive(false);
+      }
+    }
+
+    syncLiveMetrics();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedSymbol, baseList]);
+
+  // Sugestões instantâneas da busca global no S&P 500
+  const searchSuggestions = useMemo(() => {
+    if (!searchTerm.trim()) return [];
+    return searchSP500(searchTerm).slice(0, 8);
+  }, [searchTerm]);
+
+  // Lista filtrada e enriquecida com dados ao vivo da Tastytrade
+  const filteredAssets = useMemo(() => {
+    let list = baseList;
+    if (searchTerm.trim()) {
+      const q = searchTerm.trim().toUpperCase();
+      list = searchSP500(q);
+    }
+    return list.slice(0, 50).map(item => {
+      const live = liveMetricsMap[item.symbol.toUpperCase()];
+      const enrichedItem: SP500StockData = live ? {
+        ...item,
+        ivr: live.ivRank ?? item.ivr,
+        ivp: live.ivPercentile ?? item.ivp,
+        iv30: live.iv30 ?? item.iv30,
+        liquidityRating: live.liquidityRating ?? item.liquidityRating,
+        daysToEarnings: live.daysToEarnings !== undefined ? live.daysToEarnings : item.daysToEarnings,
+      } : item;
+
       return {
-        ...asset,
-        evaluation
+        ...enrichedItem,
+        evaluation: volatilityEngine.evaluate(enrichedItem)
       };
     });
-  }, []);
+  }, [baseList, searchTerm, liveMetricsMap]);
 
-  // Lista filtrada
-  const filteredAssets = useMemo(() => {
-    return evaluatedAssets.filter(item => {
-      if (searchTerm.trim()) {
-        const q = searchTerm.trim().toUpperCase();
-        if (!item.symbol.includes(q) && !item.name.toUpperCase().includes(q)) {
-          return false;
-        }
-      }
-      if (activeFilter === 'SELL_VOL') return item.ivr >= 50;
-      if (activeFilter === 'BUY_VOL') return item.ivr < 35;
-      if (activeFilter === 'WALL_SNIPER') {
-        const distToPut = Math.abs(item.spot - item.putWall) / item.spot;
-        const distToCall = Math.abs(item.spot - item.callWall) / item.spot;
-        return distToPut < 0.03 || distToCall < 0.03;
-      }
-      return true;
-    });
-  }, [evaluatedAssets, activeFilter, searchTerm]);
-
-  // Ativo atualmente selecionado
+  // Ativo atualmente selecionado enriquecido dinamicamente com a API Live
   const selectedAsset = useMemo(() => {
-    return evaluatedAssets.find(a => a.symbol === selectedSymbol) || evaluatedAssets[0];
-  }, [evaluatedAssets, selectedSymbol]);
+    const asset = getSP500Asset(selectedSymbol);
+    const live = liveMetricsMap[selectedSymbol.toUpperCase()];
+    if (!live) return asset;
 
-  const rec = selectedAsset.evaluation;
+    return {
+      ...asset,
+      ivr: live.ivRank ?? asset.ivr,
+      ivp: live.ivPercentile ?? asset.ivp,
+      iv30: live.iv30 ?? asset.iv30,
+      liquidityRating: live.liquidityRating ?? asset.liquidityRating,
+      daysToEarnings: live.daysToEarnings !== undefined ? live.daysToEarnings : asset.daysToEarnings,
+      dividendAmount: live.dividendYield ? Number((asset.spot * (live.dividendYield / 100)).toFixed(2)) : asset.dividendAmount,
+      hvHistory: (live.hv90 !== undefined && live.hv60 !== undefined && live.hv30 !== undefined)
+        ? [live.hv90, live.hv60, live.hv30]
+        : asset.hvHistory,
+    };
+  }, [selectedSymbol, liveMetricsMap]);
+
+  // Avaliação determinística completa do ativo ativo
+  const rec = useMemo(() => {
+    return volatilityEngine.evaluate(selectedAsset);
+  }, [selectedAsset]);
+
   const rationale = rec.didacticRationale;
 
   // Candlesticks simulados dos últimos 40 dias para o gráfico de preço com OI
@@ -325,6 +193,19 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
   return (
     <section className="space-y-6">
       
+      {/* BANNER GLOBAL DE TRANSPARÊNCIA E AUDITORIA (Fase 0 - Achados A-07/A-08) */}
+      <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs font-mono text-amber-200">
+        <div className="flex items-center gap-2.5">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+          <span>
+            <strong>Aviso de Transparência Quantitativa:</strong> Métricas de IV Rank e IV 30d são sincronizadas com a API Tastytrade. Parâmetros de payoff e ordens operam com modelos calibrados. Sempre confirme no book oficial antes de investir.
+          </span>
+        </div>
+        <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold shrink-0">
+          PROVENIÊNCIA RASTREADA
+        </span>
+      </div>
+
       {/* 1. BARRA MACRO DO MERCADO AMERICANO (§5.2 da skill) */}
       <div className="bg-[#0c1322] border border-gray-800/90 rounded-2xl p-4 shadow-xl">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -333,13 +214,40 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
               <Gauge className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-sm font-bold text-white font-mono tracking-tight">
                   Analista de Volatilidade & Riscos Institucionais
                 </h1>
                 <span className="text-[10px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono font-bold">
                   SKILL: analista-senior-opcoes-us
                 </span>
+                {liveMetricsMap[selectedSymbol.toUpperCase()]?.source === 'tastytrade-live' ? (
+                  <span 
+                    className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 font-mono font-bold flex items-center gap-1.5 shadow-sm"
+                    title="Métricas de volatilidade oficiais recebidas diretamente da API da Tastytrade em tempo real"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>AO VIVO (TASTYTRADE: {selectedSymbol})</span>
+                    {isRefreshingLive && <RefreshCw className="w-2.5 h-2.5 animate-spin text-emerald-400" />}
+                  </span>
+                ) : liveMetricsMap[selectedSymbol.toUpperCase()] ? (
+                  <span 
+                    className="text-[10px] px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/40 font-mono flex items-center gap-1.5"
+                    title="Dado quantitativo prévio calibrado em cache/referencial"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                    <span>MODELO CALIBRADO</span>
+                  </span>
+                ) : (
+                  <span 
+                    className="text-[10px] px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-mono flex items-center gap-1.5"
+                    title="Consultando banco de dados quantitativo S&P 500 com suporte a sincronização live"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                    <span>SINCRONIZANDO TASTYTRADE...</span>
+                    {isRefreshingLive && <RefreshCw className="w-2.5 h-2.5 animate-spin text-cyan-400" />}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-gray-400 font-sans">
                 Monitoramento contínuo de IV Rank, VRP Yang-Zhang e barreiras GEX para o mercado americano.
@@ -384,6 +292,17 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 pb-3">
               <div className="flex flex-wrap items-center gap-1.5 bg-[#070b14] p-1 rounded-xl border border-gray-800 text-xs font-mono">
                 <button 
+                  onClick={() => setActiveFilter('TOP_50_UNDER_150')}
+                  className={`px-3 py-1 rounded-lg transition font-bold flex items-center gap-1.5 ${
+                    activeFilter === 'TOP_50_UNDER_150'
+                      ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                  title="Filtra as 50 ações mais líquidas do S&P 500 com cotação abaixo de $150 para mitigar risco e margem"
+                >
+                  <span>💎 Top 50 (&lt; $150)</span>
+                </button>
+                <button 
                   onClick={() => setActiveFilter('ALL')}
                   className={`px-3 py-1 rounded-lg transition font-bold ${
                     activeFilter === 'ALL'
@@ -391,7 +310,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                       : 'text-gray-400 hover:text-white'
                   }`}
                 >
-                  Todos ({evaluatedAssets.length})
+                  Todos S&P 500 ({SP500_DATASET.length})
                 </button>
                 <button 
                   onClick={() => setActiveFilter('SELL_VOL')}
@@ -425,15 +344,68 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                 </button>
               </div>
 
-              <div className="relative w-44">
-                <Search className="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-2" />
+              {/* Campo de Busca Global em Todo o S&P 500 com Autocomplete Instantâneo */}
+              <div className="relative w-52 md:w-64">
+                <Search className="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-2.5" />
                 <input 
                   type="text"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Buscar ticker..."
-                  className="w-full bg-[#070b14] border border-gray-800 rounded-lg pl-8 pr-2 py-1 text-xs font-mono text-white focus:outline-none focus:border-purple-500 uppercase"
+                  onFocus={() => setIsSearchFocused(true)}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setIsSearchFocused(true);
+                  }}
+                  placeholder="Buscar qualquer ação do S&P 500..."
+                  className="w-full bg-[#070b14] border border-gray-800 rounded-lg pl-8 pr-7 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-purple-500 uppercase"
                 />
+                {searchTerm && (
+                  <button 
+                    onClick={() => {
+                      setSearchTerm('');
+                      setIsSearchFocused(false);
+                    }}
+                    className="absolute right-2 top-2 text-gray-500 hover:text-white"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
+                {/* Dropdown de Sugestões Instantâneas do S&P 500 */}
+                {isSearchFocused && searchSuggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-[#0c1322] border border-purple-500/40 rounded-xl shadow-2xl z-40 max-h-64 overflow-y-auto custom-scrollbar divide-y divide-gray-800/60 font-mono text-xs">
+                    <div className="px-3 py-1.5 bg-[#070b14] text-[10px] text-gray-400 font-sans flex justify-between items-center">
+                      <span>S&P 500 ({searchSuggestions.length} encontrados)</span>
+                      <span>Clique para abrir</span>
+                    </div>
+                    {searchSuggestions.map((item) => (
+                      <div
+                        key={`sug-${item.symbol}`}
+                        onClick={() => {
+                          setSelectedSymbol(item.symbol);
+                          setIsSearchFocused(false);
+                          setSearchTerm('');
+                        }}
+                        className="px-3 py-2 hover:bg-purple-500/15 cursor-pointer flex justify-between items-center transition"
+                      >
+                        <div>
+                          <div className="font-bold text-white flex items-center gap-1.5">
+                            <span>{item.symbol}</span>
+                            <span className="text-[10px] text-gray-400 font-sans font-normal truncate max-w-[110px]">{item.name}</span>
+                          </div>
+                          <div className="text-[9px] text-gray-500 font-sans">{item.sector}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className={`font-bold ${item.spot <= 150 ? 'text-emerald-400' : 'text-gray-300'}`}>
+                            ${item.spot.toFixed(2)}
+                          </div>
+                          <div className="text-[9px] text-purple-300">
+                            {'★'.repeat(item.liquidityRating)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -472,6 +444,9 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                           <div className="font-bold text-white flex items-center gap-1.5">
                             {item.symbol}
                             {isSelected && <Check className="w-3 h-3 text-purple-400" />}
+                            {liveMetricsMap[item.symbol.toUpperCase()]?.source === 'tastytrade-live' && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Dados Live da Tastytrade" />
+                            )}
                           </div>
                           <div className="text-[9px] text-gray-500 font-sans truncate w-24">{item.name}</div>
                         </td>
@@ -1028,13 +1003,23 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                   <span className="text-xs text-gray-400 font-sans">{selectedAsset.name}</span>
                   <span className="px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono">Líquido 5/5</span>
                 </div>
-                <div className="flex items-center gap-3 font-mono text-xs mt-1">
+                <div className="flex flex-wrap items-center gap-3 font-mono text-xs mt-1">
                   <span>Spot: <strong className="text-white">${selectedAsset.spot.toFixed(2)}</strong></span>
                   <span className={`font-semibold ${selectedAsset.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {selectedAsset.change >= 0 ? '+' : ''}{selectedAsset.change.toFixed(2)}%
                   </span>
                   <span className="text-gray-500">|</span>
                   <span className="text-gray-400">SOFR: <strong className="text-gray-200">5.32%</strong></span>
+                  <span className="text-gray-500">|</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${
+                    liveMetricsMap[selectedSymbol.toUpperCase()]?.source === 'tastytrade-live'
+                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                      : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                  }`}>
+                    {liveMetricsMap[selectedSymbol.toUpperCase()]?.source === 'tastytrade-live'
+                      ? 'Fonte: Tastytrade Live'
+                      : 'Fonte: Modelo Calibrado'}
+                  </span>
                 </div>
               </div>
 
@@ -1052,15 +1037,32 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
               </div>
             </div>
 
-            {/* Métricas Chave do Veredito */}
-            <div className="grid grid-cols-3 gap-2 text-center font-mono text-xs">
+            {/* Métricas Chave do Veredito (Com IV Rank, IV %, IV Percentil, VRP e Zero Gamma Flip) */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-center font-mono text-xs">
               <div className="bg-[#070b14] p-2.5 rounded-xl border border-gray-800">
                 <div className="text-[10px] text-gray-400">IV Rank (252d)</div>
-                <div className={`text-base font-bold mt-0.5 ${rec.ivr >= 50 ? 'text-rose-400' : 'text-cyan-300'}`}>
-                  {rec.ivr.toFixed(1)}%
+                <div className={`text-base font-bold mt-0.5 ${selectedAsset.ivr >= 50 ? 'text-rose-400' : 'text-cyan-300'}`}>
+                  {selectedAsset.ivr.toFixed(1)}%
                 </div>
-                <div className="text-[9px] text-gray-400">{rec.ivr >= 50 ? 'Prêmio Inflado' : 'Prêmio Barato'}</div>
+                <div className="text-[9px] text-gray-400">{selectedAsset.ivr >= 50 ? 'Prêmio Inflado' : 'Prêmio Barato'}</div>
               </div>
+
+              <div className="bg-[#070b14] p-2.5 rounded-xl border border-gray-800">
+                <div className="text-[10px] text-gray-400">IV % (Atual 30d)</div>
+                <div className="text-base font-bold text-amber-300 mt-0.5">
+                  {selectedAsset.iv30.toFixed(1)}%
+                </div>
+                <div className="text-[9px] text-gray-400">Vol Implícita ATM</div>
+              </div>
+
+              <div className="bg-[#070b14] p-2.5 rounded-xl border border-gray-800">
+                <div className="text-[10px] text-gray-400">IV Percentil</div>
+                <div className="text-base font-bold text-purple-300 mt-0.5">
+                  {selectedAsset.ivp.toFixed(0)}%
+                </div>
+                <div className="text-[9px] text-gray-400">Freq. Histórica</div>
+              </div>
+
               <div className="bg-[#070b14] p-2.5 rounded-xl border border-gray-800">
                 <div className="text-[10px] text-gray-400">VRP (Prêmio Risco)</div>
                 <div className={`text-base font-bold mt-0.5 ${rec.vrp >= 4 ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -1068,7 +1070,8 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                 </div>
                 <div className="text-[9px] text-gray-400">{rec.vrp >= 0 ? 'IV > RV Yang-Zhang' : 'IV < RV'}</div>
               </div>
-              <div className="bg-[#070b14] p-2.5 rounded-xl border border-gray-800">
+
+              <div className="bg-[#070b14] p-2.5 rounded-xl border border-gray-800 col-span-2 sm:col-span-1">
                 <div className="text-[10px] text-gray-400">Zero Gamma Flip</div>
                 <div className="text-base font-bold text-cyan-300 mt-0.5">${rec.zeroGammaFlip.toFixed(2)}</div>
                 <div className="text-[9px] text-gray-400">Divisor de Águas</div>
@@ -1233,7 +1236,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
             <div className="bg-[#070b14] p-4 rounded-xl border border-purple-500/30 space-y-1 font-mono text-xs">
               <div className="text-[10px] uppercase text-purple-300 font-bold">Em Uma Frase</div>
               <p className="text-gray-200 leading-relaxed font-sans text-sm">
-                "{rationale.oneLiner}"
+                &ldquo;{rationale.oneLiner}&rdquo;
               </p>
             </div>
 

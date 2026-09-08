@@ -23,6 +23,8 @@ export class TastytradeAuthService {
   private baseUrl: string;
   private tokenFilePath: string;
   private streamerFilePath: string;
+  private memoryToken: TokenCache | null = null;
+  private memoryStreamer: StreamerCache | null = null;
 
   constructor() {
     this.clientId = process.env.CLIENT_ID || '';
@@ -54,12 +56,20 @@ export class TastytradeAuthService {
   }
 
   public async getAccessToken(forceRefresh = false): Promise<string> {
+    const now = Date.now() / 1000;
+
+    // 1. Checa cache em memória (compatível com ambientes serverless com disco efêmero/read-only) (Achado A-18)
+    if (!forceRefresh && this.memoryToken && this.memoryToken.expires_at > now + 60) {
+      return this.memoryToken.access_token;
+    }
+
+    // 2. Checa cache em disco como contingência persistente
     if (!forceRefresh && fs.existsSync(this.tokenFilePath)) {
       try {
         const raw = fs.readFileSync(this.tokenFilePath, 'utf8');
         const data: TokenCache = JSON.parse(raw);
-        const now = Date.now() / 1000;
         if (data.expires_at > now + 60) {
+          this.memoryToken = data;
           return data.access_token;
         }
       } catch (err: any) {
@@ -93,7 +103,6 @@ export class TastytradeAuthService {
     const body = await res.json();
     const accessToken = body.access_token;
     const expiresIn = body.expires_in || 900;
-    const now = Date.now() / 1000;
 
     const cache: TokenCache = {
       access_token: accessToken,
@@ -101,6 +110,7 @@ export class TastytradeAuthService {
       expires_at: now + expiresIn,
       fetched_at: now,
     };
+    this.memoryToken = cache;
 
     try {
       fs.writeFileSync(this.tokenFilePath, JSON.stringify(cache, null, 2), 'utf8');
@@ -112,12 +122,20 @@ export class TastytradeAuthService {
   }
 
   public async getStreamerToken(forceRefresh = false): Promise<{ token: string; dxlinkUrl: string }> {
+    const now = Date.now() / 1000;
+
+    // 1. Checa cache em memória
+    if (!forceRefresh && this.memoryStreamer && this.memoryStreamer.expires_at > now + 300) {
+      return { token: this.memoryStreamer.token, dxlinkUrl: this.memoryStreamer.dxlink_url };
+    }
+
+    // 2. Checa cache em disco
     if (!forceRefresh && fs.existsSync(this.streamerFilePath)) {
       try {
         const raw = fs.readFileSync(this.streamerFilePath, 'utf8');
         const data: StreamerCache = JSON.parse(raw);
-        const now = Date.now() / 1000;
         if (data.expires_at > now + 300) {
+          this.memoryStreamer = data;
           return { token: data.token, dxlinkUrl: data.dxlink_url };
         }
       } catch (err: any) {
@@ -149,17 +167,17 @@ export class TastytradeAuthService {
     }
 
     const expiresIn = 20 * 3600;
-    const now = Date.now() / 1000;
-    const cache: StreamerCache = {
+    const streamerCache: StreamerCache = {
       token,
       dxlink_url: dxlinkUrl,
       expires_in: expiresIn,
       expires_at: now + expiresIn,
       fetched_at: now,
     };
+    this.memoryStreamer = streamerCache;
 
     try {
-      fs.writeFileSync(this.streamerFilePath, JSON.stringify(cache, null, 2), 'utf8');
+      fs.writeFileSync(this.streamerFilePath, JSON.stringify(streamerCache, null, 2), 'utf8');
     } catch (err: any) {
       console.warn('[TastyAuth] Não foi possível persistir streamer token em disco:', err.message);
     }

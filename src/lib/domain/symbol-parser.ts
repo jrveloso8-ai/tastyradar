@@ -21,7 +21,8 @@ export function parseOptionSymbol(symbol: string): ParsedOptionSymbol | null {
     const rawStrikeStr = match[4];
 
     let strike = parseFloat(rawStrikeStr);
-    if (rawStrikeStr.length >= 8) {
+    // Padrão OCC oficial possui 8 dígitos (5 para inteiros, 3 para decimais com padStart)
+    if (rawStrikeStr.length >= 8 || strike >= 10000) {
       strike = strike / 1000;
     }
 

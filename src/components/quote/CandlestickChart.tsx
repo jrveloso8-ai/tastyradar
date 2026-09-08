@@ -58,6 +58,9 @@ export function CandlestickChart({ candles, spotPrice }: CandlestickChartProps) 
           <span className="text-cyan-400">MA50: ${activeCandle.ma50.toFixed(2)}</span>
           <span className="text-purple-400">MA200: ${activeCandle.ma200.toFixed(2)}</span>
           <span className="text-emerald-400">RSI(14): {activeCandle.rsi}</span>
+          <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-mono" title="Série OHLCV histórica calculada parametricamente por semente determinística">
+            SÉRIE HISTÓRICA MODELADA
+          </span>
         </div>
       </div>
 
