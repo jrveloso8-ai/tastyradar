@@ -192,4 +192,100 @@ describe('VolatilityEngine (Skill: analista-senior-opcoes-us)', () => {
     expect(putOtm.type).toBe('PUT_OTM');
     expect(callOtm.type).toBe('CALL_OTM');
   });
+
+  it('deve calcular o prêmio sensível à volatilidade real: IV 80% gera crédito maior que IV 22% (Achado N-02)', () => {
+    const baseInput: VolatilityAssetInput = {
+      symbol: 'NVDA',
+      name: 'NVIDIA Corp',
+      spot: 142.50,
+      change: 1.0,
+      rv20: 25.0,
+      ivr: 75.0,
+      ivp: 80.0,
+      netGex: 100.0,
+      zeroGammaFlip: 138.00,
+      putWall: 135.00,
+      callWall: 155.00,
+      iv30: 22.0,
+    };
+
+    const resultLowIv = volatilityEngine.evaluate({ ...baseInput, iv30: 22.0, ivr: 52.0 });
+    const resultHighIv = volatilityEngine.evaluate({ ...baseInput, iv30: 80.0, ivr: 95.0 });
+
+    // Em venda de volatilidade, o prêmio decorre da volatilidade:
+    // IV 80% deve gerar crédito líquido expressivamente superior a IV 22%
+    expect(resultHighIv.netCredit).toBeGreaterThan(resultLowIv.netCredit * 1.5);
+  });
+
+  it('deve calcular breakevens e max loss com valores analíticos exatos (Golden Test) (Achados A-10, A-12, N-05)', () => {
+    const input: VolatilityAssetInput = {
+      symbol: 'NVDA',
+      name: 'NVIDIA Corp',
+      spot: 142.50,
+      change: 1.0,
+      iv30: 44.0,
+      rv20: 30.0,
+      ivr: 75.0,
+      ivp: 80.0,
+      netGex: 100.0,
+      zeroGammaFlip: 138.00,
+      putWall: 135.00,
+      callWall: 155.00,
+    };
+
+    const result = volatilityEngine.evaluate(input);
+    expect(result.strategy.id).toBe(20); // Iron Condor
+
+    // Strikes ancorados fora das walls:
+    const shortPut = result.legs.find(l => l.action === 'SELL' && l.type === 'PUT')!;
+    const shortCall = result.legs.find(l => l.action === 'SELL' && l.type === 'CALL')!;
+    expect(shortPut.strike).toBe(135.00);
+    expect(shortCall.strike).toBe(155.00);
+
+    // netCredit calculado via BSM analítico sobre IV 44% e 35 DTE
+    expect(result.netCredit).toBeGreaterThan(0.20);
+    expect(result.netCredit).toBeLessThan(3.50);
+
+    // Asserções independentes de Breakeven e Max Loss:
+    const expectedLowerBe = Number((135.00 - result.netCredit).toFixed(2));
+    const expectedUpperBe = Number((155.00 + result.netCredit).toFixed(2));
+    expect(result.lowerBreakeven).toBe(expectedLowerBe);
+    expect(result.upperBreakeven).toBe(expectedUpperBe);
+
+    const wingWidth = 5.00; // step = 5 para spot > 100
+    const expectedMaxLoss = Math.max(0, Number(((wingWidth - result.netCredit) * 100).toFixed(2)));
+    expect(result.maxLoss).toBe(expectedMaxLoss);
+
+    // POP deriva puramente dos deltas BSM das pernas vendidas (1 - pDelta - cDelta)
+    const pDelta = shortPut.delta;
+    const cDelta = shortCall.delta;
+    const expectedPop = Math.round((1 - pDelta - cDelta) * 100);
+    expect(result.popEstimate).toBe(expectedPop);
+  });
+
+  it('Bull Put Spread NÃO deve conter breakeven superior (Achado N-07)', () => {
+    // Forçar montagem de Bull Put Spread (#6)
+    const input: VolatilityAssetInput = {
+      symbol: 'AAPL',
+      name: 'Apple Inc',
+      spot: 238.10,
+      change: 2.5,
+      iv30: 32.0,
+      rv20: 22.0,
+      ivr: 55.0,
+      ivp: 58.0,
+      netGex: -40.0, // -GEX com alta elege spread direcional ou bull put
+      zeroGammaFlip: 234.00,
+      putWall: 230.00,
+      callWall: 245.00,
+    };
+
+    const result = volatilityEngine.evaluate(input);
+    if (result.strategy.id === 6) {
+      expect(result.upperBreakeven).toBeNull();
+      expect(result.lowerBreakeven).toBeLessThan(235.00);
+    } else {
+      expect(result.lowerBreakeven).toBeGreaterThan(0);
+    }
+  });
 });

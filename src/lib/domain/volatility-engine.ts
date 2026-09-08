@@ -1,4 +1,5 @@
 import { CME_STRATEGIES, StrategySpec } from './cme-catalog';
+import { calculateBsm } from './bsm-pricer';
 
 export interface VolatilityAssetInput {
   symbol: string;
@@ -98,7 +99,7 @@ export interface VolatilityRecommendation {
   maxLoss: number;
   popEstimate: number; // Probability of Profit (~ %)
   lowerBreakeven: number;
-  upperBreakeven: number;
+  upperBreakeven: number | null;
   lifecycle: {
     profitTargetPct: number; // 50% padrão Tastytrade
     profitTargetDollar: number;
@@ -191,76 +192,111 @@ export class VolatilityEngine {
     const legs: VolatilityLegSpec[] = [];
     let netCredit = 0;
     let width = step;
+    let putWingWidth = step;
+    let callWingWidth = step;
+    let shortPutStrike = 0;
+    let shortCallStrike = 0;
+    let longPutStrike = 0;
+    let longCallStrike = 0;
     const dte = electedStrategyId === 28 || electedStrategyId === 14 ? 30 : 35; // Sweet spot Tastytrade
+    const tYears = dte / 365;
+    const volDecimal = Math.max(0.05, (input.iv30 || 20) / 100);
+    const rRate = 0.045; // Taxa livre de risco US (SOFR / Fed Funds)
 
     if (strategy.id === 20) {
       // Iron Condor a Crédito: Asas vendidas fora das Walls
-      const shortPutStrike = Math.floor(Math.min(input.putWall, spot * 0.96) / step) * step;
-      const longPutStrike = shortPutStrike - step;
-      const shortCallStrike = Math.ceil(Math.max(input.callWall, spot * 1.04) / step) * step;
-      const longCallStrike = shortCallStrike + step;
-      width = step;
+      shortPutStrike = Math.floor(Math.min(input.putWall, spot * 0.96) / step) * step;
+      longPutStrike = shortPutStrike - step;
+      shortCallStrike = Math.ceil(Math.max(input.callWall, spot * 1.04) / step) * step;
+      longCallStrike = shortCallStrike + step;
+      putWingWidth = Math.abs(shortPutStrike - longPutStrike);
+      callWingWidth = Math.abs(longCallStrike - shortCallStrike);
+      width = Math.max(putWingWidth, callWingWidth);
 
-      const shortPutPrem = Number((spot * 0.012).toFixed(2));
-      const longPutPrem = Number((spot * 0.005).toFixed(2));
-      const shortCallPrem = Number((spot * 0.011).toFixed(2));
-      const longCallPrem = Number((spot * 0.004).toFixed(2));
+      // Apreçamento Black-Scholes Merton (BSM) estrito derivado da Volatilidade e DTE reais (Achado N-02)
+      const longPutBsm = calculateBsm(spot, longPutStrike, tYears, volDecimal * 1.08, rRate, 'PUT');
+      const shortPutBsm = calculateBsm(spot, shortPutStrike, tYears, volDecimal * 1.03, rRate, 'PUT');
+      const shortCallBsm = calculateBsm(spot, shortCallStrike, tYears, volDecimal * 0.98, rRate, 'CALL');
+      const longCallBsm = calculateBsm(spot, longCallStrike, tYears, volDecimal * 0.95, rRate, 'CALL');
+
+      const shortPutPrem = shortPutBsm.price;
+      const longPutPrem = longPutBsm.price;
+      const shortCallPrem = shortCallBsm.price;
+      const longCallPrem = longCallBsm.price;
 
       netCredit = Number((shortPutPrem - longPutPrem + shortCallPrem - longCallPrem).toFixed(2));
 
       legs.push(
-        { action: 'BUY', type: 'PUT', strike: longPutStrike, delta: 0.08, iv: input.iv30 * 1.08, midPrice: longPutPrem, description: `Asa de Proteção Inferior ($${longPutStrike})` },
-        { action: 'SELL', type: 'PUT', strike: shortPutStrike, delta: 0.16, iv: input.iv30 * 1.03, midPrice: shortPutPrem, description: `Venda Ancorada na Put Wall ($${shortPutStrike})` },
-        { action: 'SELL', type: 'CALL', strike: shortCallStrike, delta: 0.16, iv: input.iv30 * 0.98, midPrice: shortCallPrem, description: `Venda Ancorada na Call Wall ($${shortCallStrike})` },
-        { action: 'BUY', type: 'CALL', strike: longCallStrike, delta: 0.08, iv: input.iv30 * 0.95, midPrice: longCallPrem, description: `Asa de Proteção Superior ($${longCallStrike})` }
+        { action: 'BUY', type: 'PUT', strike: longPutStrike, delta: Math.abs(longPutBsm.delta), iv: Number((volDecimal * 1.08 * 100).toFixed(1)), midPrice: longPutPrem, description: `Asa de Proteção Inferior ($${longPutStrike})` },
+        { action: 'SELL', type: 'PUT', strike: shortPutStrike, delta: Math.abs(shortPutBsm.delta), iv: Number((volDecimal * 1.03 * 100).toFixed(1)), midPrice: shortPutPrem, description: `Venda Ancorada na Put Wall ($${shortPutStrike})` },
+        { action: 'SELL', type: 'CALL', strike: shortCallStrike, delta: Math.abs(shortCallBsm.delta), iv: Number((volDecimal * 0.98 * 100).toFixed(1)), midPrice: shortCallPrem, description: `Venda Ancorada na Call Wall ($${shortCallStrike})` },
+        { action: 'BUY', type: 'CALL', strike: longCallStrike, delta: Math.abs(longCallBsm.delta), iv: Number((volDecimal * 0.95 * 100).toFixed(1)), midPrice: longCallPrem, description: `Asa de Proteção Superior ($${longCallStrike})` }
       );
     } else if (strategy.id === 6) {
       // Bull Put Spread a Crédito
-      const shortPutStrike = Math.floor(Math.min(input.putWall, spot * 0.98) / step) * step;
-      const longPutStrike = shortPutStrike - step;
-      width = step;
-      const shortPutPrem = Number((spot * 0.018).toFixed(2));
-      const longPutPrem = Number((spot * 0.008).toFixed(2));
+      shortPutStrike = Math.floor(Math.min(input.putWall, spot * 0.98) / step) * step;
+      longPutStrike = shortPutStrike - step;
+      width = Math.abs(shortPutStrike - longPutStrike);
+
+      const longPutBsm = calculateBsm(spot, longPutStrike, tYears, volDecimal * 1.06, rRate, 'PUT');
+      const shortPutBsm = calculateBsm(spot, shortPutStrike, tYears, volDecimal * 1.02, rRate, 'PUT');
+
+      const shortPutPrem = shortPutBsm.price;
+      const longPutPrem = longPutBsm.price;
       netCredit = Number((shortPutPrem - longPutPrem).toFixed(2));
 
       legs.push(
-        { action: 'BUY', type: 'PUT', strike: longPutStrike, delta: 0.15, iv: input.iv30 * 1.06, midPrice: longPutPrem, description: `Asa de Proteção Long Put ($${longPutStrike})` },
-        { action: 'SELL', type: 'PUT', strike: shortPutStrike, delta: 0.30, iv: input.iv30 * 1.02, midPrice: shortPutPrem, description: `Short Put Suporte Wall ($${shortPutStrike})` }
+        { action: 'BUY', type: 'PUT', strike: longPutStrike, delta: Math.abs(longPutBsm.delta), iv: Number((volDecimal * 1.06 * 100).toFixed(1)), midPrice: longPutPrem, description: `Asa de Proteção Long Put ($${longPutStrike})` },
+        { action: 'SELL', type: 'PUT', strike: shortPutStrike, delta: Math.abs(shortPutBsm.delta), iv: Number((volDecimal * 1.02 * 100).toFixed(1)), midPrice: shortPutPrem, description: `Short Put Suporte Wall ($${shortPutStrike})` }
       );
     } else if (strategy.id === 28 || strategy.id === 14) {
       // Calendar Spread / Double Calendar (Débito)
       const centerStrike = Math.round(spot / step) * step;
       width = step;
-      const shortPrem = Number((spot * 0.015).toFixed(2));
-      const longPrem = Number((spot * 0.035).toFixed(2));
+      const shortBsm = calculateBsm(spot, centerStrike, 30 / 365, volDecimal, rRate, 'CALL');
+      const longBsm = calculateBsm(spot, centerStrike, 60 / 365, volDecimal * 1.05, rRate, 'CALL');
+
+      const shortPrem = shortBsm.price;
+      const longPrem = longBsm.price;
       netCredit = -Number((longPrem - shortPrem).toFixed(2)); // Custo líquido (débito)
 
       legs.push(
-        { action: 'SELL', type: 'CALL', strike: centerStrike, delta: 0.50, iv: input.iv30, midPrice: shortPrem, description: `Ponta Curta Vendida (30 DTE) Strike $${centerStrike}` },
-        { action: 'BUY', type: 'CALL', strike: centerStrike, delta: 0.50, iv: input.iv30 * 1.05, midPrice: longPrem, description: `Ponta Longa Comprada (60 DTE) Strike $${centerStrike}` }
+        { action: 'SELL', type: 'CALL', strike: centerStrike, delta: Math.abs(shortBsm.delta), iv: input.iv30, midPrice: shortPrem, description: `Ponta Curta Vendida (30 DTE) Strike $${centerStrike}` },
+        { action: 'BUY', type: 'CALL', strike: centerStrike, delta: Math.abs(longBsm.delta), iv: Number((volDecimal * 1.05 * 100).toFixed(1)), midPrice: longPrem, description: `Ponta Longa Comprada (60 DTE) Strike $${centerStrike}` }
       );
     } else {
       // Travas Verticais Direcionais (Débito)
       const isAlta = strategy.bias === 'ALTA';
       const k1 = Math.round(spot / step) * step;
       const k2 = isAlta ? k1 + step : k1 - step;
-      width = step;
-      const prem1 = Number((spot * 0.025).toFixed(2));
-      const prem2 = Number((spot * 0.012).toFixed(2));
+      width = Math.abs(k1 - k2);
+
+      const bsm1 = calculateBsm(spot, k1, tYears, volDecimal, rRate, isAlta ? 'CALL' : 'PUT');
+      const bsm2 = calculateBsm(spot, k2, tYears, volDecimal * 0.98, rRate, isAlta ? 'CALL' : 'PUT');
+
+      const prem1 = bsm1.price;
+      const prem2 = bsm2.price;
       netCredit = -Number((prem1 - prem2).toFixed(2));
 
       legs.push(
-        { action: 'BUY', type: isAlta ? 'CALL' : 'PUT', strike: k1, delta: 0.50, iv: input.iv30, midPrice: prem1, description: `Ponta Comprada ATM ($${k1})` },
-        { action: 'SELL', type: isAlta ? 'CALL' : 'PUT', strike: k2, delta: 0.30, iv: input.iv30, midPrice: prem2, description: `Ponta Vendida OTM ($${k2})` }
+        { action: 'BUY', type: isAlta ? 'CALL' : 'PUT', strike: k1, delta: Math.abs(bsm1.delta), iv: input.iv30, midPrice: prem1, description: `Ponta Comprada ATM ($${k1})` },
+        { action: 'SELL', type: isAlta ? 'CALL' : 'PUT', strike: k2, delta: Math.abs(bsm2.delta), iv: Number((volDecimal * 0.98 * 100).toFixed(1)), midPrice: prem2, description: `Ponta Vendida OTM ($${k2})` }
       );
     }
 
     const isCredit = netCredit > 0;
-    const creditRatio = width > 0 ? Number((Math.abs(netCredit) / width).toFixed(2)) : 0;
-    const meetsCreditRule = isCredit ? creditRatio >= 0.30 : true;
+    const creditRatio = width > 0 ? Number((Math.abs(netCredit) / width).toFixed(3)) : 0;
+    // Regra Tastytrade rigorosa de 1/3 da largura do spread (0,3333) (Achado A-04 e N-03)
+    const meetsCreditRule = isCredit ? creditRatio >= (1 / 3) : true;
 
-    const maxProfit = isCredit ? Number((netCredit * 100).toFixed(2)) : Number(((width - Math.abs(netCredit)) * 100).toFixed(2));
-    const maxLoss = isCredit ? Number(((width - netCredit) * 100).toFixed(2)) : Number((Math.abs(netCredit) * 100).toFixed(2));
+    // Perda Máxima Real e Lucro Máximo Real considerando asas assimétricas (Achado A-12)
+    const maxProfit = isCredit 
+      ? Number((netCredit * 100).toFixed(2)) 
+      : Number(((width - Math.abs(netCredit)) * 100).toFixed(2));
+
+    const maxLoss = isCredit 
+      ? Math.max(0, Number(((width - netCredit) * 100).toFixed(2))) 
+      : Number((Math.abs(netCredit) * 100).toFixed(2));
 
     // Teste de Atribuição por Dividendo (§2.2 da skill)
     const divAmount = input.dividendAmount || 0;
@@ -270,9 +306,51 @@ export class VolatilityEngine {
       ? `ALERTA DE ATRIBUIÇÃO: Dividendo de $${divAmount.toFixed(2)} supera o extrínseco de $${callExtrinsic.toFixed(2)}. Risco iminente de exercício antecipado da Call curta!`
       : `Seguro: Dividendo de $${divAmount.toFixed(2)} inferior ao extrínseco remanescente ($${callExtrinsic.toFixed(2)}).`;
 
-    // Breakevens aproximados
-    const lowerBreakeven = isCredit ? Number((spot * 0.94 - netCredit).toFixed(2)) : Number((spot - Math.abs(netCredit)).toFixed(2));
-    const upperBreakeven = isCredit ? Number((spot * 1.05 + netCredit).toFixed(2)) : Number((spot + Math.abs(netCredit)).toFixed(2));
+    // Breakevens Matemáticos Exatos a partir dos strikes reais (Achados A-10 e N-07)
+    let lowerBreakeven = 0;
+    let upperBreakeven: number | null = null;
+
+    if (strategy.id === 20) {
+      // Iron Condor: shortPut - crédito e shortCall + crédito
+      lowerBreakeven = Number((shortPutStrike - netCredit).toFixed(2));
+      upperBreakeven = Number((shortCallStrike + netCredit).toFixed(2));
+    } else if (strategy.id === 6) {
+      // Bull Put Spread: shortPut - crédito. Sem breakeven superior (elimina constante spot * 1.05) (Achado N-07)
+      lowerBreakeven = Number((shortPutStrike - netCredit).toFixed(2));
+      upperBreakeven = null;
+    } else if (strategy.id === 28 || strategy.id === 14) {
+      // Calendar Spread: centerK - netDebit e centerK + netDebit (elimina multiplicador arbitrário 1.5) (Achado N-07)
+      const centerK = Math.round(spot / step) * step;
+      lowerBreakeven = Number((centerK - Math.abs(netCredit)).toFixed(2));
+      upperBreakeven = Number((centerK + Math.abs(netCredit)).toFixed(2));
+    } else {
+      // Verticais direcionais de débito
+      const isAlta = strategy.bias === 'ALTA';
+      const k1 = Math.round(spot / step) * step;
+      const k2 = isAlta ? k1 + step : k1 - step;
+      if (isAlta) {
+        lowerBreakeven = Number((k1 + Math.abs(netCredit)).toFixed(2));
+        upperBreakeven = Number(k2.toFixed(2));
+      } else {
+        lowerBreakeven = Number(k2.toFixed(2));
+        upperBreakeven = Number((k1 - Math.abs(netCredit)).toFixed(2));
+      }
+    }
+
+    // Estimativa de POP Matemática a partir dos Deltas Analíticos das Pernas Vendidas (Achados A-11 e N-03)
+    let dynamicPop = 50;
+    if (strategy.id === 20) {
+      // Iron Condor: 1 - deltaCallCurta - deltaPutCurta
+      const pDelta = Math.abs(legs.find(l => l.action === 'SELL' && l.type === 'PUT')?.delta || 0.16);
+      const cDelta = Math.abs(legs.find(l => l.action === 'SELL' && l.type === 'CALL')?.delta || 0.16);
+      dynamicPop = Math.min(95, Math.max(25, Math.round((1 - pDelta - cDelta) * 100)));
+    } else if (isCredit) {
+      const sDelta = Math.abs(legs.find(l => l.action === 'SELL')?.delta || 0.30);
+      dynamicPop = Math.min(95, Math.max(25, Math.round((1 - sDelta) * 100)));
+    } else {
+      const lDelta = Math.abs(legs.find(l => l.action === 'BUY')?.delta || 0.50);
+      dynamicPop = Math.min(85, Math.max(15, Math.round(lDelta * 100)));
+    }
 
     // Formatação padronizada (§13 da skill analista-senior-opcoes-us)
     const formattedTextOutput = `DIAGNÓSTICO DE VOLATILIDADE — ${input.symbol} | Vencimento: ${dte} DTE
@@ -341,13 +419,17 @@ PLAYBOOK TASTYTRADE (§8):
       fourJobsSummary: {
         insurancePricing: `IV 30d em ${input.iv30.toFixed(1)}% vs RV Yang-Zhang de ${input.rv20.toFixed(1)}% (VRP de ${vrp >= 0 ? '+' : ''}${vrp.toFixed(1)} pts). O mercado precifica uma oscilação ${vrp >= 0 ? 'superior' : 'inferior'} à verificada nos últimos meses.`,
         structureChoice: `Em vez de usar sempre a mesma estratégia, o sistema selecionou ${strategy.name} calibrada para ${dte} DTE (Sweet Spot de decaimento do Theta).`,
-        riskBeforeReward: `Melhor cenário: Ganho de $${maxProfit.toFixed(2)}. Pior cenário: Perda máxima limitada a $${maxLoss.toFixed(2)}. Breakevens entre $${lowerBreakeven.toFixed(2)} e $${upperBreakeven.toFixed(2)}.`,
+        riskBeforeReward: upperBreakeven !== null
+          ? `Melhor cenário: Ganho de $${maxProfit.toFixed(2)}. Pior cenário: Perda máxima limitada a $${maxLoss.toFixed(2)}. Breakevens entre $${lowerBreakeven.toFixed(2)} e $${upperBreakeven.toFixed(2)}.`
+          : `Melhor cenário: Ganho de $${maxProfit.toFixed(2)}. Pior cenário: Perda máxima limitada a $${maxLoss.toFixed(2)}. Breakeven em $${lowerBreakeven.toFixed(2)} (sem teto superior de prejuízo).`,
         exitPlan: `Realização de lucro: Fechar com 50% do lucro ($${(Math.abs(netCredit) * 0.5).toFixed(2)}). Saída preventiva: Fechar ou rolar impreterivelmente aos 21 DTE restantes para evitar risco de Gamma.`
       },
       fourCashQuestions: {
         maxProfitCash: `+$${maxProfit.toFixed(2)} por contrato (100% do lucro potencial se o preço permanecer dentro da zona das Walls de OI até o vencimento)`,
         maxLossCash: `-$${maxLoss.toFixed(2)} por contrato (trava de segurança comprada limita a perda no pior cenário absoluto; o capital nunca fica exposto a risco infinito)`,
-        breakevenPoint: `Abaixo de $${lowerBreakeven.toFixed(2)} ou acima de $${upperBreakeven.toFixed(2)} (qualquer cotação intermediária preserva lucro ou breakeven)`,
+        breakevenPoint: upperBreakeven !== null
+          ? `Abaixo de $${lowerBreakeven.toFixed(2)} ou acima de $${upperBreakeven.toFixed(2)} (qualquer cotação intermediária preserva lucro ou breakeven)`
+          : `Abaixo de $${lowerBreakeven.toFixed(2)} (qualquer cotação acima preserva lucro integral de $${maxProfit.toFixed(2)})`,
         whatMakesItFail: isCredit
           ? `Rompimento violento das barreiras de Open Interest (Put Wall $${input.putWall.toFixed(2)} ou Call Wall $${input.callWall.toFixed(2)}) com explosão de volatilidade não antecipada pelos formadores de mercado.`
           : `Ausência de movimento direcional ou colapso rápido da volatilidade implícita consumindo o prêmio pago no decaimento temporal (Theta).`
@@ -394,7 +476,7 @@ PLAYBOOK TASTYTRADE (§8):
       meetsCreditRule,
       maxProfit,
       maxLoss,
-      popEstimate: isCredit ? 72 : 48,
+      popEstimate: dynamicPop,
       lowerBreakeven,
       upperBreakeven,
       lifecycle: {
