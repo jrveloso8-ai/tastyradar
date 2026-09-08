@@ -1,0 +1,607 @@
+{
+  "data": {
+    "items": [
+      {
+        "symbol": "AAPL",
+        "implied-volatility-index": "0.263700858",
+        "implied-volatility-index-15-day": "0.275164341",
+        "implied-volatility-index-5-day-change": "0.00698909",
+        "implied-volatility-index-rank": "0.431383903",
+        "tos-implied-volatility-index-rank": "0.431383903",
+        "tw-implied-volatility-index-rank": "0.380387471",
+        "tos-implied-volatility-index-rank-updated-at": "2026-09-04T19:50:18.756Z",
+        "implied-volatility-index-rank-source": "tos",
+        "implied-volatility-percentile": "0.341457692",
+        "implied-volatility-updated-at": "2026-09-04T19:50:18.743Z",
+        "liquidity-value": "72627.156110639",
+        "liquidity-rank": "0.355267319",
+        "liquidity-rating": 4,
+        "updated-at": "2026-09-07T13:06:03.500Z",
+        "option-expiration-implied-volatilities": [
+          {
+            "expiration-date": "2026-09-04",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "1.0113195"
+          },
+          {
+            "expiration-date": "2026-09-09",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.277290173"
+          },
+          {
+            "expiration-date": "2026-09-11",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.288763133"
+          },
+          {
+            "expiration-date": "2026-09-14",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.266893938"
+          },
+          {
+            "expiration-date": "2026-09-16",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.276800415"
+          },
+          {
+            "expiration-date": "2026-09-18",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.277006944"
+          },
+          {
+            "expiration-date": "2026-09-25",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.267610186"
+          },
+          {
+            "expiration-date": "2026-10-02",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.263463327"
+          },
+          {
+            "expiration-date": "2026-10-09",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.264177381"
+          },
+          {
+            "expiration-date": "2026-10-16",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.262736846"
+          },
+          {
+            "expiration-date": "2026-10-23",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.258971064"
+          },
+          {
+            "expiration-date": "2026-11-20",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.287461679"
+          },
+          {
+            "expiration-date": "2026-12-18",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.282615787"
+          },
+          {
+            "expiration-date": "2027-01-15",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.281542276"
+          },
+          {
+            "expiration-date": "2027-02-19",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.291438968"
+          },
+          {
+            "expiration-date": "2027-03-19",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.301485488"
+          },
+          {
+            "expiration-date": "2027-04-16",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.279754024"
+          },
+          {
+            "expiration-date": "2027-06-17",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.296887633"
+          },
+          {
+            "expiration-date": "2027-09-17",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.294628237"
+          },
+          {
+            "expiration-date": "2027-12-17",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.300512923"
+          },
+          {
+            "expiration-date": "2028-01-21",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.301733264"
+          },
+          {
+            "expiration-date": "2028-03-17",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.296393167"
+          },
+          {
+            "expiration-date": "2028-12-15",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.312601382"
+          }
+        ],
+        "liquidity-running-state": {
+          "sum": "0.0",
+          "count": 0,
+          "started-at": "2026-09-05T10:09:36.149Z"
+        },
+        "beta": "1.070028424",
+        "beta-updated-at": "2026-09-06T17:00:48.068Z",
+        "corr-spy-3month": "0.27",
+        "dividend-rate-per-share": "0.27",
+        "annual-dividend-per-share": "0.0",
+        "dividend-yield": "0.003375316",
+        "dividend-ex-date": "2026-08-10",
+        "dividend-next-date": "2022-08-05",
+        "dividend-pay-date": "2026-08-13",
+        "dividend-updated-at": "2026-09-07T12:03:41.582Z",
+        "earnings": {
+          "visible": true,
+          "expected-report-date": "2026-10-29",
+          "estimated": false,
+          "late-flag": 0,
+          "quarter-end-date": "2026-09-01",
+          "actual-eps": "1.85",
+          "consensus-estimate": "1.98",
+          "updated-at": "2026-09-04T02:15:52.646Z"
+        },
+        "listed-market": "XNAS",
+        "lendability": "Easy To Borrow",
+        "borrow-rate": "0.0",
+        "market-cap": 4669699774600,
+        "implied-volatility-30-day": "26.37",
+        "historical-volatility-30-day": "20.49",
+        "historical-volatility-60-day": "28.91",
+        "historical-volatility-90-day": "31.64",
+        "iv-hv-30-day-difference": "5.88",
+        "price-earnings-ratio": "36.81803",
+        "earnings-per-share": "8.69058",
+        "sector": "Technology",
+        "industry": "Communications Equipment"
+      },
+      {
+        "symbol": "F",
+        "implied-volatility-index": "0.331093307",
+        "implied-volatility-index-15-day": "0.327189897",
+        "implied-volatility-index-5-day-change": "-0.000648175",
+        "implied-volatility-index-rank": "0.305007052",
+        "tos-implied-volatility-index-rank": "0.305007052",
+        "tw-implied-volatility-index-rank": "0.093705555",
+        "tos-implied-volatility-index-rank-updated-at": "2026-09-04T19:49:53.564Z",
+        "implied-volatility-index-rank-source": "tos",
+        "implied-volatility-percentile": "0.27757782",
+        "implied-volatility-updated-at": "2026-09-04T19:49:53.552Z",
+        "liquidity-value": "293743.645945118",
+        "liquidity-rank": "1.339476083",
+        "liquidity-rating": 4,
+        "updated-at": "2026-09-07T13:06:07.487Z",
+        "option-expiration-implied-volatilities": [
+          {
+            "expiration-date": "2026-09-04",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "25.885679909"
+          },
+          {
+            "expiration-date": "2026-09-11",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.311519572"
+          },
+          {
+            "expiration-date": "2026-09-18",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.328110177"
+          },
+          {
+            "expiration-date": "2026-09-25",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.323451554"
+          },
+          {
+            "expiration-date": "2026-10-02",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.328386313"
+          },
+          {
+            "expiration-date": "2026-10-09",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.336468106"
+          },
+          {
+            "expiration-date": "2026-10-16",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.355096719"
+          },
+          {
+            "expiration-date": "2026-10-23",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.35882266"
+          },
+          {
+            "expiration-date": "2026-11-20",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.392369781"
+          },
+          {
+            "expiration-date": "2026-12-18",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.383854113"
+          },
+          {
+            "expiration-date": "2027-01-15",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.385504865"
+          },
+          {
+            "expiration-date": "2027-03-19",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.379897745"
+          },
+          {
+            "expiration-date": "2027-06-17",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.393015894"
+          },
+          {
+            "expiration-date": "2027-09-17",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.39856533"
+          },
+          {
+            "expiration-date": "2027-12-17",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.402918744"
+          },
+          {
+            "expiration-date": "2028-01-21",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.412841206"
+          },
+          {
+            "expiration-date": "2028-12-15",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.424153793"
+          }
+        ],
+        "liquidity-running-state": {
+          "sum": "0.0",
+          "count": 0,
+          "started-at": "2026-09-05T10:09:56.689Z"
+        },
+        "beta": "1.932607501",
+        "beta-updated-at": "2026-09-06T17:00:36.704Z",
+        "corr-spy-3month": "0.1",
+        "dividend-rate-per-share": "0.15",
+        "annual-dividend-per-share": "0.0",
+        "dividend-yield": "0.041039672",
+        "dividend-ex-date": "2026-08-11",
+        "dividend-next-date": "2022-08-10",
+        "dividend-pay-date": "2026-09-01",
+        "dividend-updated-at": "2026-09-07T12:03:35.339Z",
+        "earnings": {
+          "visible": true,
+          "expected-report-date": "2026-10-22",
+          "estimated": false,
+          "late-flag": 0,
+          "quarter-end-date": "2026-09-01",
+          "actual-eps": "0.45",
+          "consensus-estimate": "0.41",
+          "updated-at": "2026-08-28T02:15:52.964Z"
+        },
+        "listed-market": "XNYS",
+        "lendability": "Easy To Borrow",
+        "borrow-rate": "0.0",
+        "market-cap": 58298648651,
+        "implied-volatility-30-day": "33.11",
+        "historical-volatility-30-day": "32.62",
+        "historical-volatility-60-day": "29.34",
+        "historical-volatility-90-day": "30.51",
+        "iv-hv-30-day-difference": "0.49",
+        "price-earnings-ratio": "-99999.99",
+        "earnings-per-share": "-1.87885",
+        "sector": "Consumer Cyclical",
+        "industry": "Auto & Truck Manufacturers"
+      },
+      {
+        "symbol": "SPY",
+        "implied-volatility-index": "0.142460933",
+        "implied-volatility-index-15-day": "0.13133616",
+        "implied-volatility-index-5-day-change": "-0.000624553",
+        "implied-volatility-index-rank": "0.245975855",
+        "tos-implied-volatility-index-rank": "0.245975855",
+        "tw-implied-volatility-index-rank": "0.063538575",
+        "tos-implied-volatility-index-rank-updated-at": "2026-09-04T19:56:33.060Z",
+        "implied-volatility-index-rank-source": "tos",
+        "implied-volatility-percentile": "0.105976734",
+        "implied-volatility-updated-at": "2026-09-04T19:56:33.049Z",
+        "liquidity-value": "233360.777221963",
+        "liquidity-rank": "0.855228212",
+        "liquidity-rating": 4,
+        "updated-at": "2026-09-07T12:03:57.337Z",
+        "option-expiration-implied-volatilities": [
+          {
+            "expiration-date": "2026-09-04",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.457327268"
+          },
+          {
+            "expiration-date": "2026-09-08",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.070746543"
+          },
+          {
+            "expiration-date": "2026-09-09",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.08197373"
+          },
+          {
+            "expiration-date": "2026-09-10",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.092563867"
+          },
+          {
+            "expiration-date": "2026-09-11",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.108210364"
+          },
+          {
+            "expiration-date": "2026-09-14",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.09926305"
+          },
+          {
+            "expiration-date": "2026-09-15",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.102870092"
+          },
+          {
+            "expiration-date": "2026-09-16",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.113636546"
+          },
+          {
+            "expiration-date": "2026-09-17",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.118463988"
+          },
+          {
+            "expiration-date": "2026-09-18",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.130897986"
+          },
+          {
+            "expiration-date": "2026-09-25",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.133078724"
+          },
+          {
+            "expiration-date": "2026-09-30",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.137282212"
+          },
+          {
+            "expiration-date": "2026-10-02",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.140871681"
+          },
+          {
+            "expiration-date": "2026-10-09",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.145591963"
+          },
+          {
+            "expiration-date": "2026-10-16",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.154002599"
+          },
+          {
+            "expiration-date": "2026-10-23",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.153471422"
+          },
+          {
+            "expiration-date": "2026-10-30",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.159479872"
+          },
+          {
+            "expiration-date": "2026-11-20",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.17191606"
+          },
+          {
+            "expiration-date": "2026-11-30",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.166040802"
+          },
+          {
+            "expiration-date": "2026-12-18",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.183629688"
+          },
+          {
+            "expiration-date": "2026-12-31",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.173683805"
+          },
+          {
+            "expiration-date": "2027-01-15",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.189260309"
+          },
+          {
+            "expiration-date": "2027-01-29",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.175606794"
+          },
+          {
+            "expiration-date": "2027-02-26",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.173090882"
+          },
+          {
+            "expiration-date": "2027-03-19",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.195097254"
+          },
+          {
+            "expiration-date": "2027-03-31",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.195839018"
+          },
+          {
+            "expiration-date": "2027-06-17",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.210886897"
+          },
+          {
+            "expiration-date": "2027-06-30",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.181102597"
+          },
+          {
+            "expiration-date": "2027-09-17",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.215889725"
+          },
+          {
+            "expiration-date": "2027-12-17",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.218981089"
+          },
+          {
+            "expiration-date": "2028-01-21",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.219943371"
+          },
+          {
+            "expiration-date": "2028-06-16",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.224179244"
+          },
+          {
+            "expiration-date": "2028-12-15",
+            "option-chain-type": "Standard",
+            "settlement-type": "PM",
+            "implied-volatility": "0.227147381"
+          }
+        ],
+        "liquidity-running-state": {
+          "sum": "0.0",
+          "count": 0,
+          "started-at": "2026-09-05T10:10:03.533Z"
+        },
+        "beta": "1.0",
+        "corr-spy-3month": "1.0",
+        "dividend-rate-per-share": "1.903516",
+        "annual-dividend-per-share": "0.0",
+        "dividend-yield": "0.009885955",
+        "dividend-ex-date": "2026-06-18",
+        "dividend-next-date": "2022-12-16",
+        "dividend-pay-date": "2026-07-31",
+        "dividend-updated-at": "2026-09-07T12:03:57.337Z",
+        "earnings": {
+          "visible": false,
+          "estimated": false,
+          "late-flag": 0
+        },
+        "listed-market": "ARCX",
+        "lendability": "Easy To Borrow",
+        "borrow-rate": "0.0",
+        "market-cap": 0,
+        "implied-volatility-30-day": "14.25",
+        "historical-volatility-30-day": "8.01",
+        "historical-volatility-60-day": "11.33",
+        "historical-volatility-90-day": "13.75",
+        "iv-hv-30-day-difference": "6.24",
+        "price-earnings-ratio": "0.0",
+        "earnings-per-share": "0.0"
+      }
+    ]
+  }
+}

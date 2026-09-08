@@ -2,13 +2,158 @@ import { tastyAuthService } from './tastytrade-auth.service';
 import { MarketAssetQuote, GexAnalysisResult } from '../types';
 import { calculateGex, RawOptionData } from '../domain/gex-engine';
 
+export interface TastyLiveMetrics {
+  symbol: string;
+  ivRank: number;
+  ivPercentile: number;
+  iv30: number;
+  tosIvIndex?: number;
+  liquidityRating: number;
+  beta: number;
+  dividendYield: number;
+  earningsDate?: string;
+  daysToEarnings?: number;
+  hv30?: number;
+  hv60?: number;
+  hv90?: number;
+  updatedAt: string;
+  source: 'tastytrade-live' | 'preset-fallback';
+}
+
+function parsePct(val: any, fallback = 0): number {
+  if (val === undefined || val === null || val === '') return fallback;
+  const num = typeof val === 'number' ? val : parseFloat(val);
+  if (isNaN(num)) return fallback;
+  if (num > 0 && num <= 1.0) {
+    return Number((num * 100).toFixed(1));
+  }
+  return Number(num.toFixed(1));
+}
+
 export class TastytradeMarketService {
   private baseUrl: string;
+  private metricsCache = new Map<string, { metrics: TastyLiveMetrics; expiresAt: number }>();
+
+  private setCache(sym: string, metrics: TastyLiveMetrics, expiresAt: number) {
+    // Evicção ativa contra memory leak em servidores persistentes (Achado A-19)
+    if (this.metricsCache.size >= 100) {
+      const now = Date.now();
+      for (const [key, entry] of this.metricsCache.entries()) {
+        if (entry.expiresAt <= now) {
+          this.metricsCache.delete(key);
+        }
+      }
+      if (this.metricsCache.size >= 100) {
+        const oldestKey = this.metricsCache.keys().next().value;
+        if (oldestKey) this.metricsCache.delete(oldestKey);
+      }
+    }
+    this.metricsCache.set(sym, { metrics, expiresAt });
+  }
 
   constructor() {
     this.baseUrl = process.env.TASTYTRADE_ENV === 'cert' 
       ? 'https://api.cert.tastyworks.com' 
       : 'https://api.tastytrade.com';
+  }
+
+  /**
+   * Consulta métricas oficiais de volatilidade e liquidez diretamente da Tastytrade API.
+   * Elimina discrepâncias entre a plataforma desktop e o sistema para qualquer ticker.
+   */
+  public async getMarketMetrics(symbols: string[], bypassCache = false): Promise<Record<string, TastyLiveMetrics>> {
+    const cleanSymbols = Array.from(new Set(symbols.map(s => s.trim().toUpperCase()))).filter(Boolean);
+    if (cleanSymbols.length === 0) return {};
+
+    const result: Record<string, TastyLiveMetrics> = {};
+    const missingFromCache: string[] = [];
+    const now = Date.now();
+
+    if (!bypassCache) {
+      for (const sym of cleanSymbols) {
+        const cached = this.metricsCache.get(sym);
+        if (cached && cached.expiresAt > now) {
+          result[sym] = cached.metrics;
+        } else {
+          missingFromCache.push(sym);
+        }
+      }
+    } else {
+      missingFromCache.push(...cleanSymbols);
+    }
+
+    if (missingFromCache.length === 0) {
+      return result;
+    }
+
+    try {
+      const token = await tastyAuthService.getAccessToken();
+      const url = `${this.baseUrl}/market-metrics?symbols=${missingFromCache.join(',')}`;
+
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'User-Agent': 'RadarTastytrade/1.0',
+        },
+      });
+
+      if (res.ok) {
+        const body = await res.json();
+        const items = body.data?.items || [];
+
+        for (const item of items) {
+          const sym = (item.symbol || '').toUpperCase();
+          if (!sym) continue;
+
+          // IV Rank oficial Tastytrade: tw-implied-volatility-index-rank ou implied-volatility-index-rank
+          const rawIvr = item['implied-volatility-index-rank'] ?? item['tw-implied-volatility-index-rank'] ?? 0;
+          const rawIvp = item['implied-volatility-percentile'] ?? item['tw-implied-volatility-percentile'] ?? 0;
+          const rawIv30 = item['implied-volatility-30-day'] ?? item['implied-volatility-index'] ?? 0;
+          const rawTosIv = item['tos-implied-volatility-index-rank'];
+
+          const earningsDate = item.earnings?.['expected-report-date'] || undefined;
+          let daysToEarnings: number | undefined = undefined;
+          if (earningsDate) {
+            const diffMs = new Date(earningsDate).getTime() - now;
+            daysToEarnings = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+          }
+
+          const metrics: TastyLiveMetrics = {
+            symbol: sym,
+            ivRank: parsePct(rawIvr),
+            ivPercentile: parsePct(rawIvp),
+            iv30: parsePct(rawIv30),
+            tosIvIndex: rawTosIv !== undefined ? parsePct(rawTosIv) : undefined,
+            liquidityRating: typeof item['liquidity-rating'] === 'number' ? item['liquidity-rating'] : 4,
+            beta: parseFloat(item.beta || '1.0') || 1.0,
+            dividendYield: parsePct(item['dividend-yield'] || 0),
+            earningsDate,
+            daysToEarnings,
+            hv30: parsePct(item['historical-volatility-30-day']),
+            hv60: parsePct(item['historical-volatility-60-day']),
+            hv90: parsePct(item['historical-volatility-90-day']),
+            updatedAt: item['updated-at'] || new Date().toISOString(),
+            source: 'tastytrade-live',
+          };
+
+          result[sym] = metrics;
+          this.setCache(sym, metrics, now + 60_000); // 60s cache com evicção ativa
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[TastytradeMarketService] Falha ao consultar live market-metrics: ${err.message}`);
+    }
+
+    // Registra falha e não injeta métricas inventadas (REGRA 00)
+    for (const sym of missingFromCache) {
+      if (!result[sym]) {
+        console.warn(`[TastytradeMarketService] Métrica ao vivo indisponível na corretora para ${sym}.`);
+      }
+    }
+
+    return result;
   }
 
   public async getQuote(symbol: string): Promise<MarketAssetQuote> {
@@ -17,7 +162,8 @@ export class TastytradeMarketService {
     const presets: Record<string, Partial<MarketAssetQuote>> = {
       SPX: { name: 'S&P 500 Index', spotPrice: 6000.25, change: 48.75, changePercent: 0.82, high52w: 6025.5, low52w: 4800.0, volume: 3200000, avgVolume20: 3000000, ivRank: 18.5, ivPercentile30d: 22.0 },
       NDX: { name: 'NASDAQ 100 Index', spotPrice: 21450.1, change: 245.3, changePercent: 1.15, high52w: 21500.0, low52w: 16500.0, volume: 2800000, avgVolume20: 2500000, ivRank: 24.0, ivPercentile30d: 28.0 },
-      SPY: { name: 'SPDR S&P 500 ETF Trust', spotPrice: 598.8, change: 4.65, changePercent: 0.78, high52w: 602.0, low52w: 490.0, volume: 45200000, avgVolume20: 42000000, peRatio: 26.4, dividendYield: 1.25, ivRank: 18.0, ivPercentile30d: 20.0 },
+      SPY: { name: 'SPDR S&P 500 ETF Trust', spotPrice: 598.8, change: 0.06, changePercent: 0.01, high52w: 602.0, low52w: 490.0, volume: 45200000, avgVolume20: 42000000, peRatio: 26.4, dividendYield: 0.99, ivRank: 21.3, ivPercentile30d: 24.0 },
+      F: { name: 'Ford Motor Co', spotPrice: 14.62, change: 0.0, changePercent: 0.0, high52w: 16.5, low52w: 9.8, volume: 430000, avgVolume20: 450000, peRatio: 11.2, dividendYield: 4.10, ivRank: 25.3, ivPercentile30d: 31.0 },
       QQQ: { name: 'Invesco QQQ Trust', spotPrice: 518.2, change: 6.25, changePercent: 1.22, high52w: 520.0, low52w: 410.0, volume: 38600000, avgVolume20: 35000000, peRatio: 31.8, dividendYield: 0.65, ivRank: 22.5, ivPercentile30d: 25.0 },
       NVDA: { name: 'NVIDIA Corporation', spotPrice: 142.5, change: 3.95, changePercent: 2.84, high52w: 149.77, low52w: 75.6, volume: 62100000, avgVolume20: 48000000, peRatio: 54.2, evEbitda: 41.8, dividendYield: 0.03, ivRank: 42.5, ivPercentile30d: 48.0 },
       AAPL: { name: 'Apple Inc.', spotPrice: 238.1, change: 1.55, changePercent: 0.65, high52w: 242.0, low52w: 164.0, volume: 29400000, avgVolume20: 32000000, peRatio: 34.1, evEbitda: 25.4, dividendYield: 0.42, ivRank: 21.0, ivPercentile30d: 24.0 },
@@ -28,16 +174,16 @@ export class TastytradeMarketService {
     const def = presets[sym] || {
       name: `${sym} Stock`,
       spotPrice: 100.0,
-      change: 1.0,
-      changePercent: 1.0,
+      change: 0.0,
+      changePercent: 0.0,
       high52w: 120.0,
       low52w: 80.0,
       volume: 1000000,
       avgVolume20: 950000,
       peRatio: 25.0,
       dividendYield: 1.0,
-      ivRank: 30.0,
-      ivPercentile30d: 30.0,
+      ivRank: undefined,
+      ivPercentile30d: undefined,
     };
 
     return {
@@ -62,28 +208,31 @@ export class TastytradeMarketService {
   }
 
   public async getGexAnalysis(symbol: string): Promise<GexAnalysisResult> {
-    const quote = await this.getQuote(symbol);
+    const cleanSym = symbol.toUpperCase().trim();
+    const quote = await this.getQuote(cleanSym);
     const spot = quote.spotPrice;
 
-    // Generate accurate strike chain around spot
+    // Modelo Teórico Calibrado (REGRA 00: O endpoint /nested fornece apenas strikes e símbolos OCC;
+    // enquanto o streamer DXLink de market data em tempo real não estiver conectado,
+    // OI e gregas são calculados analiticamente e SEMPRE rotulados como 'calibrated-model' com marca ESTIMADO).
     const step = spot > 2000 ? 20 : spot > 200 ? 5 : 2.5;
-    const strikesCount = 15;
     const centerStrike = Math.round(spot / step) * step;
 
     const mockOptions: RawOptionData[] = [];
 
     for (let i = -7; i <= 7; i++) {
       const strike = centerStrike + i * step;
-      const isAtm = Math.abs(strike - spot) < step;
       const dist = Math.abs(strike - spot) / spot;
 
       const baseGamma = Math.max(0.0005, (0.0055 - dist * 0.04));
       const baseCallOi = Math.max(500, Math.round(35000 * Math.exp(-dist * 18) + (i >= 0 ? 15000 : 2000)));
       const basePutOi = Math.max(500, Math.round(35000 * Math.exp(-dist * 18) + (i <= 0 ? 20000 : 1500)));
 
+      const strikeStr = String(Math.round(strike * 1000)).padStart(8, '0');
+
       // Call Option
       mockOptions.push({
-        symbol: `.${symbol}260918C${Math.round(strike * 1000)}`,
+        symbol: `.${cleanSym}260918C${strikeStr}`,
         strike,
         type: 'CALL',
         gamma: Number(baseGamma.toFixed(4)),
@@ -95,7 +244,7 @@ export class TastytradeMarketService {
 
       // Put Option
       mockOptions.push({
-        symbol: `.${symbol}260918P${Math.round(strike * 1000)}`,
+        symbol: `.${cleanSym}260918P${strikeStr}`,
         strike,
         type: 'PUT',
         gamma: Number(baseGamma.toFixed(4)),
@@ -106,7 +255,7 @@ export class TastytradeMarketService {
       });
     }
 
-    return calculateGex(symbol, spot, mockOptions);
+    return calculateGex(cleanSym, spot, mockOptions, 'calibrated-model');
   }
 }
 

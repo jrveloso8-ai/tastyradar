@@ -33,6 +33,24 @@ export class TastytradeAuthService {
       : 'https://api.tastytrade.com';
     this.tokenFilePath = path.join(process.cwd(), 'tasty_token.json');
     this.streamerFilePath = path.join(process.cwd(), 'streamer_token.json');
+
+    // Fallback resiliente para carregar .env.local diretamente
+    if (!this.clientId && fs.existsSync(path.join(process.cwd(), '.env.local'))) {
+      try {
+        const envContent = fs.readFileSync(path.join(process.cwd(), '.env.local'), 'utf8');
+        for (const line of envContent.split('\n')) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('#') || !trimmed.includes('=')) continue;
+          const [k, ...vParts] = trimmed.split('=');
+          const v = vParts.join('=').trim();
+          if (k === 'CLIENT_ID' && !this.clientId) this.clientId = v;
+          if (k === 'CLIENT_SECRET' && !this.clientSecret) this.clientSecret = v;
+          if (k === 'REFRESH_TOKEN' && !this.refreshToken) this.refreshToken = v;
+        }
+      } catch (err: any) {
+        console.warn('[TastyAuth] Aviso ao tentar ler .env.local:', err.message);
+      }
+    }
   }
 
   public async getAccessToken(forceRefresh = false): Promise<string> {
@@ -44,8 +62,8 @@ export class TastytradeAuthService {
         if (data.expires_at > now + 60) {
           return data.access_token;
         }
-      } catch {
-        // Cache miss
+      } catch (err: any) {
+        console.warn('[TastyAuth] Cache de token inexistente ou corrompido:', err.message);
       }
     }
 
@@ -86,7 +104,9 @@ export class TastytradeAuthService {
 
     try {
       fs.writeFileSync(this.tokenFilePath, JSON.stringify(cache, null, 2), 'utf8');
-    } catch {}
+    } catch (err: any) {
+      console.warn('[TastyAuth] Não foi possível persistir token em disco:', err.message);
+    }
 
     return accessToken;
   }
@@ -100,7 +120,9 @@ export class TastytradeAuthService {
         if (data.expires_at > now + 300) {
           return { token: data.token, dxlinkUrl: data.dxlink_url };
         }
-      } catch {}
+      } catch (err: any) {
+        console.warn('[TastyAuth] Streamer token cache miss ou inválido:', err.message);
+      }
     }
 
     const accessToken = await this.getAccessToken();
@@ -138,7 +160,9 @@ export class TastytradeAuthService {
 
     try {
       fs.writeFileSync(this.streamerFilePath, JSON.stringify(cache, null, 2), 'utf8');
-    } catch {}
+    } catch (err: any) {
+      console.warn('[TastyAuth] Não foi possível persistir streamer token em disco:', err.message);
+    }
 
     return { token, dxlinkUrl };
   }

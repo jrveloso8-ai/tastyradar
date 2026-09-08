@@ -1,0 +1,13 @@
+{
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "no-empty": ["error", { "allowEmptyCatch": false }],
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "CallExpression[callee.object.name='Math'][callee.property.name='random']",
+        "message": "REGRA 00: Math.random() e terminantemente proibido. Serie historica e motores quantitativos devem ser reproduziveis e deterministicos."
+      }
+    ]
+  }
+}

@@ -114,15 +114,6 @@ export class BrapiService {
         financialDebtToEbitda = Number(((financialDebt - totalCash) / ebitda).toFixed(2));
       }
 
-      // 6. Reconciliação de Solvência para casos com provisões pesadas de balanço (ex: VALE3)
-      if (cleanSymbol === 'VALE3') {
-        if (!financialDebtToEbitda || financialDebtToEbitda > 2.5) {
-          financialDebtToEbitda = financialDebt && totalCash && ebitda && ebitda > 0
-            ? Number(((financialDebt - totalCash) / ebitda).toFixed(2))
-            : 0.8;
-        }
-      }
-
       // 7. Extração de Lucro Líquido
       const netIncome = stats?.netIncomeToCommon ?? fin?.netIncome ?? null;
 
@@ -147,7 +138,8 @@ export class BrapiService {
         priceToBook: item?.priceToBook ?? stats?.priceToBook ?? null,
         dividendYield: item?.dividendYield ?? stats?.dividendYield ?? null,
       };
-    } catch {
+    } catch (err: any) {
+      console.warn(`[BrapiService] Falha ao consultar fundamentos de ${cleanSymbol}:`, err.message);
       return {
         symbol: cleanSymbol,
       };

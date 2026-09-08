@@ -55,6 +55,7 @@ export interface GexAnalysisResult {
   callWalls: { strike: number; symbol: string; contracts: number; delta: number; iv: number; distancePct: number }[];
   putWalls: { strike: number; symbol: string; contracts: number; delta: number; iv: number; distancePct: number }[];
   calculatedAt: string;
+  source?: 'tastytrade-live' | 'calibrated-model';
 }
 
 export interface MarketAssetQuote {
@@ -78,3 +79,4 @@ export interface MarketAssetQuote {
 }
 
 export * from './financial';
+export * from './provenance';
