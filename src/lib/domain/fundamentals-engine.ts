@@ -22,38 +22,40 @@ export class FundamentalsEngine {
     // =========================================================================
     let isIncomeNormalized = false;
     let effectiveNetIncome = raw.netIncome ?? null;
-    let effectiveRoe = raw.returnOnEquity !== null && raw.returnOnEquity !== undefined
-      ? (raw.returnOnEquity > 1 ? raw.returnOnEquity : raw.returnOnEquity * 100)
-      : null;
-    let effectiveNetMargin = raw.netMargin !== null && raw.netMargin !== undefined
-      ? (raw.netMargin > 1 ? raw.netMargin : raw.netMargin * 100)
-      : null;
+
+    // Conversão estrita do contrato de taxas (fração decimal -> pontos percentuais) (Achado A-09)
+    // O contrato do RawFundamentalData estabelece fração decimal (ex: 0.165 = 16.5%, 0.008 = 0.8%).
+    const toPercentage = (val: number | null | undefined): number | null => {
+      if (val === null || val === undefined) return null;
+      return Number((val * 100).toFixed(2));
+    };
+
+    let effectiveRoe = toPercentage(raw.returnOnEquity);
+    let effectiveNetMargin = toPercentage(raw.netMargin);
     let effectivePE = raw.priceEarnings ?? null;
 
-    // Detecção de distorção não-caixa (ex: baixa contábil de R$ 25,1 bi na VALE3 com FCO de R$ 50,6 bi)
+    // Detecção paramétrica de distorção não-caixa ex-impairment (Achado A-06)
     const fco = raw.operatingCashFlow ?? null;
     const netInc = raw.netIncome ?? null;
-    const hasExplicitImpairment = raw.nonRecurringImpairment && raw.nonRecurringImpairment > 0;
-    const isValeDistortion = symbol === 'VALE3' && (effectiveRoe === null || effectiveRoe < 8);
+    const hasExplicitImpairment = typeof raw.nonRecurringImpairment === 'number' && raw.nonRecurringImpairment > 0;
 
     if (
       hasExplicitImpairment ||
-      isValeDistortion ||
       (fco !== null && fco > 0 && netInc !== null && (netInc <= 0 || (fco / netInc > 2.5 && fco > 1000000000)))
     ) {
       isIncomeNormalized = true;
-      const impairmentDesc = symbol === 'VALE3' 
-        ? 'Baixa contábil não-caixa de R$ 25,1 bi no TTM compensada por FCO robusto de R$ 50,6 bi'
+      const impairmentValue = raw.nonRecurringImpairment || 0;
+      const impairmentDesc = impairmentValue > 0
+        ? `Baixa contábil não-caixa de R$ ${(impairmentValue / 1e9).toFixed(1)} bi expurgada com base em FCO de R$ ${fco ? (fco / 1e9).toFixed(1) : 'N/A'} bi`
         : 'Lucro contábil deprimido por baixas não-caixa enquanto a geração operacional de caixa (FCO) se mantém robusta';
 
       distortionsDetected.push(`Rentabilidade Contábil Normalizada: ${impairmentDesc}.`);
 
-      if (symbol === 'VALE3') {
-        effectiveRoe = 16.5; // ~15-20% normalizado ex-impairment
-        effectiveNetMargin = 28.5; // Margem líquida normalizada
-        effectivePE = 6.2; // Múltiplo normalizado condizente com ciclo
-      } else if (effectiveRoe !== null && effectiveRoe < 10 && fco !== null && netInc !== null && fco > netInc) {
-        effectiveRoe = Math.min(25, Number((effectiveRoe * (fco / Math.max(1, netInc))).toFixed(2)));
+      if (effectiveRoe !== null && effectiveRoe < 10 && fco !== null && netInc !== null) {
+        const adjustmentFactor = impairmentValue > 0 
+          ? (netInc + impairmentValue) / Math.max(1, netInc)
+          : fco / Math.max(1, netInc);
+        effectiveRoe = Math.min(25, Number((effectiveRoe * adjustmentFactor).toFixed(2)));
       }
     }
 
@@ -68,7 +70,7 @@ export class FundamentalsEngine {
     const rawDebtToEbitda = (raw.debtToEbitda !== undefined && raw.debtToEbitda !== null) ? raw.debtToEbitda : null;
     const rawFinDebtToEbitda = (raw.financialDebtToEbitda !== undefined && raw.financialDebtToEbitda !== null) ? raw.financialDebtToEbitda : null;
 
-    // Se houver discrepância por passivos não-financeiros (IFRS-16 / provisões de longo prazo)
+    // Reconciliação paramétrica: Exclusão de passivos não-financeiros (IFRS-16 / provisões de longo prazo)
     if (
       rawDebtToEbitda !== null &&
       rawFinDebtToEbitda !== null &&
@@ -77,13 +79,7 @@ export class FundamentalsEngine {
       isDebtReconciled = true;
       effectiveDebtToEbitda = rawFinDebtToEbitda;
       distortionsDetected.push(
-        `Dívida Líquida Reconciliada: Exclusão de passivos IFRS-16 e provisões socioambientais (${rawDebtToEbitda.toFixed(2)}x bruto vs ${rawFinDebtToEbitda.toFixed(2)}x financeiro).`
-      );
-    } else if (symbol === 'VALE3' && (rawDebtToEbitda === null || rawDebtToEbitda > 2.0)) {
-      isDebtReconciled = true;
-      effectiveDebtToEbitda = rawFinDebtToEbitda ?? 0.8;
-      distortionsDetected.push(
-        `Dívida Líquida Reconciliada VALE3: Usando 0,8x oficial do release 2T26 LTM Proforma (ex-provisões Brumadinho/Samarco e leasing IFRS-16).`
+        `Dívida Líquida Reconciliada: Exclusão de passivos IFRS-16 e provisões não-financeiras (${rawDebtToEbitda.toFixed(2)}x bruto vs ${rawFinDebtToEbitda.toFixed(2)}x financeiro).`
       );
     }
 
@@ -123,8 +119,8 @@ export class FundamentalsEngine {
         status,
         description: desc,
         isAdjusted: isIncomeNormalized,
-        rawAccountingValue: raw.returnOnEquity !== null && raw.returnOnEquity !== undefined ? (raw.returnOnEquity > 1 ? raw.returnOnEquity : raw.returnOnEquity * 100) : null,
-        rawAccountingFormatted: raw.returnOnEquity !== null && raw.returnOnEquity !== undefined ? `${(raw.returnOnEquity > 1 ? raw.returnOnEquity : raw.returnOnEquity * 100).toFixed(2)}%` : 'N/D',
+        rawAccountingValue: toPercentage(raw.returnOnEquity),
+        rawAccountingFormatted: raw.returnOnEquity !== null && raw.returnOnEquity !== undefined ? `${toPercentage(raw.returnOnEquity)?.toFixed(2)}%` : 'N/D',
         adjustmentReason: isIncomeNormalized ? 'Normalizado ex-baixas não-caixa / impairment' : undefined,
         source: isIncomeNormalized ? 'NORMALIZADO_FCO' : 'BRAPI_CONTABIL',
       });
@@ -165,8 +161,8 @@ export class FundamentalsEngine {
         status,
         description: desc,
         isAdjusted: isIncomeNormalized,
-        rawAccountingValue: raw.netMargin !== null && raw.netMargin !== undefined ? (raw.netMargin > 1 ? raw.netMargin : raw.netMargin * 100) : null,
-        rawAccountingFormatted: raw.netMargin !== null && raw.netMargin !== undefined ? `${(raw.netMargin > 1 ? raw.netMargin : raw.netMargin * 100).toFixed(2)}%` : 'N/D',
+        rawAccountingValue: toPercentage(raw.netMargin),
+        rawAccountingFormatted: raw.netMargin !== null && raw.netMargin !== undefined ? `${toPercentage(raw.netMargin)?.toFixed(2)}%` : 'N/D',
         adjustmentReason: isIncomeNormalized ? 'Ajustada pelo fluxo de caixa e margem operacional' : undefined,
         source: isIncomeNormalized ? 'NORMALIZADO_FCO' : 'BRAPI_CONTABIL',
       });
@@ -183,9 +179,7 @@ export class FundamentalsEngine {
 
     // Métrica: Margem EBITDA
     rentMaxPoints += 30;
-    const rawEbitdaMargin = raw.ebitdaMargin !== null && raw.ebitdaMargin !== undefined
-      ? (raw.ebitdaMargin > 1 ? raw.ebitdaMargin : raw.ebitdaMargin * 100)
-      : null;
+    const rawEbitdaMargin = toPercentage(raw.ebitdaMargin);
 
     if (rawEbitdaMargin !== null) {
       let status: FundamentalMetricStatus = 'NEUTRO';
@@ -425,9 +419,7 @@ export class FundamentalsEngine {
 
     // Métrica: Dividend Yield
     valMaxPoints += 30;
-    const dy = raw.dividendYield !== null && raw.dividendYield !== undefined
-      ? (raw.dividendYield > 1 ? raw.dividendYield : raw.dividendYield * 100)
-      : null;
+    const dy = toPercentage(raw.dividendYield);
 
     if (dy !== null) {
       let status: FundamentalMetricStatus = 'NEUTRO';

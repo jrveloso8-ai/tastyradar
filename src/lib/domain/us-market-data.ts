@@ -114,54 +114,184 @@ export interface CandleDataPoint {
   macdHist: number;
 }
 
+/**
+ * Calcula a Média Móvel Exponencial (EMA) canônica de uma série.
+ */
+export function calculateEMA(values: number[], period: number): number[] {
+  if (values.length === 0) return [];
+  const k = 2 / (period + 1);
+  const ema: number[] = new Array(values.length);
+
+  let sum = 0;
+  for (let i = 0; i < values.length; i++) {
+    if (i < period) {
+      sum += values[i];
+      ema[i] = sum / (i + 1);
+    } else {
+      ema[i] = values[i] * k + ema[i - 1] * (1 - k);
+    }
+  }
+  return ema;
+}
+
+/**
+ * Calcula o RSI canônico de J. Welles Wilder Jr. com suavização exponencial (Modified MA, alpha = 1/period).
+ * Não confunde com RSI simples de Cutler.
+ */
+export function calculateWilderRSI(closes: number[], period = 14): number[] {
+  const rsi: number[] = new Array(closes.length).fill(50.0);
+  if (closes.length <= period) return rsi;
+
+  const gains: number[] = [0];
+  const losses: number[] = [0];
+  for (let i = 1; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    gains.push(Math.max(0, diff));
+    losses.push(Math.max(0, -diff));
+  }
+
+  // Primeiro período (t = period): média simples
+  let avgGain = gains.slice(1, period + 1).reduce((acc, v) => acc + v, 0) / period;
+  let avgLoss = losses.slice(1, period + 1).reduce((acc, v) => acc + v, 0) / period;
+
+  if (avgLoss === 0) {
+    rsi[period] = 100.0;
+  } else {
+    const rs = avgGain / avgLoss;
+    rsi[period] = Number((100 - (100 / (1 + rs))).toFixed(2));
+  }
+
+  // Períodos subsequentes: Suavização exponencial de Wilder (avg * 13 + current) / 14
+  for (let i = period + 1; i < closes.length; i++) {
+    avgGain = (avgGain * (period - 1) + gains[i]) / period;
+    avgLoss = (avgLoss * (period - 1) + losses[i]) / period;
+
+    if (avgLoss === 0) {
+      rsi[i] = 100.0;
+    } else {
+      const rs = avgGain / avgLoss;
+      rsi[i] = Number((100 - (100 / (1 + rs))).toFixed(2));
+    }
+  }
+
+  return rsi;
+}
+
+/**
+ * Calcula o MACD canônico de Gerald Appel (12, 26, 9).
+ * MACD Line = EMA(12) - EMA(26)
+ * Signal Line = EMA(9) da MACD Line
+ * MACD Histogram = MACD Line - Signal Line
+ */
+export function calculateCanonicalMACD(
+  closes: number[],
+  fastPeriod = 12,
+  slowPeriod = 26,
+  signalPeriod = 9
+): { macdLine: number[]; signalLine: number[]; histogram: number[] } {
+  const emaFast = calculateEMA(closes, fastPeriod);
+  const emaSlow = calculateEMA(closes, slowPeriod);
+
+  const macdLine = emaFast.map((fast, i) => fast - emaSlow[i]);
+  const signalLine = calculateEMA(macdLine, signalPeriod);
+  const histogram = macdLine.map((m, i) => Number((m - signalLine[i]).toFixed(2)));
+
+  return { macdLine, signalLine, histogram };
+}
+
+// Gerador pseudo-aleatório determinístico (LCG) ancorado no símbolo para reprodutibilidade estrita (Achado A-01)
+function deterministicPseudoRandom(seedStr: string, index: number): number {
+  let hash = 0;
+  for (let i = 0; i < seedStr.length; i++) {
+    hash = (hash << 5) - hash + seedStr.charCodeAt(i);
+    hash |= 0;
+  }
+  const x = Math.sin((hash + index * 9301 + 49297) % 233280) * 10000;
+  return x - Math.floor(x); // número entre 0 e 1 perfeitamente reproduzível a cada F5
+}
+
 export function generateCandlesticks(symbol: string, currentSpot: number, totalPeriods = 90): CandleDataPoint[] {
-  const list: CandleDataPoint[] = [];
-  let price = currentSpot * (symbol === 'TSLA' || symbol === 'INTC' || symbol === 'BA' ? 1.15 : 0.85);
+  const sym = symbol.toUpperCase();
+  // Ponto de partida determinado por hash do símbolo, sem constantes mágicas por ticker (REGRA 00 Invariante 7)
+  const initialOffset = 0.88 + deterministicPseudoRandom(sym, 0) * 0.24;
+  let price = currentSpot * initialOffset;
 
   const startDate = new Date();
-  startDate.setDate(startDate.getDate() - totalPeriods * 1.4);
+  startDate.setDate(startDate.getDate() - Math.round(totalPeriods * 1.4));
 
-  let ma20Accum = price;
-  let ma50Accum = price;
-  let ma200Accum = price;
+  interface RawCandle {
+    dateStr: string;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+  }
+
+  const rawCandles: RawCandle[] = [];
+  const closes: number[] = [];
 
   for (let i = 0; i < totalPeriods; i++) {
     const d = new Date(startDate);
     d.setDate(d.getDate() + i);
 
     const isLast = i === totalPeriods - 1;
-    let target = isLast ? currentSpot : price;
-    
-    const drift = (currentSpot - price) / (totalPeriods - i + 5);
-    const noise = (Math.random() - 0.48) * (currentSpot * 0.02);
-    const open = isLast ? currentSpot * 0.99 : price;
+    const drift = (currentSpot - price) / (totalPeriods - i + 2);
+
+    // Ruído determinístico ancorado no ticker (mesmo dia e ticker geram exatamente a mesma vela)
+    const r1 = deterministicPseudoRandom(sym, i * 4 + 1);
+    const r2 = deterministicPseudoRandom(sym, i * 4 + 2);
+    const r3 = deterministicPseudoRandom(sym, i * 4 + 3);
+    const r4 = deterministicPseudoRandom(sym, i * 4 + 4);
+
+    const noise = (r1 - 0.48) * (currentSpot * 0.02);
+    const open = isLast ? currentSpot * 0.995 : price;
     const close = isLast ? currentSpot : Math.max(1, open + drift + noise);
-    const high = Math.max(open, close) + Math.random() * (currentSpot * 0.012);
-    const low = Math.min(open, close) - Math.random() * (currentSpot * 0.012);
-    const volume = Math.round(15000000 + Math.random() * 35000000);
+    const high = Math.max(open, close) + r2 * (currentSpot * 0.012);
+    const low = Math.min(open, close) - r3 * (currentSpot * 0.012);
+    const volume = Math.round(15000000 + r4 * 35000000);
 
     price = close;
-    ma20Accum = ma20Accum * 0.95 + close * 0.05;
-    ma50Accum = ma50Accum * 0.98 + close * 0.02;
-    ma200Accum = ma200Accum * 0.995 + close * 0.005;
+    closes.push(close);
 
-    const rsi = Math.min(85, Math.max(25, 50 + (close - ma20Accum) / (currentSpot * 0.05) * 20));
-    const macdHist = (close - ma20Accum) * 0.2;
-
-    list.push({
-      date: d.toISOString().slice(0, 10),
-      open: Number(open.toFixed(2)),
-      high: Number(high.toFixed(2)),
-      low: Number(low.toFixed(2)),
-      close: Number(close.toFixed(2)),
+    rawCandles.push({
+      dateStr: d.toISOString().slice(0, 10),
+      open,
+      high,
+      low,
+      close,
       volume,
-      ma20: Number(ma20Accum.toFixed(2)),
-      ma50: Number(ma50Accum.toFixed(2)),
-      ma200: Number(ma200Accum.toFixed(2)),
-      rsi: Number(rsi.toFixed(1)),
-      macdHist: Number(macdHist.toFixed(2)),
     });
   }
 
-  return list;
+  // Indicadores canônicos calculados sobre a série integral de fechamentos
+  const rsiSeries = calculateWilderRSI(closes, 14);
+  const macdSeries = calculateCanonicalMACD(closes, 12, 26, 9);
+
+  return rawCandles.map((c, i) => {
+    // Médias Móveis Simples (SMA 20, SMA 50, SMA 200)
+    const slice20 = closes.slice(Math.max(0, i - 19), i + 1);
+    const ma20 = slice20.reduce((acc, v) => acc + v, 0) / slice20.length;
+
+    const slice50 = closes.slice(Math.max(0, i - 49), i + 1);
+    const ma50 = slice50.reduce((acc, v) => acc + v, 0) / slice50.length;
+
+    const slice200 = closes.slice(Math.max(0, i - 199), i + 1);
+    const ma200 = slice200.reduce((acc, v) => acc + v, 0) / slice200.length;
+
+    return {
+      date: c.dateStr,
+      open: Number(c.open.toFixed(2)),
+      high: Number(c.high.toFixed(2)),
+      low: Number(c.low.toFixed(2)),
+      close: Number(c.close.toFixed(2)),
+      volume: c.volume,
+      ma20: Number(ma20.toFixed(2)),
+      ma50: Number(ma50.toFixed(2)),
+      ma200: Number(ma200.toFixed(2)),
+      rsi: Number(rsiSeries[i].toFixed(1)),
+      macdHist: Number(macdSeries.histogram[i].toFixed(2)),
+    };
+  });
 }
+

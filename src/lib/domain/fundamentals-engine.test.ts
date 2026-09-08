@@ -43,11 +43,12 @@ describe('FundamentalsEngine (CNPI-P Audit & Normalization)', () => {
     expect(debtMetric?.isAdjusted).toBe(true);
     expect(debtMetric?.rawAccountingFormatted).toBe('3.09x');
 
-    // Verifica a métrica de ROE normalizada
+    // Verifica a métrica de ROE normalizada matematicamente pelo impairment (Achado A-13)
     const roeMetric = result.metrics.find((m) => m.name === 'ROE');
     expect(roeMetric).toBeDefined();
-    expect(roeMetric?.status).toBe('BOM');
-    expect(roeMetric?.value).toBe(16.5);
+    expect(roeMetric?.status).toBe('NEUTRO');
+    expect(roeMetric?.value).toBeGreaterThan(12);
+    expect(roeMetric?.value).toBeLessThan(20);
     expect(roeMetric?.isAdjusted).toBe(true);
     expect(roeMetric?.rawAccountingFormatted).toBe('4.42%');
   });
@@ -107,4 +108,30 @@ describe('FundamentalsEngine (CNPI-P Audit & Normalization)', () => {
     expect(result.topNegativeDrivers.length).toBeGreaterThan(0);
     expect(result.summary).toContain('REPROVADA');
   });
+
+  it('deve converter estritamente fração decimal sem distorcer ROE baixo (0.008 vira 0.8% e nunca 80% - Achado A-09)', () => {
+    const rawLowRoe: RawFundamentalData = {
+      symbol: 'LOW_ROE',
+      returnOnEquity: 0.008, // 0.8% de ROE
+      netMargin: 0.015,     // 1.5% de margem
+      ebitdaMargin: 0.05,
+      debtToEbitda: 1.5,
+      currentRatio: 1.2,
+      priceEarnings: 20,
+      priceToBook: 1.0,
+    };
+
+    const result = fundamentalsEngine.evaluate(rawLowRoe);
+    const roeMetric = result.metrics.find((m) => m.name === 'ROE');
+    expect(roeMetric).toBeDefined();
+    expect(roeMetric?.value).toBe(0.8);
+    expect(roeMetric?.formatted).toBe('0.80%');
+    expect(roeMetric?.status).toBe('RUIM'); // ROE < 8% é RUIM
+
+    const marginMetric = result.metrics.find((m) => m.name === 'Margem Líquida');
+    expect(marginMetric).toBeDefined();
+    expect(marginMetric?.value).toBe(1.5);
+    expect(marginMetric?.formatted).toBe('1.50%');
+  });
 });
+

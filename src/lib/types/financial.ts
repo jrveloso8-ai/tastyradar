@@ -58,13 +58,18 @@ export interface RawFundamentalData {
   operatingCashFlow?: number | null;
   financialDebt?: number | null;
   financialDebtToEbitda?: number | null;
+  /** Rentabilidade sobre o Patrimônio Líquido (ROE). Fração decimal estrita (ex: 0.165 para 16.5%, 0.008 para 0.8%). */
   returnOnEquity?: number | null;
+  /** Margem Líquida. Fração decimal estrita (ex: 0.285 para 28.5%, 0.0399 para 3.99%). */
   netMargin?: number | null;
+  /** Margem EBITDA. Fração decimal estrita (ex: 0.2381 para 23.81%). */
   ebitdaMargin?: number | null;
   debtToEbitda?: number | null;
   currentRatio?: number | null;
   priceEarnings?: number | null;
   priceToBook?: number | null;
+  /** Dividend Yield. Fração decimal estrita (ex: 0.07 para 7.0%). */
   dividendYield?: number | null;
   nonRecurringImpairment?: number | null;
 }
+
