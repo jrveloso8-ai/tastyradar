@@ -1,3 +1,18 @@
+/**
+ * Catálogo de ~64 tickers usado por Cotação/Fundamentos/Gráfico (QuoteView, ScreenerView).
+ * NÃO é a mesma base do motor de opções: `SP500_DATASET` (sp500-dataset.ts) tem 48
+ * tickers com IV30/RV20/IVR/IVP, GEX e Walls de OI reais — campos que USStockItem não
+ * carrega. Hoje só 31 tickers existem nos dois catálogos ao mesmo tempo; os outros 33
+ * daqui têm cotação/fundamentos normalmente, mas SEM estrutura de opções (a aba Opções
+ * de QuoteView.tsx avisa explicitamente quando o ticker não está em SP500_DATASET, em
+ * vez de fabricar strikes/prêmios — ver Nível 1 Parte 3 da remediação, Ciclo 4).
+ *
+ * Por que dois catálogos em vez de um: consolidá-los exigiria levantar IV/GEX/Walls
+ * reais para os 33 tickers que só existem aqui (ou marcá-los formalmente como
+ * indisponíveis) e migrar todo componente que hoje importa um catálogo específico —
+ * decisão de produto/dado deliberadamente adiada (Nível 1 Parte 4, decidido em conjunto
+ * com o usuário em 2026-09-08: documentar a coexistência agora, consolidar depois).
+ */
 export interface USStockItem {
   symbol: string;
   name: string;
@@ -20,7 +35,10 @@ export interface USStockItem {
   strategy?: string;
   fundStatus: 'APROVADO' | 'REPROVADO' | 'EM_OBSERVACAO';
   fundScore: number;
+  dataAsOf?: string; // Marca-d'agua de frescor do dado estatico (Achado C5-01)
 }
+
+export const US_DATA_AS_OF = '2026-09-08';
 
 export const US_STOCKS_DATASET: USStockItem[] = [
   // Big Tech & Growth

@@ -8,12 +8,25 @@ export interface SP500StockData extends VolatilityAssetInput {
   iv52wMax: number;
   hvHistory: number[];
   ivHistory: number[];
+  dataAsOf?: string; // Marca-d'agua de frescor do dado estatico (Achado C5-01)
 }
+
+export const SP500_DATA_AS_OF = '2026-09-08';
 
 /**
  * Base de Dados Otimizada do S&P 500 para o Radar de Volatilidade.
  * Inclui os componentes mais líquidos do mercado com ênfase no universo < $150
  * para conformidade com a regra de risco máximo (1% a 2% da conta).
+ *
+ * NÃO é o mesmo catálogo de Cotação/Fundamentos: `US_STOCKS_DATASET` (us-market-data.ts)
+ * tem 64 tickers para cotação/gráfico/fundamentos, mas sem os campos de volatilidade/GEX
+ * que este arquivo carrega. Só 48 tickers estão aqui, e só 31 existem nos dois catálogos
+ * ao mesmo tempo — por isso a Estratégia Eleita de opções (QuoteView.tsx) só é gerada
+ * para os tickers presentes aqui; fora daqui, a aba Opções mostra aviso de falta de
+ * cobertura em vez de valores fabricados (Nível 1 Parte 3 da remediação, Ciclo 4).
+ * A consolidação dos dois catálogos em um único schema foi deliberadamente adiada
+ * (Nível 1 Parte 4, decidido com o usuário em 2026-09-08) por exigir levantar dado real
+ * de IV/GEX/Walls para os 33 tickers que hoje só existem em US_STOCKS_DATASET.
  */
 export const SP500_DATASET: SP500StockData[] = [
   // =========================================================================
@@ -188,30 +201,11 @@ export const SP500_DATASET: SP500StockData[] = [
     hvHistory: [21, 20.2, 19.8, 19.5, 19.2, 19.0],
     ivHistory: [26, 25, 24, 23, 22.5, 22.0],
   },
-  {
-    symbol: 'F',
-    name: 'Ford Motor Company',
-    sector: 'Consumer Discretionary',
-    spot: 14.62,
-    change: 0.00,
-    ivr: 25.3,
-    ivp: 29.0,
-    iv30: 34.5,
-    rv20: 24.5,
-    skew25: 5.4,
-    liquidityRating: 5,
-    avgOptionVolume: 1100000,
-    netGex: 22.0,
-    zeroGammaFlip: 14.20,
-    putWall: 13.50,
-    callWall: 16.00,
-    dividendAmount: 0.15,
-    callExtrinsic: 0.85,
-    iv52wMin: 28.0,
-    iv52wMax: 53.7,
-    hvHistory: [28, 27, 26, 25.5, 25.0, 24.5],
-    ivHistory: [44, 40, 38, 36, 35, 34.5],
-  },
+  // Removida entrada duplicada de 'F' (Ford) que existia aqui — SP500_DATASET.find()
+  // sempre retorna a primeira ocorrência (linha ~22, com avgOptionVolume/netGex
+  // diferentes desta), então esta segunda entrada era código morto inalcançável,
+  // além de manter dois conjuntos de números divergentes para o mesmo ticker sem
+  // indicação de qual estava correto (Achado Nível 4, Ciclo 4).
   {
     symbol: 'GM',
     name: 'General Motors Company',
