@@ -1,7 +1,20 @@
 import React from 'react';
 import { Shield } from 'lucide-react';
 
-export function Footer() {
+interface FooterProps {
+  apiStatus?: { status: 'ONLINE' | 'OFFLINE' | 'CHECANDO'; latencyMs: number | null };
+}
+
+export function Footer({ apiStatus = { status: 'CHECANDO', latencyMs: null } }: FooterProps) {
+  const statusLabel =
+    apiStatus.status === 'ONLINE'
+      ? `Tastytrade Open API — Online (${apiStatus.latencyMs}ms)`
+      : apiStatus.status === 'OFFLINE'
+      ? 'Tastytrade Open API — Offline'
+      : 'Tastytrade Open API — checando…';
+  const statusColor =
+    apiStatus.status === 'ONLINE' ? 'text-emerald-400/80' : apiStatus.status === 'OFFLINE' ? 'text-red-400/80' : 'text-amber-400/80';
+
   return (
     <footer className="w-full border-t border-gray-800/80 bg-[#090e18] py-4 px-4 sm:px-6 lg:px-8 mt-auto">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3 text-xs">
@@ -15,7 +28,15 @@ export function Footer() {
         </div>
 
         <div className="flex items-center gap-4 text-gray-500 text-[11px] font-mono">
-          <span>Tastytrade Open API & DXLink Realtime</span>
+          {/* Removida a alegação "DXLink Realtime" (Achado D-02/C-05): o projeto não tem
+              client de streaming implementado; o que existe é um health check real via
+              GET /api/health (autenticação REST), refletido aqui. */}
+          <span
+            className={statusColor}
+            title="Checagem real via GET /api/health — confirma autenticação REST com a Tastytrade, não um stream de dados ativo."
+          >
+            {statusLabel}
+          </span>
           <span className="text-gray-700">•</span>
           <span className="text-emerald-400/80 flex items-center gap-1">
             <Shield className="w-3 h-3 text-emerald-400" />

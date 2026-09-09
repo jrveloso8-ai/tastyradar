@@ -21,14 +21,20 @@ interface NavbarProps {
   activeTab: ActiveTab;
   onTabChange: (tab: ActiveTab) => void;
   uniqueVisitors?: number | null;
-  apiStatus?: { status: string; latencyMs: number };
+  apiStatus?: { status: 'ONLINE' | 'OFFLINE' | 'CHECANDO'; latencyMs: number | null };
 }
 
 export function Navbar({ 
   activeTab, 
   onTabChange, 
-  uniqueVisitors = 3, 
-  apiStatus = { status: 'ONLINE', latencyMs: 84 } 
+  // Sem valor fabricado por padrão (Achado Nível 4, Ciclo 4): o projeto não tem
+  // contador de visitantes único implementado; se nada for passado, o badge
+  // simplesmente não aparece (ver `{uniqueVisitors && (...)}` abaixo) em vez de
+  // mostrar um número inventado.
+  uniqueVisitors, 
+  // Sem checagem real ainda (ex.: componente renderizado fora de page.tsx) => estado
+  // neutro "CHECANDO", nunca mais um "ONLINE" fabricado por padrão (Achado D-02/C-05).
+  apiStatus = { status: 'CHECANDO', latencyMs: null } 
 }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -98,10 +104,29 @@ export function Navbar({
               </div>
             )}
 
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/60 border border-emerald-700/50 text-emerald-400 text-[10px] sm:text-[11px] font-mono">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="hidden sm:inline">TASTYTRADE + DXLink </span>
-              <strong className="text-emerald-300">{apiStatus.latencyMs}ms</strong>
+            <div
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] sm:text-[11px] font-mono ${
+                apiStatus.status === 'ONLINE'
+                  ? 'bg-emerald-950/60 border-emerald-700/50 text-emerald-400'
+                  : apiStatus.status === 'OFFLINE'
+                  ? 'bg-red-950/60 border-red-700/50 text-red-400'
+                  : 'bg-amber-950/60 border-amber-700/50 text-amber-400'
+              }`}
+              title="Checagem real via GET /api/health (autenticação com a Tastytrade) — não confirma stream de dados em tempo real, apenas conectividade da API REST."
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  apiStatus.status === 'ONLINE'
+                    ? 'bg-emerald-400 animate-pulse'
+                    : apiStatus.status === 'OFFLINE'
+                    ? 'bg-red-400'
+                    : 'bg-amber-400 animate-pulse'
+                }`}
+              ></span>
+              <span className="hidden sm:inline">Tastytrade API </span>
+              <strong className={apiStatus.status === 'ONLINE' ? 'text-emerald-300' : apiStatus.status === 'OFFLINE' ? 'text-red-300' : 'text-amber-300'}>
+                {apiStatus.status === 'CHECANDO' ? 'checando…' : apiStatus.status === 'OFFLINE' ? 'offline' : `${apiStatus.latencyMs}ms`}
+              </strong>
             </div>
 
             {/* Mobile Hamburger Toggle Button */}
