@@ -46,3 +46,5 @@ Thumbs.db
 *.sln
 *.sw?
 .gemini/
+# Cache incremental do TypeScript - muda a cada build, nao deveria ser versionado
+tsconfig.tsbuildinfo
