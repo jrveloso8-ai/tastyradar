@@ -14,9 +14,9 @@ export interface RawOptionData {
 export interface GexOperationalDiagnostics {
   isClustered: boolean; // Walls encavaladas
   clusteringDistancePct: number;
-  pinCandidateStrike: number;
-  sniperEntryCallWall: number;
-  sniperEntryPutWall: number;
+  pinCandidateStrike?: number | null;
+  sniperEntryCallWall?: number | null;
+  sniperEntryPutWall?: number | null;
   regimeDescription: string;
   recommendedPlay: string;
 }
@@ -158,11 +158,11 @@ export function calculateGex(
     };
   });
 
-  const topCallWall = topCallStrikes[0]?.strike ?? spotPrice;
-  const topPutWall = topPutStrikes[0]?.strike ?? spotPrice;
+  const topCallWall = topCallStrikes[0]?.strike ?? null;
+  const topPutWall = topPutStrikes[0]?.strike ?? null;
 
   // Pin Candidate (Ancoragem por maior Open Interest consolidado)
-  const pinCandidate = [...sortedStrikes].sort((a, b) => (b.callOpenInterest + b.putOpenInterest) - (a.callOpenInterest + a.putOpenInterest))[0]?.strike || spotPrice;
+  const pinCandidate = [...sortedStrikes].sort((a, b) => (b.callOpenInterest + b.putOpenInterest) - (a.callOpenInterest + a.putOpenInterest))[0]?.strike ?? null;
 
   // Zero Gamma Flip (Nível onde o Net GEX cruza o zero)
   let zeroGammaFlip = spotPrice;
@@ -178,8 +178,10 @@ export function calculateGex(
   // Max GEX Magnet (Strike com maior magnitude absoluta de GEX)
   const maxGexMagnetStrike = [...sortedStrikes].sort((a, b) => b.absoluteGex - a.absoluteGex)[0]?.strike || spotPrice;
 
-  const wallDistancePct = Number((((topCallWall - topPutWall) / spotPrice) * 100).toFixed(1));
-  const isClustered = wallDistancePct <= 4.0; // Menos de 4% de distância = encavaladas
+  const wallDistancePct = (topCallWall !== null && topPutWall !== null)
+    ? Number((((topCallWall - topPutWall) / spotPrice) * 100).toFixed(1))
+    : 0;
+  const isClustered = topCallWall !== null && topPutWall !== null && wallDistancePct <= 4.0;
 
   return {
     symbol,
