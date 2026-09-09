@@ -1,291 +1,208 @@
 import { describe, it, expect } from 'vitest';
-import { volatilityEngine, VolatilityAssetInput } from './volatility-engine';
+import { classifyRegime, planStrategy, buildRecommendation, VolatilityAssetInput } from './volatility-engine';
+import { OptionChainResult, OptionChainStrike, OptionChainExpiration } from '../services/tastytrade-market.service';
+import { RealGreeksQuote } from '../services/tastytrade-dxlink.service';
 
-describe('VolatilityEngine (Skill: analista-senior-opcoes-us)', () => {
-  it('deve eleger Venda de Volatilidade e Iron Condor quando IVR > 50, VRP > +5 e +GEX', () => {
-    const input: VolatilityAssetInput = {
-      symbol: 'NVDA',
-      name: 'NVIDIA Corp',
-      spot: 142.50,
-      change: 2.84,
-      iv30: 44.5,
-      rv20: 32.1,
-      ivr: 74.2,
-      ivp: 81.0,
-      netGex: 120.5,
-      zeroGammaFlip: 138.00,
-      putWall: 135.00,
-      callWall: 155.00,
-    };
+/**
+ * Suíte reescrita em 2026-09-08 junto com o motor. Antes testava `volatilityEngine.evaluate()`
+ * (síncrono, sem IO, mas com strike/DTE/preço fabricados por fórmula — exatamente o padrão que
+ * gerou o achado da BAC). O motor novo é dividido em 3 funções puras e testáveis sem rede:
+ * `classifyRegime` (árvore de decisão vol/GEX — inalterada), `planStrategy` (escolhe strikes/
+ * vencimento REAIS a partir de uma OptionChainResult mockada aqui) e `buildRecommendation`
+ * (precifica com cotações/gregas REAIS mockadas aqui, no formato exato que a API da Tastytrade
+ * devolve). Isso testa o comportamento de honestidade de dado (null quando falta cotação/grego
+ * real) sem depender de rede — os mocks representam a forma da resposta real, não valores
+ * inventados pelo próprio motor.
+ */
 
-    const result = volatilityEngine.evaluate(input);
+function buildMockChain(spot: number, dte: number, strikeStep = 5, strikeCount = 12): OptionChainResult {
+  const centerStrike = Math.round(spot / strikeStep) * strikeStep;
+  const strikes: OptionChainStrike[] = [];
+  for (let i = -strikeCount / 2; i <= strikeCount / 2; i++) {
+    const strike = centerStrike + i * strikeStep;
+    if (strike <= 0) continue;
+    strikes.push({
+      strike,
+      callSymbol: `NVDA  260101C${String(strike * 1000).padStart(8, '0')}`,
+      putSymbol: `NVDA  260101P${String(strike * 1000).padStart(8, '0')}`,
+      callStreamerSymbol: `.NVDA260101C${strike}`,
+      putStreamerSymbol: `.NVDA260101P${strike}`,
+    });
+  }
+  const expiration: OptionChainExpiration = {
+    expirationDate: '2026-01-01',
+    daysToExpiration: dte,
+    expirationType: 'Regular',
+    settlementType: 'PM',
+    strikes,
+  };
+  const farExpiration: OptionChainExpiration = {
+    ...expiration,
+    expirationDate: '2026-02-01',
+    daysToExpiration: dte + 30,
+  };
+  return { symbol: 'NVDA', expirations: [expiration, farExpiration], source: 'tastytrade-live', fetchedAt: new Date().toISOString() };
+}
 
-    expect(result.volRegime).toBe('SELL_VOLATILITY');
-    expect(result.gexRegime).toBe('+GEX');
-    expect(result.strategy.id).toBe(20); // Iron Condor #20
-    expect(result.isCredit).toBe(true);
-    expect(result.netCredit).toBeGreaterThan(0);
-    expect(result.targetDte).toBe(35); // 30-45 DTE
-    expect(result.lifecycle.profitTargetPct).toBe(50);
-    expect(result.lifecycle.defenseDte).toBe(21);
-    expect(result.meetsCreditRule).toBe(true);
+function mockQuotesForPlan(plan: NonNullable<ReturnType<typeof planStrategy>>, mid = 1.5): Map<string, { bid: number | null; ask: number | null; mid: number | null }> {
+  const quotes = new Map<string, { bid: number | null; ask: number | null; mid: number | null }>();
+  for (const leg of plan.legs) {
+    quotes.set(leg.occSymbol, { bid: mid - 0.05, ask: mid + 0.05, mid });
+  }
+  return quotes;
+}
+
+function mockGreeksForPlan(plan: NonNullable<ReturnType<typeof planStrategy>>, delta = 0.2, iv = 0.35): Map<string, RealGreeksQuote> {
+  const greeks = new Map<string, RealGreeksQuote>();
+  for (const leg of plan.legs) {
+    greeks.set(leg.streamerSymbol, {
+      symbol: leg.streamerSymbol,
+      delta: leg.action === 'SELL' ? -delta : delta,
+      gamma: 0.01,
+      iv,
+      openInterest: 500,
+      lastPrice: null,
+    });
+  }
+  return greeks;
+}
+
+const baseInput: VolatilityAssetInput = {
+  symbol: 'NVDA',
+  name: 'NVIDIA Corp',
+  spot: 142.5,
+  change: 2.84,
+  iv30: 44.5,
+  rv20: 32.1,
+  ivr: 74.2,
+  ivp: 81.0,
+  netGex: 120.5,
+  zeroGammaFlip: 138.0,
+  putWall: 135.0,
+  callWall: 155.0,
+};
+
+describe('classifyRegime (árvore de decisão vol/GEX — sem IO)', () => {
+  it('elege Venda de Volatilidade + Iron Condor quando IVR>50, VRP>=4 e +GEX', () => {
+    const r = classifyRegime(baseInput);
+    expect(r.volRegime).toBe('SELL_VOLATILITY');
+    expect(r.gexRegime).toBe('+GEX');
+    expect(r.strategy.id).toBe(20);
   });
 
-  it('deve ancorar pernas do Iron Condor fora das Walls institucionais', () => {
-    const input: VolatilityAssetInput = {
-      symbol: 'NVDA',
-      name: 'NVIDIA Corp',
-      spot: 142.50,
-      change: 1.0,
-      iv30: 40.0,
-      rv20: 30.0,
-      ivr: 65.0,
-      ivp: 70.0,
-      netGex: 80.0,
-      zeroGammaFlip: 138.00,
-      putWall: 135.00,
-      callWall: 155.00,
-    };
-
-    const result = volatilityEngine.evaluate(input);
-    const shortPut = result.legs.find((l) => l.action === 'SELL' && l.type === 'PUT');
-    const shortCall = result.legs.find((l) => l.action === 'SELL' && l.type === 'CALL');
-
-    expect(shortPut).toBeDefined();
-    expect(shortCall).toBeDefined();
-    expect(shortPut!.strike).toBeLessThanOrEqual(input.putWall);
-    expect(shortCall!.strike).toBeGreaterThanOrEqual(input.callWall);
+  it('elege Compra de Volatilidade quando IVR<=30 e VRP<=1.0', () => {
+    const input: VolatilityAssetInput = { ...baseInput, iv30: 22.0, rv20: 21.5, ivr: 25.0, netGex: 50.0 };
+    const r = classifyRegime(input);
+    expect(r.volRegime).toBe('BUY_VOLATILITY');
+    expect(r.strategy.id).toBe(28); // +GEX -> Double Calendar
   });
 
-  it('deve eleger Compra de Volatilidade quando IVR < 30 e VRP <= 1.0', () => {
-    const input: VolatilityAssetInput = {
-      symbol: 'TSLA',
-      name: 'Tesla Inc',
-      spot: 248.30,
-      change: -2.5,
-      iv30: 34.0,
-      rv20: 38.0,
-      ivr: 20.0,
-      ivp: 22.0,
-      netGex: -45.0, // -GEX
-      zeroGammaFlip: 252.00,
-      putWall: 235.00,
-      callWall: 265.00,
-    };
+  it('elege Bull Put Spread quando preço encostado na Put Wall em +GEX', () => {
+    const input: VolatilityAssetInput = { ...baseInput, spot: 135.5, putWall: 135.0, callWall: 160.0 };
+    const r = classifyRegime(input);
+    expect(r.strategy.id).toBe(6);
+  });
+});
 
-    const result = volatilityEngine.evaluate(input);
-
-    expect(result.volRegime).toBe('BUY_VOLATILITY');
-    expect(result.gexRegime).toBe('-GEX');
-    expect(result.isCredit).toBe(false); // Estrutura a débito
-    expect(result.strategy.id).toBe(2); // Bear Put Spread #2
+describe('planStrategy (strikes/vencimento REAIS a partir da cadeia)', () => {
+  it('retorna null quando não há cadeia real', () => {
+    expect(planStrategy(baseInput, null)).toBeNull();
   });
 
-  it('deve eleger Double Calendar quando IVR for baixo mas em regime estável de +GEX', () => {
-    const input: VolatilityAssetInput = {
-      symbol: 'SPY',
-      name: 'SPDR S&P 500 ETF',
-      spot: 598.80,
-      change: 0.5,
-      iv30: 12.5,
-      rv20: 12.0,
-      ivr: 18.0,
-      ivp: 20.0,
-      netGex: 350.0, // +GEX
-      zeroGammaFlip: 590.00,
-      putWall: 590.00,
-      callWall: 605.00,
-    };
-
-    const result = volatilityEngine.evaluate(input);
-
-    expect(result.volRegime).toBe('BUY_VOLATILITY');
-    expect(result.strategy.id).toBe(28); // Double Calendar #28
-  });
-
-  it('deve disparar alerta de atribuição de dividendo quando dividendo > extrínseco (§2.2)', () => {
-    const input: VolatilityAssetInput = {
-      symbol: 'AAPL',
-      name: 'Apple Inc',
-      spot: 238.10,
-      change: 0.2,
-      iv30: 25.0,
-      rv20: 18.0,
-      ivr: 60.0,
-      ivp: 65.0,
-      netGex: 50.0,
-      zeroGammaFlip: 234.00,
-      putWall: 230.00,
-      callWall: 245.00,
-      dividendAmount: 1.50, // Dividendo alto
-      callExtrinsic: 0.40,  // Extrínseco baixo
-    };
-
-    const result = volatilityEngine.evaluate(input);
-
-    expect(result.lifecycle.hasDividendRisk).toBe(true);
-    expect(result.lifecycle.dividendRiskReason).toContain('ALERTA DE ATRIBUIÇÃO');
-  });
-
-  it('deve manter veredito seguro quando dividendo <= extrínseco', () => {
-    const input: VolatilityAssetInput = {
-      symbol: 'NVDA',
-      name: 'NVIDIA Corp',
-      spot: 142.50,
-      change: 1.0,
-      iv30: 44.0,
-      rv20: 32.0,
-      ivr: 70.0,
-      ivp: 75.0,
-      netGex: 100.0,
-      zeroGammaFlip: 138.00,
-      putWall: 135.00,
-      callWall: 155.00,
-      dividendAmount: 0.04,
-      callExtrinsic: 1.20,
-    };
-
-    const result = volatilityEngine.evaluate(input);
-
-    expect(result.lifecycle.hasDividendRisk).toBe(false);
-    expect(result.lifecycle.dividendRiskReason).toContain('Seguro');
-  });
-
-  it('deve gerar texto formatado padronizado do §13 da skill', () => {
-    const input: VolatilityAssetInput = {
-      symbol: 'NVDA',
-      name: 'NVIDIA Corp',
-      spot: 142.50,
-      change: 1.0,
-      iv30: 44.0,
-      rv20: 32.0,
-      ivr: 70.0,
-      ivp: 75.0,
-      netGex: 100.0,
-      zeroGammaFlip: 138.00,
-      putWall: 135.00,
-      callWall: 155.00,
-    };
-
-    const result = volatilityEngine.evaluate(input);
-
-    expect(result.formattedTextOutput).toContain('DIAGNÓSTICO DE VOLATILIDADE');
-    expect(result.formattedTextOutput).toContain('PLAYBOOK TASTYTRADE');
-    expect(result.formattedTextOutput).toContain('50% do lucro');
-    expect(result.formattedTextOutput).toContain('21 DTE');
-  });
-
-  it('deve gerar a curva de Volatility Smile / Skew com Put Skew institucional', () => {
-    const spot = 140;
-    const ivAtm = 40;
-    const smile = volatilityEngine.generateSmile(spot, ivAtm, 5.0);
-
-    expect(smile.length).toBeGreaterThanOrEqual(9);
-    const putOtm = smile[0]; // Greve baixa (OTM Put)
-    const atmPoint = smile.find((p) => p.type === 'ATM');
-    const callOtm = smile[smile.length - 1]; // Greve alta (OTM Call)
-
-    expect(atmPoint).toBeDefined();
-    expect(atmPoint?.iv).toBeCloseTo(ivAtm, 0);
-    // Put Skew: a IV das Puts OTM deve ser superior à ATM devido ao prêmio de cauda (crashophobia)
-    expect(putOtm.iv).toBeGreaterThan(atmPoint!.iv);
-    expect(putOtm.type).toBe('PUT_OTM');
-    expect(callOtm.type).toBe('CALL_OTM');
-  });
-
-  it('deve calcular o prêmio sensível à volatilidade real: IV 80% gera crédito maior que IV 22% (Achado N-02)', () => {
-    const baseInput: VolatilityAssetInput = {
-      symbol: 'NVDA',
-      name: 'NVIDIA Corp',
-      spot: 142.50,
-      change: 1.0,
-      rv20: 25.0,
-      ivr: 75.0,
-      ivp: 80.0,
-      netGex: 100.0,
-      zeroGammaFlip: 138.00,
-      putWall: 135.00,
-      callWall: 155.00,
-      iv30: 22.0,
-    };
-
-    const resultLowIv = volatilityEngine.evaluate({ ...baseInput, iv30: 22.0, ivr: 52.0 });
-    const resultHighIv = volatilityEngine.evaluate({ ...baseInput, iv30: 80.0, ivr: 95.0 });
-
-    // Em venda de volatilidade, o prêmio decorre da volatilidade:
-    // IV 80% deve gerar crédito líquido expressivamente superior a IV 22%
-    expect(resultHighIv.netCredit).toBeGreaterThan(resultLowIv.netCredit * 1.5);
-  });
-
-  it('deve calcular breakevens e max loss com valores analíticos exatos (Golden Test) (Achados A-10, A-12, N-05)', () => {
-    const input: VolatilityAssetInput = {
-      symbol: 'NVDA',
-      name: 'NVIDIA Corp',
-      spot: 142.50,
-      change: 1.0,
-      iv30: 44.0,
-      rv20: 30.0,
-      ivr: 75.0,
-      ivp: 80.0,
-      netGex: 100.0,
-      zeroGammaFlip: 138.00,
-      putWall: 135.00,
-      callWall: 155.00,
-    };
-
-    const result = volatilityEngine.evaluate(input);
-    expect(result.strategy.id).toBe(20); // Iron Condor
-
-    // Strikes ancorados fora das walls:
-    const shortPut = result.legs.find(l => l.action === 'SELL' && l.type === 'PUT')!;
-    const shortCall = result.legs.find(l => l.action === 'SELL' && l.type === 'CALL')!;
-    expect(shortPut.strike).toBe(135.00);
-    expect(shortCall.strike).toBe(155.00);
-
-    // netCredit calculado via BSM analítico sobre IV 44% e 35 DTE
-    expect(result.netCredit).toBeGreaterThan(0.20);
-    expect(result.netCredit).toBeLessThan(3.50);
-
-    // Asserções independentes de Breakeven e Max Loss:
-    const expectedLowerBe = Number((135.00 - result.netCredit).toFixed(2));
-    const expectedUpperBe = Number((155.00 + result.netCredit).toFixed(2));
-    expect(result.lowerBreakeven).toBe(expectedLowerBe);
-    expect(result.upperBreakeven).toBe(expectedUpperBe);
-
-    const wingWidth = 5.00; // step = 5 para spot > 100
-    const expectedMaxLoss = Math.max(0, Number(((wingWidth - result.netCredit) * 100).toFixed(2)));
-    expect(result.maxLoss).toBe(expectedMaxLoss);
-
-    // POP deriva puramente dos deltas BSM das pernas vendidas (1 - pDelta - cDelta)
-    const pDelta = shortPut.delta;
-    const cDelta = shortCall.delta;
-    const expectedPop = Math.round((1 - pDelta - cDelta) * 100);
-    expect(result.popEstimate).toBe(expectedPop);
-  });
-
-  it('Bull Put Spread NÃO deve conter breakeven superior (Achado N-07)', () => {
-    // Forçar montagem de Bull Put Spread (#6)
-    const input: VolatilityAssetInput = {
-      symbol: 'AAPL',
-      name: 'Apple Inc',
-      spot: 238.10,
-      change: 2.5,
-      iv30: 32.0,
-      rv20: 22.0,
-      ivr: 55.0,
-      ivp: 58.0,
-      netGex: -40.0, // -GEX com alta elege spread direcional ou bull put
-      zeroGammaFlip: 234.00,
-      putWall: 230.00,
-      callWall: 245.00,
-    };
-
-    const result = volatilityEngine.evaluate(input);
-    if (result.strategy.id === 6) {
-      expect(result.upperBreakeven).toBeNull();
-      expect(result.lowerBreakeven).toBeLessThan(235.00);
-    } else {
-      expect(result.lowerBreakeven).toBeGreaterThan(0);
+  it('só usa strikes que existem de fato na cadeia mockada (nunca um grid sintético)', () => {
+    const chain = buildMockChain(142.5, 35, 5, 20);
+    const validStrikes = new Set(chain.expirations[0].strikes.map((s) => s.strike));
+    const plan = planStrategy(baseInput, chain);
+    expect(plan).not.toBeNull();
+    for (const leg of plan!.legs) {
+      expect(validStrikes.has(leg.strike)).toBe(true);
     }
+  });
+
+  it('escolhe o vencimento real mais próximo do alvo, não um DTE fixo (regressão do achado BAC)', () => {
+    // Cadeia com um vencimento real de 38 DTE (não 35) — o motor deve usar 38 real, não fabricar 35.
+    const chain = buildMockChain(142.5, 38, 5, 20);
+    const plan = planStrategy(baseInput, chain);
+    expect(plan).not.toBeNull();
+    expect(plan!.expiration.daysToExpiration).toBe(38);
+  });
+
+  it('retorna null se a cadeia não tiver strikes suficientes para montar a estrutura', () => {
+    const chain = buildMockChain(142.5, 35, 5, 0); // só o strike central
+    const plan = planStrategy(baseInput, chain);
+    expect(plan).toBeNull();
+  });
+});
+
+describe('buildRecommendation (precificação REAL — honestidade de dado)', () => {
+  it('retorna null se qualquer perna eleita não tiver cotação real (nunca mistura real com modelo)', () => {
+    const chain = buildMockChain(142.5, 35, 5, 20);
+    const plan = planStrategy(baseInput, chain);
+    expect(plan).not.toBeNull();
+    const quotes = mockQuotesForPlan(plan!);
+    // Remove a cotação de uma perna para simular indisponibilidade parcial
+    const firstKey = quotes.keys().next().value!;
+    quotes.delete(firstKey);
+    const greeks = mockGreeksForPlan(plan!);
+    const rec = buildRecommendation(baseInput, plan!, quotes, greeks);
+    expect(rec).toBeNull();
+  });
+
+  it('monta a recomendação com preço/strike/vencimento reais quando todas as cotações existem', () => {
+    const chain = buildMockChain(142.5, 35, 5, 20);
+    const plan = planStrategy(baseInput, chain);
+    const quotes = mockQuotesForPlan(plan!, 1.2);
+    const greeks = mockGreeksForPlan(plan!);
+    const rec = buildRecommendation(baseInput, plan!, quotes, greeks);
+    expect(rec).not.toBeNull();
+    expect(rec!.expirationDate).toBe(chain.expirations[0].expirationDate);
+    expect(rec!.targetDte).toBe(chain.expirations[0].daysToExpiration);
+    expect(rec!.dataQuality.pricedFromRealQuotes).toBe(true);
+    for (const leg of rec!.legs) {
+      expect(quotes.get(leg.occSymbol)?.mid).toBe(leg.midPrice);
+    }
+  });
+
+  it('popEstimate fica null quando alguma perna vendida não tem delta real (nunca substitui por BSM)', () => {
+    const chain = buildMockChain(142.5, 35, 5, 20);
+    const plan = planStrategy(baseInput, chain);
+    const quotes = mockQuotesForPlan(plan!);
+    const greeks = mockGreeksForPlan(plan!);
+    // Remove o delta de uma perna vendida
+    for (const [key, g] of greeks.entries()) {
+      const leg = plan!.legs.find((l) => l.streamerSymbol === key);
+      if (leg?.action === 'SELL') {
+        greeks.set(key, { ...g, delta: null });
+        break;
+      }
+    }
+    const rec = buildRecommendation(baseInput, plan!, quotes, greeks);
+    expect(rec).not.toBeNull();
+    expect(rec!.popEstimate).toBeNull();
+    expect(rec!.dataQuality.greeksAvailable).toBe(false);
+  });
+
+  it('smileCurve fica null sem gregas reais por strike (não fabrica curva sintética)', () => {
+    const chain = buildMockChain(142.5, 35, 5, 20);
+    const plan = planStrategy(baseInput, chain);
+    const quotes = mockQuotesForPlan(plan!);
+    const greeks = mockGreeksForPlan(plan!);
+    const rec = buildRecommendation(baseInput, plan!, quotes, greeks, null);
+    expect(rec).not.toBeNull();
+    expect(rec!.smileCurve).toBeNull();
+    expect(rec!.dataQuality.smileAvailable).toBe(false);
+  });
+
+  it('breakevens do Iron Condor usam os strikes reais eleitos e o crédito real recebido', () => {
+    const chain = buildMockChain(142.5, 35, 5, 20);
+    const plan = planStrategy(baseInput, chain);
+    expect(plan!.strategy.id).toBe(20);
+    const quotes = mockQuotesForPlan(plan!, 1.0);
+    const greeks = mockGreeksForPlan(plan!);
+    const rec = buildRecommendation(baseInput, plan!, quotes, greeks)!;
+    const shortPut = rec.legs.find((l) => l.action === 'SELL' && l.type === 'PUT')!;
+    const shortCall = rec.legs.find((l) => l.action === 'SELL' && l.type === 'CALL')!;
+    expect(rec.lowerBreakeven).toBeCloseTo(shortPut.strike - rec.netCredit, 2);
+    expect(rec.upperBreakeven!).toBeCloseTo(shortCall.strike + rec.netCredit, 2);
   });
 });

@@ -37,7 +37,9 @@ export class AIConsultantEngine {
     context: AIConsultantContext
   ): Promise<AIConsultantResponse> {
     const symbol = context.symbol.toUpperCase().trim();
-    const stock = context.stock || US_STOCKS_DATASET.find((s) => s.symbol === symbol) || {
+    const knownStock = context.stock || US_STOCKS_DATASET.find((s) => s.symbol === symbol);
+    const isKnownTicker = !!knownStock;
+    const stock = knownStock || {
       symbol,
       name: `${symbol} Stock`,
       sector: 'Geral',
@@ -71,9 +73,15 @@ export class AIConsultantEngine {
       financialDebtToEbitda: Math.min(stock.debtToEbitda, 1.2),
       priceEarnings: stock.peRatio,
       dividendYield: stock.dividendYield / 100,
-      currentRatio: 1.45,
-      ebitdaMargin: 0.28,
-      priceToBook: Number((stock.peRatio / 18).toFixed(2)),
+      // Mesma correção já aplicada em QuoteView.tsx e fundamentals/route.ts (Nível 3,
+      // Ciclo 4) — achado C5-04 do laudo Ciclo 5: esta era a última cópia restante da
+      // fabricação (1.45 / 0.28 / peRatio÷18 sem base declarada). Sem fonte real de
+      // fundamentos para tickers US no ecossistema Tastytrade (corretora, não vendor de
+      // fundamentos — confirmado contra a doc oficial), estes 3 campos ficam null; o
+      // fundamentals-engine já trata isso como "Dado não disponível na fonte".
+      currentRatio: null,
+      ebitdaMargin: null,
+      priceToBook: null,
       operatingCashFlow: null,
       netIncome: null,
       nonRecurringImpairment: null,
@@ -338,14 +346,22 @@ ${stock.category === 'LATERAL'
       `Como montar a estratégia de opções ${electedStrategyName}?`,
     ];
 
+    if (!isKnownTicker) {
+      answer =
+        `⚠️ **${symbol} está fora da cobertura atual do RADAR** (não consta no dataset de ~66 ativos monitorados).\n\n` +
+        `Os números abaixo (fundamentos, score, stop/alvo, estratégia) são apenas **ilustrativos de como a análise funcionaria**, ` +
+        `não foram calculados a partir de dado real de ${symbol}, e não devem ser usados para decisão de investimento.\n\n---\n\n` +
+        answer;
+    }
+
     return {
       answer,
       suggestedQuestions,
       contextUsed: {
         symbol: stock.symbol,
         gexRegime,
-        fundScore: fundResult.score,
-        fundStatus: fundResult.status,
+        fundScore: isKnownTicker ? fundResult.score : 0,
+        fundStatus: isKnownTicker ? fundResult.status : 'SEM_COBERTURA',
         electedStrategy: electedStrategyName,
       },
     };

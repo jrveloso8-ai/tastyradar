@@ -22,12 +22,8 @@ describe('TastytradeMarketService - Market Metrics', () => {
     expect(metrics).toEqual({});
   });
 
-  it('should compute GEX analysis with valid strikes and provenance', async () => {
-    const gex = await tastyMarketService.getGexAnalysis('SPY');
-    expect(gex).toBeDefined();
-    expect(gex.symbol).toBe('SPY');
-    expect(gex.spotPrice).toBeGreaterThan(0);
-    expect(gex.strikes.length).toBeGreaterThan(0);
-    expect(gex.source).toMatch(/tastytrade-live|calibrated-model/);
-  });
+  // getQuote()/getGexAnalysis() foram removidos do serviço (Nível 1, Parte 1 — eram
+  // código morto com uma terceira fonte de spot divergente). O teste de GEX que existia
+  // aqui cobria esse método removido; a cobertura de calculateGex() em si permanece em
+  // gex-engine.test.ts, que é o motor de verdade e não mudou.
 });

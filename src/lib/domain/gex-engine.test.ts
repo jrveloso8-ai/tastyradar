@@ -23,6 +23,15 @@ describe('GexEngine Domain', () => {
     expect(result.callWalls.length).toBeGreaterThan(0);
     expect(result.putWalls.length).toBeGreaterThan(0);
     expect(result.gammaRegime).toBeDefined();
+
+    // Guarda de magnitude (Achado M-01, Ciclo 3 — corrigido nesta sessão): antes deste
+    // teste, um regression bug no fator "por 1% de movimento" (×0.01 faltando ou
+    // reintroduzido por engano) passava despercebido porque os testes só checavam sinal.
+    // Valores de referência calculados independentemente em Python a partir da mesma
+    // fórmula institucional (Gamma × OI × Spot² × 100 × 0,01 / 1.000.000):
+    expect(result.totalCallGex).toBeCloseTo(11880.0, 1);
+    expect(result.totalPutGex).toBeCloseTo(-11700.0, 1);
+    expect(result.totalNetGex).toBeCloseTo(180.0, 1);
   });
 
   it('should handle empty options list safely', () => {

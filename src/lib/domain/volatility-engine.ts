@@ -1,39 +1,86 @@
 import { CME_STRATEGIES, StrategySpec } from './cme-catalog';
-import { calculateBsm } from './bsm-pricer';
+import { OptionChainResult, OptionChainExpiration } from '../services/tastytrade-market.service';
+import { RealGreeksQuote } from '../services/tastytrade-dxlink.service';
+
+/**
+ * Motor de Volatilidade — reescrito em 2026-09-08 para eliminar strike/DTE/preço
+ * fabricados (achado da BAC: recomendou strike $47,5 inexistente e 35 DTE fixo contra
+ * 38 DTE real). Ver PLANO_MESTRE_REMEDIACAO_RADAR.md para o histórico completo.
+ *
+ * Contrato de honestidade ("só dados reais", diretriz do usuário em 2026-09-08):
+ * - `planStrategy()` só usa vencimentos e strikes que existem de fato na cadeia real
+ *   (OptionChainResult vindo de tastyMarketService.getOptionChain()). Se não achar
+ *   vencimento/strike real utilizável, retorna null — nunca inventa um grid sintético.
+ * - `buildRecommendation()` só usa preço de perna vindo de cotação real (bid/ask/mid
+ *   via GET /market-data/by-type). Se qualquer perna eleita não tiver cotação real,
+ *   a função retorna null — a recomendação inteira fica indisponível, nunca com uma
+ *   perna real e outra estimada por modelo misturadas sem aviso.
+ * - Delta, IV por contrato e Open Interest só existem via streaming DXLink (não há
+ *   endpoint REST para grego na API da Tastytrade — confirmado contra a doc oficial).
+ *   Onde esse dado não estiver disponível, os campos ficam `null` e a UI deve exibir
+ *   "indisponível", nunca um valor calculado por BSM apresentado como se fosse real.
+ */
 
 export interface VolatilityAssetInput {
   symbol: string;
   name: string;
   spot: number;
   change: number;
-  iv30: number; // Implied Volatility 30-day index (%)
+  iv30: number; // Implied Volatility 30-day index (%) — métrica agregada REAL (Tastytrade market metrics)
   rv20: number; // Realized Volatility 20-day Yang-Zhang (%)
   ivr: number;  // IV Rank (0-100)
   ivp: number;  // IV Percentile (0-100)
-  skew25?: number; // IV(put delta 25) - IV(call delta 25)
-  liquidityRating?: number; // 1 to 5 (Tastytrade rating)
+  skew25?: number;
+  liquidityRating?: number;
   netGex: number; // Dollar GEX em $ Milhões
   zeroGammaFlip: number;
   putWall: number;
   callWall: number;
-  dividendAmount?: number; // Dividendo em $ declarado no período
-  callExtrinsic?: number;  // Valor extrínseco da call curta
+  dividendAmount?: number;
+  callExtrinsic?: number;
   daysToEarnings?: number;
 }
 
-export interface VolatilityLegSpec {
+export interface RealLeg {
   action: 'BUY' | 'SELL';
   type: 'CALL' | 'PUT';
   strike: number;
-  delta: number;
-  iv: number;
-  midPrice: number;
+  occSymbol: string; // símbolo OCC real (para GET /market-data/by-type)
+  streamerSymbol: string; // símbolo dxfeed real (para streaming DXLink)
+  role: string;
+  description: string;
+}
+
+export interface StrategyPlan {
+  strategy: StrategySpec;
+  expiration: OptionChainExpiration; // vencimento REAL escolhido
+  farExpiration?: OptionChainExpiration; // só para calendários (2 vencimentos reais)
+  legs: RealLeg[];
+  volRegime: 'SELL_VOLATILITY' | 'BUY_VOLATILITY' | 'NEUTRAL';
+  volRegimeLabel: string;
+  volRegimeReason: string;
+  gexRegime: '+GEX' | '-GEX';
+  isPlusGex: boolean;
+  vrp: number;
+}
+
+export interface PricedLeg {
+  action: 'BUY' | 'SELL';
+  type: 'CALL' | 'PUT';
+  strike: number;
+  occSymbol: string;
+  midPrice: number; // REAL — obrigatório; sem isso buildRecommendation já retorna null antes de chegar aqui
+  bid: number | null;
+  ask: number | null;
+  delta: number | null; // REAL via DXLink; null = indisponível (não é substituído por modelo)
+  iv: number | null; // REAL via DXLink (Greeks.volatility); null = indisponível
+  openInterest: number | null; // REAL via DXLink (Summary.openInterest); null = indisponível
   description: string;
 }
 
 export interface VolatilitySmilePoint {
   strike: number;
-  moneyness: number; // Strike / Spot
+  moneyness: number;
   deltaLabel: string;
   iv: number;
   type: 'PUT_OTM' | 'ATM' | 'CALL_OTM';
@@ -88,22 +135,23 @@ export interface VolatilityRecommendation {
   putWall: number;
   callWall: number;
   strategy: StrategySpec;
-  targetDte: number;
+  targetDte: number; // REAL, do vencimento escolhido
   targetDteLabel: string;
-  legs: VolatilityLegSpec[];
-  netCredit: number; // Positivo se crédito, negativo se débito
+  expirationDate: string; // REAL (ISO), do vencimento escolhido
+  legs: PricedLeg[];
+  netCredit: number;
   isCredit: boolean;
-  creditWidthRatio: number; // Ratio crédito / largura das asas
-  meetsCreditRule: boolean; // >= 1/3 da largura
+  creditWidthRatio: number;
+  meetsCreditRule: boolean;
   maxProfit: number;
   maxLoss: number;
-  popEstimate: number; // Probability of Profit (~ %)
+  popEstimate: number | null; // null se alguma perna vendida não tiver delta real
   lowerBreakeven: number;
   upperBreakeven: number | null;
   lifecycle: {
-    profitTargetPct: number; // 50% padrão Tastytrade
+    profitTargetPct: number;
     profitTargetDollar: number;
-    defenseDte: number; // 21 DTE
+    defenseDte: number;
     defenseDateNotice: string;
     untestedSideRule: string;
     hasDividendRisk: boolean;
@@ -112,436 +160,510 @@ export interface VolatilityRecommendation {
   };
   didacticRationale: DidacticRationale;
   formattedTextOutput: string;
-  smileCurve: VolatilitySmilePoint[];
+  smileCurve: VolatilitySmilePoint[] | null; // null se IV real por strike indisponível
+  dataQuality: {
+    pricedFromRealQuotes: true; // sempre true — se não fosse, buildRecommendation teria retornado null
+    greeksAvailable: boolean; // true se todas as pernas vendidas tiverem delta real
+    smileAvailable: boolean;
+  };
 }
 
-export class VolatilityEngine {
-  /**
-   * Avalia um ativo aplicando a árvore de decisão institucional da skill analista-senior-opcoes-us:
-   * 1. Preço da Volatilidade: IVR, IVP e VRP (Yang-Zhang).
-   * 2. Mecânica dos Market Makers: Regime GEX, Zero Gamma Flip e Walls de OI.
-   * 3. Playbook Tastytrade: 30-45 DTE, 50% de lucro, defesa aos 21 DTE e regra do crédito >= 1/3.
-   */
-  public evaluate(input: VolatilityAssetInput): VolatilityRecommendation {
-    const spot = input.spot;
-    const vrp = Number((input.iv30 - input.rv20).toFixed(1));
-    const ivr = input.ivr;
-    const ivp = input.ivp;
-    const isPlusGex = input.netGex >= 0;
-    const gexRegime: '+GEX' | '-GEX' = isPlusGex ? '+GEX' : '-GEX';
+// ---------------------------------------------------------------------------
+// Helpers de seleção real (substituem os antigos `step`/`dte` sintéticos)
+// ---------------------------------------------------------------------------
 
-    // 1. Árvore de Decisão de Volatilidade (§5.4 da skill)
-    let volRegime: 'SELL_VOLATILITY' | 'BUY_VOLATILITY' | 'NEUTRAL' = 'NEUTRAL';
-    let volRegimeLabel = 'Neutro em Volatilidade';
-    let volRegimeReason = 'IV Rank intermediário (30-50%). Expressar viés direcional com risco definido.';
-
-    if (ivr >= 50 && vrp >= 4.0) {
-      volRegime = 'SELL_VOLATILITY';
-      volRegimeLabel = 'Venda de Volatilidade (Coleta de Prêmio)';
-      volRegimeReason = `IV Rank em ${ivr.toFixed(1)}% com VRP de +${vrp.toFixed(1)} pts. O prêmio cobrado supera a volatilidade realizada Yang-Zhang.`;
-    } else if (ivr <= 30 && vrp <= 1.0) {
-      volRegime = 'BUY_VOLATILITY';
-      volRegimeLabel = 'Compra de Volatilidade / Débito';
-      volRegimeReason = `IV Rank deprimido em ${ivr.toFixed(1)}% com VRP de ${vrp.toFixed(1)} pts. Opções baratas com assimetria para expansão de cauda.`;
+function pickStrikeNear(strikes: number[], target: number): number {
+  let best = strikes[0];
+  let bestDiff = Math.abs(strikes[0] - target);
+  for (const s of strikes) {
+    const diff = Math.abs(s - target);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = s;
     }
+  }
+  return best;
+}
 
-    // 2. Seleção da Estrutura CME com base em Vol + GEX
-    let electedStrategyId = 20; // Default: Iron Condor #20
-    const step = spot > 300 ? 10 : spot > 100 ? 5 : 2.5;
+function pickAdjacentStrike(sortedStrikes: number[], reference: number, direction: 'below' | 'above'): number | null {
+  const idx = sortedStrikes.indexOf(reference);
+  if (idx === -1) return null;
+  if (direction === 'below') return idx > 0 ? sortedStrikes[idx - 1] : null;
+  return idx < sortedStrikes.length - 1 ? sortedStrikes[idx + 1] : null;
+}
 
-    // Distância até as paredes
-    const distToPutWall = Math.abs(spot - input.putWall) / spot;
-    const distToCallWall = Math.abs(spot - input.callWall) / spot;
+function pickExpiration(
+  expirations: OptionChainExpiration[],
+  targetDte: number,
+  minDte = 15,
+  maxDte = 70
+): OptionChainExpiration | null {
+  if (expirations.length === 0) return null;
+  const candidates = expirations.filter((e) => e.daysToExpiration >= minDte && e.daysToExpiration <= maxDte);
+  const pool = candidates.length > 0 ? candidates : expirations;
+  let best = pool[0];
+  let bestDiff = Math.abs(pool[0].daysToExpiration - targetDte);
+  for (const e of pool) {
+    const diff = Math.abs(e.daysToExpiration - targetDte);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = e;
+    }
+  }
+  return best;
+}
 
-    if (volRegime === 'SELL_VOLATILITY') {
-      if (isPlusGex) {
-        if (distToPutWall < 0.02) {
-          // Preço encostado no suporte institucional -> Bull Put Spread
-          electedStrategyId = 6;
-        } else if (distToCallWall < 0.02) {
-          // Preço encostado no teto institucional -> Bear Call Spread
-          electedStrategyId = 7;
-        } else {
-          // Contido dentro do túnel institucional -> Iron Condor
-          electedStrategyId = 20;
-        }
-      } else {
-        // -GEX com alta vol -> Jade Lizard ou Broken-Wing para cortar cauda
-        electedStrategyId = 22;
-      }
-    } else if (volRegime === 'BUY_VOLATILITY') {
-      if (isPlusGex) {
-        // Mercado amarrado com vol barata -> Double Calendar Spread
-        electedStrategyId = 28;
-      } else {
-        // -GEX rompendo -> Travas direcionais de débito
-        if (input.change < 0) {
-          electedStrategyId = 2; // Bear Put Spread
-        } else {
-          electedStrategyId = 1; // Bull Call Spread
-        }
-      }
+// ---------------------------------------------------------------------------
+// Fase 1: escolha da estratégia + strikes/vencimentos reais (sem preço ainda)
+// ---------------------------------------------------------------------------
+
+/**
+ * Escolhe a estrutura CME e os strikes/vencimentos REAIS que a compõem, a partir da
+ * cadeia de opções real do ativo. Retorna null se a cadeia não tiver vencimento ou
+ * strikes utilizáveis nas faixas-alvo — nunca inventa um grid.
+ *
+ * NOTA IMPORTANTE (achado desta reescrita, fora do escopo de "dados reais", reportado
+ * separadamente ao usuário): a árvore de decisão original mapeia as estratégias 7
+ * ("Trava de Baixa com Call a Crédito") e 22 ("Jade Lizard") através do mesmo template
+ * genérico de trava direcional de débito (ids 1/2), usando `strategy.bias` para
+ * escolher PUT ou CALL — isso reproduz o comportamento pré-existente do arquivo
+ * original (preservado aqui de propósito, para não misturar a correção de dados com
+ * uma correção de arquitetura de estratégia não solicitada), mas produz uma estrutura
+ * que não corresponde ao nome da estratégia nesses dois casos específicos.
+ */
+export interface RegimeClassification {
+  strategy: StrategySpec;
+  volRegime: 'SELL_VOLATILITY' | 'BUY_VOLATILITY' | 'NEUTRAL';
+  volRegimeLabel: string;
+  volRegimeReason: string;
+  gexRegime: '+GEX' | '-GEX';
+  isPlusGex: boolean;
+  vrp: number;
+}
+
+/**
+ * Classifica o regime de volatilidade/GEX e elege a estratégia CME — só usa métricas
+ * agregadas já reais do ativo (IV30/RV20/IVR real do market metrics, netGex/walls reais
+ * do GEX engine), NÃO precisa da cadeia de opções. Separado de `planStrategy()` para
+ * permitir telas de listagem (ex.: tabela de ativos do S&P 500) mostrarem regime/
+ * estratégia elegível sem abrir uma cadeia + conexão DXLink por linha da tabela — isso
+ * seria abrir dezenas de WebSockets só para renderizar uma lista, desproporcional ao
+ * dado exibido (VRP e nome da estratégia, nenhum strike/preço/grego).
+ */
+export function classifyRegime(input: VolatilityAssetInput): RegimeClassification {
+  const spot = input.spot;
+  const vrp = Number((input.iv30 - input.rv20).toFixed(1));
+  const ivr = input.ivr;
+  const isPlusGex = input.netGex >= 0;
+  const gexRegime: '+GEX' | '-GEX' = isPlusGex ? '+GEX' : '-GEX';
+
+  let volRegime: 'SELL_VOLATILITY' | 'BUY_VOLATILITY' | 'NEUTRAL' = 'NEUTRAL';
+  let volRegimeLabel = 'Neutro em Volatilidade';
+  let volRegimeReason = 'IV Rank intermediário (30-50%). Expressar viés direcional com risco definido.';
+
+  if (ivr >= 50 && vrp >= 4.0) {
+    volRegime = 'SELL_VOLATILITY';
+    volRegimeLabel = 'Venda de Volatilidade (Coleta de Prêmio)';
+    volRegimeReason = `IV Rank em ${ivr.toFixed(1)}% com VRP de +${vrp.toFixed(1)} pts. O prêmio cobrado supera a volatilidade realizada Yang-Zhang.`;
+  } else if (ivr <= 30 && vrp <= 1.0) {
+    volRegime = 'BUY_VOLATILITY';
+    volRegimeLabel = 'Compra de Volatilidade / Débito';
+    volRegimeReason = `IV Rank deprimido em ${ivr.toFixed(1)}% com VRP de ${vrp.toFixed(1)} pts. Opções baratas com assimetria para expansão de cauda.`;
+  }
+
+  let electedStrategyId = 20;
+  const distToPutWall = Math.abs(spot - input.putWall) / spot;
+  const distToCallWall = Math.abs(spot - input.callWall) / spot;
+
+  if (volRegime === 'SELL_VOLATILITY') {
+    if (isPlusGex) {
+      if (distToPutWall < 0.02) electedStrategyId = 6;
+      else if (distToCallWall < 0.02) electedStrategyId = 7;
+      else electedStrategyId = 20;
     } else {
-      // Neutro
-      electedStrategyId = input.change >= 0 ? 1 : 2;
+      electedStrategyId = 22;
     }
+  } else if (volRegime === 'BUY_VOLATILITY') {
+    if (isPlusGex) electedStrategyId = 28;
+    else electedStrategyId = input.change < 0 ? 2 : 1;
+  } else {
+    electedStrategyId = input.change >= 0 ? 1 : 2;
+  }
 
-    const strategy = CME_STRATEGIES.find((s) => s.id === electedStrategyId) || CME_STRATEGIES[19];
+  const strategy = CME_STRATEGIES.find((s) => s.id === electedStrategyId) || CME_STRATEGIES[19];
+  return { strategy, volRegime, volRegimeLabel, volRegimeReason, gexRegime, isPlusGex, vrp };
+}
 
-    // 3. Montagem das Pernas e Strikes Ancorados nas Walls
-    const legs: VolatilityLegSpec[] = [];
-    let netCredit = 0;
-    let width = step;
-    let putWingWidth = step;
-    let callWingWidth = step;
-    let shortPutStrike = 0;
-    let shortCallStrike = 0;
-    let longPutStrike = 0;
-    let longCallStrike = 0;
-    const dte = electedStrategyId === 28 || electedStrategyId === 14 ? 30 : 35; // Sweet spot Tastytrade
-    const tYears = dte / 365;
-    const volDecimal = Math.max(0.05, (input.iv30 || 20) / 100);
-    const rRate = 0.045; // Taxa livre de risco US (SOFR / Fed Funds)
+export function planStrategy(input: VolatilityAssetInput, chain: OptionChainResult | null): StrategyPlan | null {
+  if (!chain || chain.expirations.length === 0) return null;
 
-    if (strategy.id === 20) {
-      // Iron Condor a Crédito: Asas vendidas fora das Walls
-      shortPutStrike = Math.floor(Math.min(input.putWall, spot * 0.96) / step) * step;
-      longPutStrike = shortPutStrike - step;
-      shortCallStrike = Math.ceil(Math.max(input.callWall, spot * 1.04) / step) * step;
-      longCallStrike = shortCallStrike + step;
-      putWingWidth = Math.abs(shortPutStrike - longPutStrike);
-      callWingWidth = Math.abs(longCallStrike - shortCallStrike);
-      width = Math.max(putWingWidth, callWingWidth);
+  const spot = input.spot;
+  const { strategy, volRegime, volRegimeLabel, volRegimeReason, gexRegime, isPlusGex, vrp } = classifyRegime(input);
+  const isCalendar = strategy.id === 28 || strategy.id === 14;
+  const targetDte = isCalendar ? 30 : 35;
 
-      // Apreçamento Black-Scholes Merton (BSM) estrito derivado da Volatilidade e DTE reais (Achado N-02)
-      const longPutBsm = calculateBsm(spot, longPutStrike, tYears, volDecimal * 1.08, rRate, 'PUT');
-      const shortPutBsm = calculateBsm(spot, shortPutStrike, tYears, volDecimal * 1.03, rRate, 'PUT');
-      const shortCallBsm = calculateBsm(spot, shortCallStrike, tYears, volDecimal * 0.98, rRate, 'CALL');
-      const longCallBsm = calculateBsm(spot, longCallStrike, tYears, volDecimal * 0.95, rRate, 'CALL');
+  const planBase = { strategy, volRegime, volRegimeLabel, volRegimeReason, gexRegime, isPlusGex, vrp };
 
-      const shortPutPrem = shortPutBsm.price;
-      const longPutPrem = longPutBsm.price;
-      const shortCallPrem = shortCallBsm.price;
-      const longCallPrem = longCallBsm.price;
+  if (isCalendar) {
+    const shortExp = pickExpiration(chain.expirations, 30);
+    if (!shortExp) return null;
+    const longCandidates = chain.expirations.filter((e) => e.daysToExpiration > shortExp.daysToExpiration);
+    const longExp = pickExpiration(longCandidates.length > 0 ? longCandidates : chain.expirations, 60);
+    if (!longExp || longExp.expirationDate === shortExp.expirationDate) return null;
 
-      netCredit = Number((shortPutPrem - longPutPrem + shortCallPrem - longCallPrem).toFixed(2));
+    const shortStrikes = shortExp.strikes.map((s) => s.strike);
+    const longStrikeSet = new Set(longExp.strikes.map((s) => s.strike));
+    const common = shortStrikes.filter((s) => longStrikeSet.has(s));
+    if (common.length === 0) return null;
 
-      legs.push(
-        { action: 'BUY', type: 'PUT', strike: longPutStrike, delta: Math.abs(longPutBsm.delta), iv: Number((volDecimal * 1.08 * 100).toFixed(1)), midPrice: longPutPrem, description: `Asa de Proteção Inferior ($${longPutStrike})` },
-        { action: 'SELL', type: 'PUT', strike: shortPutStrike, delta: Math.abs(shortPutBsm.delta), iv: Number((volDecimal * 1.03 * 100).toFixed(1)), midPrice: shortPutPrem, description: `Venda Ancorada na Put Wall ($${shortPutStrike})` },
-        { action: 'SELL', type: 'CALL', strike: shortCallStrike, delta: Math.abs(shortCallBsm.delta), iv: Number((volDecimal * 0.98 * 100).toFixed(1)), midPrice: shortCallPrem, description: `Venda Ancorada na Call Wall ($${shortCallStrike})` },
-        { action: 'BUY', type: 'CALL', strike: longCallStrike, delta: Math.abs(longCallBsm.delta), iv: Number((volDecimal * 0.95 * 100).toFixed(1)), midPrice: longCallPrem, description: `Asa de Proteção Superior ($${longCallStrike})` }
-      );
-    } else if (strategy.id === 6) {
-      // Bull Put Spread a Crédito
-      shortPutStrike = Math.floor(Math.min(input.putWall, spot * 0.98) / step) * step;
-      longPutStrike = shortPutStrike - step;
-      width = Math.abs(shortPutStrike - longPutStrike);
+    const centerStrike = pickStrikeNear(common, spot);
+    const shortData = shortExp.strikes.find((s) => s.strike === centerStrike)!;
+    const longData = longExp.strikes.find((s) => s.strike === centerStrike)!;
 
-      const longPutBsm = calculateBsm(spot, longPutStrike, tYears, volDecimal * 1.06, rRate, 'PUT');
-      const shortPutBsm = calculateBsm(spot, shortPutStrike, tYears, volDecimal * 1.02, rRate, 'PUT');
+    const legs: RealLeg[] = [
+      { action: 'SELL', type: 'CALL', strike: centerStrike, occSymbol: shortData.callSymbol, streamerSymbol: shortData.callStreamerSymbol, role: 'shortNear', description: `Ponta Curta Vendida (${shortExp.daysToExpiration} DTE) Strike $${centerStrike}` },
+      { action: 'BUY', type: 'CALL', strike: centerStrike, occSymbol: longData.callSymbol, streamerSymbol: longData.callStreamerSymbol, role: 'longFar', description: `Ponta Longa Comprada (${longExp.daysToExpiration} DTE) Strike $${centerStrike}` },
+    ];
 
-      const shortPutPrem = shortPutBsm.price;
-      const longPutPrem = longPutBsm.price;
-      netCredit = Number((shortPutPrem - longPutPrem).toFixed(2));
+    return { ...planBase, expiration: shortExp, farExpiration: longExp, legs };
+  }
 
-      legs.push(
-        { action: 'BUY', type: 'PUT', strike: longPutStrike, delta: Math.abs(longPutBsm.delta), iv: Number((volDecimal * 1.06 * 100).toFixed(1)), midPrice: longPutPrem, description: `Asa de Proteção Long Put ($${longPutStrike})` },
-        { action: 'SELL', type: 'PUT', strike: shortPutStrike, delta: Math.abs(shortPutBsm.delta), iv: Number((volDecimal * 1.02 * 100).toFixed(1)), midPrice: shortPutPrem, description: `Short Put Suporte Wall ($${shortPutStrike})` }
-      );
-    } else if (strategy.id === 28 || strategy.id === 14) {
-      // Calendar Spread / Double Calendar (Débito)
-      const centerStrike = Math.round(spot / step) * step;
-      width = step;
-      const shortBsm = calculateBsm(spot, centerStrike, 30 / 365, volDecimal, rRate, 'CALL');
-      const longBsm = calculateBsm(spot, centerStrike, 60 / 365, volDecimal * 1.05, rRate, 'CALL');
+  const expiration = pickExpiration(chain.expirations, targetDte);
+  if (!expiration || expiration.strikes.length < 2) return null;
+  const strikes = expiration.strikes.map((s) => s.strike).sort((a, b) => a - b);
+  const byStrike = new Map(expiration.strikes.map((s) => [s.strike, s]));
 
-      const shortPrem = shortBsm.price;
-      const longPrem = longBsm.price;
-      netCredit = -Number((longPrem - shortPrem).toFixed(2)); // Custo líquido (débito)
+  let legs: RealLeg[];
 
-      legs.push(
-        { action: 'SELL', type: 'CALL', strike: centerStrike, delta: Math.abs(shortBsm.delta), iv: input.iv30, midPrice: shortPrem, description: `Ponta Curta Vendida (30 DTE) Strike $${centerStrike}` },
-        { action: 'BUY', type: 'CALL', strike: centerStrike, delta: Math.abs(longBsm.delta), iv: Number((volDecimal * 1.05 * 100).toFixed(1)), midPrice: longPrem, description: `Ponta Longa Comprada (60 DTE) Strike $${centerStrike}` }
-      );
+  if (strategy.id === 20) {
+    const shortPutStrike = pickStrikeNear(strikes, Math.min(input.putWall, spot * 0.96));
+    const longPutStrike = pickAdjacentStrike(strikes, shortPutStrike, 'below');
+    const shortCallStrike = pickStrikeNear(strikes, Math.max(input.callWall, spot * 1.04));
+    const longCallStrike = pickAdjacentStrike(strikes, shortCallStrike, 'above');
+    if (longPutStrike == null || longCallStrike == null || shortPutStrike >= shortCallStrike) return null;
+    const lp = byStrike.get(longPutStrike)!, sp = byStrike.get(shortPutStrike)!, sc = byStrike.get(shortCallStrike)!, lc = byStrike.get(longCallStrike)!;
+    legs = [
+      { action: 'BUY', type: 'PUT', strike: longPutStrike, occSymbol: lp.putSymbol, streamerSymbol: lp.putStreamerSymbol, role: 'longPut', description: `Asa de Proteção Inferior ($${longPutStrike})` },
+      { action: 'SELL', type: 'PUT', strike: shortPutStrike, occSymbol: sp.putSymbol, streamerSymbol: sp.putStreamerSymbol, role: 'shortPut', description: `Venda Ancorada na Put Wall ($${shortPutStrike})` },
+      { action: 'SELL', type: 'CALL', strike: shortCallStrike, occSymbol: sc.callSymbol, streamerSymbol: sc.callStreamerSymbol, role: 'shortCall', description: `Venda Ancorada na Call Wall ($${shortCallStrike})` },
+      { action: 'BUY', type: 'CALL', strike: longCallStrike, occSymbol: lc.callSymbol, streamerSymbol: lc.callStreamerSymbol, role: 'longCall', description: `Asa de Proteção Superior ($${longCallStrike})` },
+    ];
+  } else if (strategy.id === 6) {
+    const shortPutStrike = pickStrikeNear(strikes, Math.min(input.putWall, spot * 0.98));
+    const longPutStrike = pickAdjacentStrike(strikes, shortPutStrike, 'below');
+    if (longPutStrike == null) return null;
+    const lp = byStrike.get(longPutStrike)!, sp = byStrike.get(shortPutStrike)!;
+    legs = [
+      { action: 'BUY', type: 'PUT', strike: longPutStrike, occSymbol: lp.putSymbol, streamerSymbol: lp.putStreamerSymbol, role: 'longPut', description: `Asa de Proteção Long Put ($${longPutStrike})` },
+      { action: 'SELL', type: 'PUT', strike: shortPutStrike, occSymbol: sp.putSymbol, streamerSymbol: sp.putStreamerSymbol, role: 'shortPut', description: `Short Put Suporte Wall ($${shortPutStrike})` },
+    ];
+  } else {
+    // Travas verticais direcionais de débito (ids 1, 2 — e, preservando o comportamento
+    // original, também 7 e 22; ver nota acima sobre essa mislabeling pré-existente)
+    const isAlta = strategy.bias === 'ALTA';
+    const k1 = pickStrikeNear(strikes, spot);
+    const k2 = isAlta ? pickAdjacentStrike(strikes, k1, 'above') : pickAdjacentStrike(strikes, k1, 'below');
+    if (k2 == null) return null;
+    const d1 = byStrike.get(k1)!, d2 = byStrike.get(k2)!;
+    const optType: 'CALL' | 'PUT' = isAlta ? 'CALL' : 'PUT';
+    const sym1 = isAlta ? d1.callSymbol : d1.putSymbol;
+    const streamer1 = isAlta ? d1.callStreamerSymbol : d1.putStreamerSymbol;
+    const sym2 = isAlta ? d2.callSymbol : d2.putSymbol;
+    const streamer2 = isAlta ? d2.callStreamerSymbol : d2.putStreamerSymbol;
+    legs = [
+      { action: 'BUY', type: optType, strike: k1, occSymbol: sym1, streamerSymbol: streamer1, role: 'k1', description: `Ponta Comprada ATM ($${k1})` },
+      { action: 'SELL', type: optType, strike: k2, occSymbol: sym2, streamerSymbol: streamer2, role: 'k2', description: `Ponta Vendida OTM ($${k2})` },
+    ];
+  }
+
+  return { ...planBase, expiration, legs };
+}
+
+// ---------------------------------------------------------------------------
+// Fase 2: precificação real + montagem da recomendação final
+// ---------------------------------------------------------------------------
+
+export function buildRecommendation(
+  input: VolatilityAssetInput,
+  plan: StrategyPlan,
+  quotes: Map<string, { bid: number | null; ask: number | null; mid: number | null }>,
+  greeks: Map<string, RealGreeksQuote>,
+  smileGreeks: Map<string, RealGreeksQuote> | null = null
+): VolatilityRecommendation | null {
+  const spot = input.spot;
+  const { strategy, expiration, legs: planLegs, volRegime, volRegimeLabel, volRegimeReason, gexRegime, isPlusGex, vrp } = plan;
+
+  // Regra de honestidade: se QUALQUER perna eleita não tiver cotação real, a
+  // recomendação inteira fica indisponível. Nunca mistura perna real com perna modelada.
+  const pricedLegs: PricedLeg[] = [];
+  for (const leg of planLegs) {
+    const q = quotes.get(leg.occSymbol);
+    if (!q || q.mid == null) return null;
+    const g = greeks.get(leg.streamerSymbol);
+    pricedLegs.push({
+      action: leg.action,
+      type: leg.type,
+      strike: leg.strike,
+      occSymbol: leg.occSymbol,
+      midPrice: q.mid,
+      bid: q.bid,
+      ask: q.ask,
+      delta: g?.delta ?? null,
+      iv: g?.iv != null ? Number((g.iv * 100).toFixed(1)) : null,
+      openInterest: g?.openInterest ?? null,
+      description: leg.description,
+    });
+  }
+
+  const netCredit = Number(
+    pricedLegs.reduce((acc, leg) => acc + (leg.action === 'SELL' ? leg.midPrice : -leg.midPrice), 0).toFixed(2)
+  );
+  const isCredit = netCredit > 0;
+
+  // Largura real: distância entre os strikes reais realmente usados (nunca um `step` sintético)
+  const strikeValues = pricedLegs.map((l) => l.strike);
+  let width: number;
+  if (strategy.id === 28 || strategy.id === 14) {
+    width = Math.max(1, Math.abs(pricedLegs[0].midPrice - pricedLegs[1].midPrice) > 0 ? pricedLegs[1].strike - pricedLegs[0].strike || 1 : 1);
+    // Calendário: mesmo strike nas duas pernas — não há "largura" de asa real. Mantido
+    // como referência mínima de $1 só para não dividir por zero nas fórmulas de
+    // maxProfit/maxLoss abaixo, que já eram uma simplificação no arquivo original
+    // (usavam `step` sintético) — limitação de modelagem pré-existente, não introduzida aqui.
+    width = 1;
+  } else {
+    width = Math.max(...strikeValues) - Math.min(...strikeValues);
+  }
+
+  const meetsCreditRule = isCredit ? Number((netCredit / width).toFixed(3)) >= 1 / 3 : true;
+  const creditRatio = width > 0 ? Number((Math.abs(netCredit) / width).toFixed(3)) : 0;
+
+  const maxProfit = isCredit
+    ? Number((netCredit * 100).toFixed(2))
+    : Number(((width - Math.abs(netCredit)) * 100).toFixed(2));
+  const maxLoss = isCredit
+    ? Math.max(0, Number(((width - netCredit) * 100).toFixed(2)))
+    : Number((Math.abs(netCredit) * 100).toFixed(2));
+
+  const divAmount = input.dividendAmount || 0;
+  const callExtrinsic = input.callExtrinsic || (netCredit > 0 ? netCredit * 0.5 : 1.0);
+  const hasDividendRisk = divAmount > 0 && divAmount > callExtrinsic;
+  const dividendRiskReason = hasDividendRisk
+    ? `ALERTA DE ATRIBUIÇÃO: Dividendo de $${divAmount.toFixed(2)} supera o extrínseco de $${callExtrinsic.toFixed(2)}. Risco iminente de exercício antecipado da Call curta!`
+    : `Seguro: Dividendo de $${divAmount.toFixed(2)} inferior ao extrínseco remanescente ($${callExtrinsic.toFixed(2)}).`;
+
+  // Breakevens a partir dos strikes reais
+  let lowerBreakeven = 0;
+  let upperBreakeven: number | null = null;
+  const findLeg = (role: string) => pricedLegs[planLegs.findIndex((l) => l.role === role)];
+
+  if (strategy.id === 20) {
+    const sp = findLeg('shortPut'), sc = findLeg('shortCall');
+    lowerBreakeven = Number((sp.strike - netCredit).toFixed(2));
+    upperBreakeven = Number((sc.strike + netCredit).toFixed(2));
+  } else if (strategy.id === 6) {
+    const sp = findLeg('shortPut');
+    lowerBreakeven = Number((sp.strike - netCredit).toFixed(2));
+    upperBreakeven = null;
+  } else if (strategy.id === 28 || strategy.id === 14) {
+    const centerK = pricedLegs[0].strike;
+    lowerBreakeven = Number((centerK - Math.abs(netCredit)).toFixed(2));
+    upperBreakeven = Number((centerK + Math.abs(netCredit)).toFixed(2));
+  } else {
+    const isAlta = strategy.bias === 'ALTA';
+    const k1Leg = findLeg('k1'), k2Leg = findLeg('k2');
+    if (isAlta) {
+      lowerBreakeven = Number((k1Leg.strike + Math.abs(netCredit)).toFixed(2));
+      upperBreakeven = Number(k2Leg.strike.toFixed(2));
     } else {
-      // Travas Verticais Direcionais (Débito)
-      const isAlta = strategy.bias === 'ALTA';
-      const k1 = Math.round(spot / step) * step;
-      const k2 = isAlta ? k1 + step : k1 - step;
-      width = Math.abs(k1 - k2);
-
-      const bsm1 = calculateBsm(spot, k1, tYears, volDecimal, rRate, isAlta ? 'CALL' : 'PUT');
-      const bsm2 = calculateBsm(spot, k2, tYears, volDecimal * 0.98, rRate, isAlta ? 'CALL' : 'PUT');
-
-      const prem1 = bsm1.price;
-      const prem2 = bsm2.price;
-      netCredit = -Number((prem1 - prem2).toFixed(2));
-
-      legs.push(
-        { action: 'BUY', type: isAlta ? 'CALL' : 'PUT', strike: k1, delta: Math.abs(bsm1.delta), iv: input.iv30, midPrice: prem1, description: `Ponta Comprada ATM ($${k1})` },
-        { action: 'SELL', type: isAlta ? 'CALL' : 'PUT', strike: k2, delta: Math.abs(bsm2.delta), iv: Number((volDecimal * 0.98 * 100).toFixed(1)), midPrice: prem2, description: `Ponta Vendida OTM ($${k2})` }
-      );
+      lowerBreakeven = Number(k2Leg.strike.toFixed(2));
+      upperBreakeven = Number((k1Leg.strike - Math.abs(netCredit)).toFixed(2));
     }
+  }
 
-    const isCredit = netCredit > 0;
-    const creditRatio = width > 0 ? Number((Math.abs(netCredit) / width).toFixed(3)) : 0;
-    // Regra Tastytrade rigorosa de 1/3 da largura do spread (0,3333) (Achado A-04 e N-03)
-    const meetsCreditRule = isCredit ? creditRatio >= (1 / 3) : true;
-
-    // Perda Máxima Real e Lucro Máximo Real considerando asas assimétricas (Achado A-12)
-    const maxProfit = isCredit 
-      ? Number((netCredit * 100).toFixed(2)) 
-      : Number(((width - Math.abs(netCredit)) * 100).toFixed(2));
-
-    const maxLoss = isCredit 
-      ? Math.max(0, Number(((width - netCredit) * 100).toFixed(2))) 
-      : Number((Math.abs(netCredit) * 100).toFixed(2));
-
-    // Teste de Atribuição por Dividendo (§2.2 da skill)
-    const divAmount = input.dividendAmount || 0;
-    const callExtrinsic = input.callExtrinsic || (netCredit > 0 ? netCredit * 0.5 : 1.0);
-    const hasDividendRisk = divAmount > 0 && divAmount > callExtrinsic;
-    const dividendRiskReason = hasDividendRisk
-      ? `ALERTA DE ATRIBUIÇÃO: Dividendo de $${divAmount.toFixed(2)} supera o extrínseco de $${callExtrinsic.toFixed(2)}. Risco iminente de exercício antecipado da Call curta!`
-      : `Seguro: Dividendo de $${divAmount.toFixed(2)} inferior ao extrínseco remanescente ($${callExtrinsic.toFixed(2)}).`;
-
-    // Breakevens Matemáticos Exatos a partir dos strikes reais (Achados A-10 e N-07)
-    let lowerBreakeven = 0;
-    let upperBreakeven: number | null = null;
-
+  // POP: só calculado se TODAS as pernas vendidas tiverem delta real (via DXLink).
+  // Sem isso, fica null — nunca substituído por um delta BSM apresentado como real.
+  const soldLegs = pricedLegs.filter((l) => l.action === 'SELL');
+  const allSoldHaveDelta = soldLegs.length > 0 && soldLegs.every((l) => l.delta != null);
+  let dynamicPop: number | null = null;
+  if (allSoldHaveDelta) {
     if (strategy.id === 20) {
-      // Iron Condor: shortPut - crédito e shortCall + crédito
-      lowerBreakeven = Number((shortPutStrike - netCredit).toFixed(2));
-      upperBreakeven = Number((shortCallStrike + netCredit).toFixed(2));
-    } else if (strategy.id === 6) {
-      // Bull Put Spread: shortPut - crédito. Sem breakeven superior (elimina constante spot * 1.05) (Achado N-07)
-      lowerBreakeven = Number((shortPutStrike - netCredit).toFixed(2));
-      upperBreakeven = null;
-    } else if (strategy.id === 28 || strategy.id === 14) {
-      // Calendar Spread: centerK - netDebit e centerK + netDebit (elimina multiplicador arbitrário 1.5) (Achado N-07)
-      const centerK = Math.round(spot / step) * step;
-      lowerBreakeven = Number((centerK - Math.abs(netCredit)).toFixed(2));
-      upperBreakeven = Number((centerK + Math.abs(netCredit)).toFixed(2));
-    } else {
-      // Verticais direcionais de débito
-      const isAlta = strategy.bias === 'ALTA';
-      const k1 = Math.round(spot / step) * step;
-      const k2 = isAlta ? k1 + step : k1 - step;
-      if (isAlta) {
-        lowerBreakeven = Number((k1 + Math.abs(netCredit)).toFixed(2));
-        upperBreakeven = Number(k2.toFixed(2));
-      } else {
-        lowerBreakeven = Number(k2.toFixed(2));
-        upperBreakeven = Number((k1 - Math.abs(netCredit)).toFixed(2));
-      }
-    }
-
-    // Estimativa de POP Matemática a partir dos Deltas Analíticos das Pernas Vendidas (Achados A-11 e N-03)
-    let dynamicPop = 50;
-    if (strategy.id === 20) {
-      // Iron Condor: 1 - deltaCallCurta - deltaPutCurta
-      const pDelta = Math.abs(legs.find(l => l.action === 'SELL' && l.type === 'PUT')?.delta || 0.16);
-      const cDelta = Math.abs(legs.find(l => l.action === 'SELL' && l.type === 'CALL')?.delta || 0.16);
-      dynamicPop = Math.min(95, Math.max(25, Math.round((1 - pDelta - cDelta) * 100)));
+      const pDelta = Math.abs(soldLegs.find((l) => l.type === 'PUT')?.delta || 0);
+      const cDelta = Math.abs(soldLegs.find((l) => l.type === 'CALL')?.delta || 0);
+      dynamicPop = Math.min(95, Math.max(5, Math.round((1 - pDelta - cDelta) * 100)));
     } else if (isCredit) {
-      const sDelta = Math.abs(legs.find(l => l.action === 'SELL')?.delta || 0.30);
-      dynamicPop = Math.min(95, Math.max(25, Math.round((1 - sDelta) * 100)));
+      const sDelta = Math.abs(soldLegs[0].delta || 0);
+      dynamicPop = Math.min(95, Math.max(5, Math.round((1 - sDelta) * 100)));
     } else {
-      const lDelta = Math.abs(legs.find(l => l.action === 'BUY')?.delta || 0.50);
-      dynamicPop = Math.min(85, Math.max(15, Math.round(lDelta * 100)));
+      const boughtLeg = pricedLegs.find((l) => l.action === 'BUY');
+      dynamicPop = boughtLeg?.delta != null ? Math.min(85, Math.max(5, Math.round(Math.abs(boughtLeg.delta) * 100))) : null;
     }
+  }
 
-    // Formatação padronizada (§13 da skill analista-senior-opcoes-us)
-    const formattedTextOutput = `DIAGNÓSTICO DE VOLATILIDADE — ${input.symbol} | Vencimento: ${dte} DTE
+  const dteLabel = `${expiration.daysToExpiration} DTE (real, ${expiration.expirationType})`;
+
+  const formattedTextOutput = `DIAGNÓSTICO DE VOLATILIDADE — ${input.symbol} | Vencimento real: ${expiration.expirationDate} (${expiration.daysToExpiration} DTE)
 
 MÉTRICAS QUANTITATIVAS:
 • Spot: $${spot.toFixed(2)} | IV30: ${input.iv30.toFixed(1)}% | RV20 (Yang-Zhang): ${input.rv20.toFixed(1)}%
-• VRP: ${vrp >= 0 ? '+' : ''}${vrp.toFixed(1)} pts | IV Rank (252d): ${ivr.toFixed(1)}% | IV Percentil: ${ivp.toFixed(0)}%
+• VRP: ${vrp >= 0 ? '+' : ''}${vrp.toFixed(1)} pts | IV Rank (252d): ${input.ivr.toFixed(1)}% | IV Percentil: ${input.ivp.toFixed(0)}%
 • Regime GEX: ${isPlusGex ? '+GEX ESTÁVEL' : '-GEX EXPLOSIVO'} | Zero Flip: $${input.zeroGammaFlip.toFixed(2)}
 • Put Wall: $${input.putWall.toFixed(2)} | Call Wall: $${input.callWall.toFixed(2)}
 
-ESTRUTURA ELEITA:
+ESTRUTURA ELEITA (strikes e vencimento confirmados na cadeia real da Tastytrade):
 • ${strategy.name} (${isCredit ? 'Crédito' : 'Débito'})
-• Crédito/Custo: $${Math.abs(netCredit).toFixed(2)} | Max Profit: $${maxProfit} | Max Loss: $${maxLoss}
+• Crédito/Custo real (bid/ask de mercado): $${Math.abs(netCredit).toFixed(2)} | Max Profit: $${maxProfit} | Max Loss: $${maxLoss}
 • Regra do Crédito (≥ 1/3 largura): ${meetsCreditRule ? 'CONFORME (Crédito remunera o risco)' : 'ALERTA: Crédito abaixo de 1/3'}
+• Probabilidade de lucro (POP): ${dynamicPop != null ? `${dynamicPop}% (a partir de delta real via streaming)` : 'indisponível (delta real não retornado pelo streaming DXLink nesta consulta)'}
 
 PLAYBOOK TASTYTRADE (§8):
 • Alvo de Saída: Fechar ordem com 50% do lucro ($${(Math.abs(netCredit) * 0.5).toFixed(2)})
 • Defesa aos 21 DTE: Encerrar impreterivelmente aos 21 DTE para mitigar Gamma/Zomma
 • ${dividendRiskReason}`;
 
-    // Justificativa Didática Strike a Strike (§2 e §8 da skill)
-    const strikeByStrikeJustification: StrikeJustificationItem[] = legs.map((leg) => {
-      if (leg.action === 'SELL' && leg.type === 'PUT') {
-        return {
-          strike: leg.strike,
-          action: 'SELL',
-          type: 'PUT',
-          role: 'Pilar de Suporte Institucional (Venda de Put)',
-          reason: `Strike posicionado na ou abaixo da Put Wall ($${input.putWall.toFixed(2)}), onde reside a maior barreira de Open Interest dos dealers. Ao vender aqui, você atua como a seguradora cobrando um prêmio inflado (IV ${leg.iv.toFixed(1)}%) num nível onde os Market Makers compram ações no delta-hedge para conter a queda.`
-        };
-      }
-      if (leg.action === 'SELL' && leg.type === 'CALL') {
-        return {
-          strike: leg.strike,
-          action: 'SELL',
-          type: 'CALL',
-          role: 'Pilar de Resistência Institucional (Venda de Call)',
-          reason: `Strike posicionado na ou acima da Call Wall ($${input.callWall.toFixed(2)}), teto dinâmico de Open Interest institucional. Os formadores de mercado vendem o ativo subjacente contra essa parede, criando resistência natural e permitindo recolher prêmio extrínseco com alta probabilidade de expirar OTM.`
-        };
-      }
-      if (leg.action === 'BUY' && leg.type === 'PUT') {
-        return {
-          strike: leg.strike,
-          action: 'BUY',
-          type: 'PUT',
-          role: 'Asa de Proteção Inferior (Seguro de Cauda)',
-          reason: `Compra da Put no strike $${leg.strike.toFixed(2)} para definir o risco máximo no pior cenário possível. Ela 'compra o seguro do seguro', garantindo que mesmo num crash repentino de mercado, sua perda é limitada matematicamente ao spread de $${width.toFixed(2)} e seu capital nunca é colocado em risco ilimitado.`
-        };
-      }
-      return {
-        strike: leg.strike,
-        action: 'BUY',
-        type: 'CALL',
-        role: 'Asa de Proteção Superior (Teto de Risco)',
-        reason: `Compra da Call no strike $${leg.strike.toFixed(2)} para travar o risco na alta explosiva (short squeeze). Garante margem de risco definida (Reg T) e elimina a cauda infinita.`
-      };
-    });
-
-    const didacticRationale: DidacticRationale = {
-      oneLiner: 'É um analista de opções com mais de 20 anos de experiência que funciona dentro da inteligência artificial: ele não adivinha se a ação vai subir ou cair — ele calcula se o preço que estão te cobrando pela opção é justo e quanto você pode perder no pior cenário, antes de você colocar dinheiro na operação.',
-      carInsuranceAnalogy: isCredit
-        ? `Pense em opções como um seguro de carro. Quem compra a opção está pagando por proteção com risco limitado ao valor pago. Quem vende a opção está no papel da seguradora: recebe o prêmio em dinheiro na hora e assume o compromisso de pagar se o evento acontecer. Em ${input.symbol}, a volatilidade implícita está cobrando ${input.iv30.toFixed(1)}%, enquanto a ação oscila historicamente apenas ${input.rv20.toFixed(1)}%. O seguro está CARO em relação ao risco real (VRP de +${vrp.toFixed(1)} pts). Estar no papel da seguradora coletando esse prêmio é matematicamente vantajoso.`
-        : `Pense em opções como um seguro de carro. Em ${input.symbol}, a volatilidade implícita está barata em ${input.iv30.toFixed(1)}% (IV Rank de apenas ${ivr.toFixed(1)}%). O 'seguro' está em liquidação com preço inferior ao histórico de oscilação do ativo. Estar no papel do comprador com risco 100% limitado ao custo inicial é a melhor relação risco/retorno.`,
-      whyThisStructure: `A estrutura eleita foi ${strategy.name} porque combina a avaliação relativa de volatilidade (IVR em ${ivr.toFixed(1)}%) com a física estabilizadora do regime de ${isPlusGex ? '+GEX (Market Makers amortecem oscilações)' : '-GEX (Dealers aceleram rompimentos)'}, mantendo o risco 100% definido por travas de proteção.`,
-      strikeByStrikeJustification,
-      fourJobsSummary: {
-        insurancePricing: `IV 30d em ${input.iv30.toFixed(1)}% vs RV Yang-Zhang de ${input.rv20.toFixed(1)}% (VRP de ${vrp >= 0 ? '+' : ''}${vrp.toFixed(1)} pts). O mercado precifica uma oscilação ${vrp >= 0 ? 'superior' : 'inferior'} à verificada nos últimos meses.`,
-        structureChoice: `Em vez de usar sempre a mesma estratégia, o sistema selecionou ${strategy.name} calibrada para ${dte} DTE (Sweet Spot de decaimento do Theta).`,
-        riskBeforeReward: upperBreakeven !== null
-          ? `Melhor cenário: Ganho de $${maxProfit.toFixed(2)}. Pior cenário: Perda máxima limitada a $${maxLoss.toFixed(2)}. Breakevens entre $${lowerBreakeven.toFixed(2)} e $${upperBreakeven.toFixed(2)}.`
-          : `Melhor cenário: Ganho de $${maxProfit.toFixed(2)}. Pior cenário: Perda máxima limitada a $${maxLoss.toFixed(2)}. Breakeven em $${lowerBreakeven.toFixed(2)} (sem teto superior de prejuízo).`,
-        exitPlan: `Realização de lucro: Fechar com 50% do lucro ($${(Math.abs(netCredit) * 0.5).toFixed(2)}). Saída preventiva: Fechar ou rolar impreterivelmente aos 21 DTE restantes para evitar risco de Gamma.`
-      },
-      fourCashQuestions: {
-        maxProfitCash: `+$${maxProfit.toFixed(2)} por contrato (100% do lucro potencial se o preço permanecer dentro da zona das Walls de OI até o vencimento)`,
-        maxLossCash: `-$${maxLoss.toFixed(2)} por contrato (trava de segurança comprada limita a perda no pior cenário absoluto; o capital nunca fica exposto a risco infinito)`,
-        breakevenPoint: upperBreakeven !== null
-          ? `Abaixo de $${lowerBreakeven.toFixed(2)} ou acima de $${upperBreakeven.toFixed(2)} (qualquer cotação intermediária preserva lucro ou breakeven)`
-          : `Abaixo de $${lowerBreakeven.toFixed(2)} (qualquer cotação acima preserva lucro integral de $${maxProfit.toFixed(2)})`,
-        whatMakesItFail: isCredit
-          ? `Rompimento violento das barreiras de Open Interest (Put Wall $${input.putWall.toFixed(2)} ou Call Wall $${input.callWall.toFixed(2)}) com explosão de volatilidade não antecipada pelos formadores de mercado.`
-          : `Ausência de movimento direcional ou colapso rápido da volatilidade implícita consumindo o prêmio pago no decaimento temporal (Theta).`
-      },
-      whatItDoesNotDo: [
-        'Não envia ordens automáticas: A ferramenta analisa e recomenda. Quem clica em comprar ou vender no broker é você.',
-        'Não adivinha direção: Ela não diz "a ação vai subir ou cair". Ela calcula se o preço cobrado pelas opções está compatível com o risco real.',
-        'Não inventa número: É a regra mais rígida. Sem o dado real de cotação ou profundidade, entrega a condição matemática necessária e os campos em aberto para confirmação no book.',
-        'Não garante lucro: Nenhuma análise garante. O que ela faz é evitar as três formas mais comuns de quebrar: pagar caro demais pelo seguro, arriscar mais do que a conta suporta e não ter plano de saída antes de entrar.'
-      ],
-      whyItMattersForBeginners: [
-        'Sabe se está pagando caro ou barato antes de entrar: com números auditáveis de IV vs HV, sem depender de palpite ou viés emocional.',
-        'Sabe exatamente quanto pode perder: cada estrutura define o stop loss no próprio payoff matemático, bloqueando perda ilimitada e limitando a exposição a 1% a 2% do capital.',
-        'Tem regra de saída definida antes da emoção aparecer: alvo de 50% de lucro e encerramento obrigatório aos 21 DTE eliminam a ganância e o pânico de vencimento.'
-      ],
-      honestExpectationNotice: 'Opções ampliam resultados nos dois sentidos. Uma operação bem estruturada pode render bem mais que a mesma quantia aplicada em ação — e uma malfeita pode consumir todo o valor investido em poucos dias, ou mais que isso em certas estruturas. Esta ferramenta reduz erro de análise e impõe disciplina. Ela não reduz o risco do mercado, e não transforma opções em algo adequado para todo perfil de investidor. Quem está começando deveria usá-la primeiro para entender as operações e simular, antes de operar valor relevante.',
-      disclaimer: 'Material quantitativo e educacional de apoio à decisão operacional em derivativos. Não constitui recomendação de investimento.'
-    };
-
-    return {
-      symbol: input.symbol,
-      spot,
-      change: input.change,
-      iv30: input.iv30,
-      rv20: input.rv20,
-      vrp,
-      ivr,
-      ivp,
-      volRegime,
-      volRegimeLabel,
-      volRegimeReason,
-      gexRegime,
-      gexRegimeLabel: isPlusGex ? '+GEX ESTÁVEL (Market Makers Amortecem)' : '-GEX EXPLOSIVO (Dealers Aceleram)',
-      zeroGammaFlip: input.zeroGammaFlip,
-      putWall: input.putWall,
-      callWall: input.callWall,
-      strategy,
-      targetDte: dte,
-      targetDteLabel: `${dte} DTE (Tastytrade Sweet Spot)`,
-      legs,
-      netCredit,
-      isCredit,
-      creditWidthRatio: creditRatio,
-      meetsCreditRule,
-      maxProfit,
-      maxLoss,
-      popEstimate: dynamicPop,
-      lowerBreakeven,
-      upperBreakeven,
-      lifecycle: {
-        profitTargetPct: 50,
-        profitTargetDollar: Number((Math.abs(netCredit) * 0.5).toFixed(2)),
-        defenseDte: 21,
-        defenseDateNotice: 'Encerrar ou rolar impreterivelmente aos 21 DTE restantes para evitar risco de Gamma e Zomma.',
-        untestedSideRule: 'Rolar o lado não testado no máximo 1x por ciclo para recolher crédito adicional.',
-        hasDividendRisk,
-        dividendRiskReason,
-        whatMakesItLose: isCredit 
-          ? 'Choque repentino de volatilidade (Volga negativa) ou rompimento abrupto fora das Walls de OI.' 
-          : 'Estagnação prolongada do preço subjacente ou colapso da volatilidade implícita (Theta decay).',
-      },
-      didacticRationale,
-      formattedTextOutput,
-      smileCurve: this.generateSmile(spot, input.iv30, input.skew25 || 4.5),
-    };
-  }
-
-  /**
-   * Gera a curva de Volatility Smile / Skew empírica para o ciclo de opções.
-   * Modela o Put Skew institucional do mercado de ações americano.
-   */
-  generateSmile(spot: number, ivAtm: number, skewFactor: number = 4.5): VolatilitySmilePoint[] {
-    const strikesCount = 11;
-    const points: VolatilitySmilePoint[] = [];
-    const minMoneyness = 0.85;
-    const maxMoneyness = 1.15;
-    const step = (maxMoneyness - minMoneyness) / (strikesCount - 1);
-
-    for (let i = 0; i < strikesCount; i++) {
-      const m = minMoneyness + i * step;
-      const strike = Number((spot * m).toFixed(1));
-      let iv = ivAtm;
-      let type: 'PUT_OTM' | 'ATM' | 'CALL_OTM' = 'ATM';
-      let deltaLabel = '50Δ ATM';
-
-      if (m < 0.99) {
-        type = 'PUT_OTM';
-        const dist = 1 - m;
-        // Put Skew: OTM Puts negociam a prêmio de volatilidade mais elevado (Tail Risk)
-        iv = ivAtm + dist * (skewFactor * 2.6) + Math.pow(dist, 2) * 20;
-        const putDelta = Math.round(50 - dist * 130);
-        deltaLabel = `${Math.max(5, putDelta)}Δ Put`;
-      } else if (m > 1.01) {
-        type = 'CALL_OTM';
-        const dist = m - 1;
-        // Call Skew mais suave com ligeiro upturn em extreme wings
-        iv = ivAtm - dist * (skewFactor * 0.5) + Math.pow(dist, 2) * 18;
-        const callDelta = Math.round(50 - dist * 130);
-        deltaLabel = `${Math.max(5, callDelta)}Δ Call`;
-      }
-
-      points.push({
-        strike,
-        moneyness: Number(m.toFixed(2)),
-        deltaLabel,
-        iv: Number(iv.toFixed(1)),
-        type,
-      });
+  const strikeByStrikeJustification: StrikeJustificationItem[] = pricedLegs.map((leg) => {
+    const ivText = leg.iv != null ? `IV real ${leg.iv.toFixed(1)}%` : 'IV real indisponível nesta consulta (streaming)';
+    if (leg.action === 'SELL' && leg.type === 'PUT') {
+      return { strike: leg.strike, action: 'SELL', type: 'PUT', role: 'Pilar de Suporte Institucional (Venda de Put)', reason: `Strike real posicionado na ou abaixo da Put Wall ($${input.putWall.toFixed(2)}). Prêmio de mercado (mid real: $${leg.midPrice.toFixed(2)}, ${ivText}) cobrado num nível onde os Market Makers compram ações no delta-hedge para conter a queda.` };
     }
+    if (leg.action === 'SELL' && leg.type === 'CALL') {
+      return { strike: leg.strike, action: 'SELL', type: 'CALL', role: 'Pilar de Resistência Institucional (Venda de Call)', reason: `Strike real posicionado na ou acima da Call Wall ($${input.callWall.toFixed(2)}). Prêmio de mercado (mid real: $${leg.midPrice.toFixed(2)}, ${ivText}) recolhido com alta probabilidade de expirar OTM.` };
+    }
+    if (leg.action === 'BUY' && leg.type === 'PUT') {
+      return { strike: leg.strike, action: 'BUY', type: 'PUT', role: 'Asa de Proteção Inferior (Seguro de Cauda)', reason: `Compra da Put real no strike $${leg.strike.toFixed(2)} (mid real: $${leg.midPrice.toFixed(2)}) para definir o risco máximo. Perda limitada matematicamente à largura real de $${width.toFixed(2)} entre os strikes negociados.` };
+    }
+    return { strike: leg.strike, action: 'BUY', type: 'CALL', role: 'Asa de Proteção Superior (Teto de Risco)', reason: `Compra da Call real no strike $${leg.strike.toFixed(2)} (mid real: $${leg.midPrice.toFixed(2)}) para travar o risco na alta. Margem de risco definida (Reg T).` };
+  });
 
-    return points;
+  const didacticRationale: DidacticRationale = {
+    oneLiner: 'É um analista de opções com mais de 20 anos de experiência que funciona dentro da inteligência artificial: ele não adivinha se a ação vai subir ou cair — ele calcula se o preço que estão te cobrando pela opção é justo e quanto você pode perder no pior cenário, antes de você colocar dinheiro na operação.',
+    carInsuranceAnalogy: isCredit
+      ? `Pense em opções como um seguro de carro. Quem vende a opção está no papel da seguradora: recebe o prêmio em dinheiro (cotação real de mercado, não estimada) e assume o compromisso de pagar se o evento acontecer. Em ${input.symbol}, a volatilidade implícita está cobrando ${input.iv30.toFixed(1)}%, enquanto a ação oscila historicamente apenas ${input.rv20.toFixed(1)}% (VRP de +${vrp.toFixed(1)} pts).`
+      : `Pense em opções como um seguro de carro. Em ${input.symbol}, a volatilidade implícita está barata em ${input.iv30.toFixed(1)}% (IV Rank de apenas ${input.ivr.toFixed(1)}%). Estar no papel do comprador, pagando o prêmio real de mercado, com risco 100% limitado ao custo inicial, é a melhor relação risco/retorno.`,
+    whyThisStructure: `A estrutura eleita foi ${strategy.name} porque combina a avaliação relativa de volatilidade (IVR em ${input.ivr.toFixed(1)}%) com a física estabilizadora do regime de ${isPlusGex ? '+GEX (Market Makers amortecem oscilações)' : '-GEX (Dealers aceleram rompimentos)'}. Strikes e vencimento confirmados contra a cadeia real de opções da Tastytrade.`,
+    strikeByStrikeJustification,
+    fourJobsSummary: {
+      insurancePricing: `IV 30d em ${input.iv30.toFixed(1)}% vs RV Yang-Zhang de ${input.rv20.toFixed(1)}% (VRP de ${vrp >= 0 ? '+' : ''}${vrp.toFixed(1)} pts).`,
+      structureChoice: `${strategy.name} calibrada para o vencimento real mais próximo do sweet spot: ${expiration.expirationDate} (${expiration.daysToExpiration} DTE).`,
+      riskBeforeReward: upperBreakeven !== null
+        ? `Melhor cenário: Ganho de $${maxProfit.toFixed(2)}. Pior cenário: Perda máxima limitada a $${maxLoss.toFixed(2)}. Breakevens entre $${lowerBreakeven.toFixed(2)} e $${upperBreakeven.toFixed(2)}.`
+        : `Melhor cenário: Ganho de $${maxProfit.toFixed(2)}. Pior cenário: Perda máxima limitada a $${maxLoss.toFixed(2)}. Breakeven em $${lowerBreakeven.toFixed(2)}.`,
+      exitPlan: `Realização de lucro: Fechar com 50% do lucro ($${(Math.abs(netCredit) * 0.5).toFixed(2)}). Saída preventiva: Fechar ou rolar impreterivelmente aos 21 DTE.`,
+    },
+    fourCashQuestions: {
+      maxProfitCash: `+$${maxProfit.toFixed(2)} por contrato`,
+      maxLossCash: `-$${maxLoss.toFixed(2)} por contrato`,
+      breakevenPoint: upperBreakeven !== null
+        ? `Abaixo de $${lowerBreakeven.toFixed(2)} ou acima de $${upperBreakeven.toFixed(2)}`
+        : `Abaixo de $${lowerBreakeven.toFixed(2)}`,
+      whatMakesItFail: isCredit
+        ? `Rompimento violento das barreiras de Open Interest (Put Wall $${input.putWall.toFixed(2)} ou Call Wall $${input.callWall.toFixed(2)}).`
+        : `Ausência de movimento direcional ou colapso da volatilidade implícita.`,
+    },
+    whatItDoesNotDo: [
+      'Não envia ordens automáticas: A ferramenta analisa e recomenda. Quem clica em comprar ou vender no broker é você.',
+      'Não adivinha direção: calcula se o preço cobrado pelas opções está compatível com o risco real.',
+      'Não inventa número: strike, vencimento e preço vêm da cadeia e cotação reais da Tastytrade. Quando delta/IV por contrato não está disponível via streaming, o campo fica marcado como indisponível — nunca preenchido por modelo.',
+      'Não garante lucro: nenhuma análise garante.',
+    ],
+    whyItMattersForBeginners: [
+      'Sabe se está pagando caro ou barato antes de entrar, com preço real de mercado.',
+      'Sabe exatamente quanto pode perder: cada estrutura define o stop loss no próprio payoff matemático.',
+      'Tem regra de saída definida antes da emoção aparecer.',
+    ],
+    honestExpectationNotice: 'Opções ampliam resultados nos dois sentidos. Esta ferramenta reduz erro de análise e impõe disciplina. Ela não reduz o risco do mercado.',
+    disclaimer: 'Material quantitativo e educacional de apoio à decisão operacional em derivativos. Não constitui recomendação de investimento.',
+  };
+
+  let smileCurve: VolatilitySmilePoint[] | null = null;
+  if (smileGreeks && smileGreeks.size > 0) {
+    smileCurve = buildRealSmile(spot, plan.expiration, smileGreeks);
   }
+
+  return {
+    symbol: input.symbol,
+    spot,
+    change: input.change,
+    iv30: input.iv30,
+    rv20: input.rv20,
+    vrp,
+    ivr: input.ivr,
+    ivp: input.ivp,
+    volRegime,
+    volRegimeLabel,
+    volRegimeReason,
+    gexRegime,
+    gexRegimeLabel: isPlusGex ? '+GEX ESTÁVEL (Market Makers Amortecem)' : '-GEX EXPLOSIVO (Dealers Aceleram)',
+    zeroGammaFlip: input.zeroGammaFlip,
+    putWall: input.putWall,
+    callWall: input.callWall,
+    strategy,
+    targetDte: expiration.daysToExpiration,
+    targetDteLabel: dteLabel,
+    expirationDate: expiration.expirationDate,
+    legs: pricedLegs,
+    netCredit,
+    isCredit,
+    creditWidthRatio: creditRatio,
+    meetsCreditRule,
+    maxProfit,
+    maxLoss,
+    popEstimate: dynamicPop,
+    lowerBreakeven,
+    upperBreakeven,
+    lifecycle: {
+      profitTargetPct: 50,
+      profitTargetDollar: Number((Math.abs(netCredit) * 0.5).toFixed(2)),
+      defenseDte: 21,
+      defenseDateNotice: 'Encerrar ou rolar impreterivelmente aos 21 DTE restantes para evitar risco de Gamma e Zomma.',
+      untestedSideRule: 'Rolar o lado não testado no máximo 1x por ciclo para recolher crédito adicional.',
+      hasDividendRisk,
+      dividendRiskReason,
+      whatMakesItLose: isCredit
+        ? 'Choque repentino de volatilidade (Volga negativa) ou rompimento abrupto fora das Walls de OI.'
+        : 'Estagnação prolongada do preço subjacente ou colapso da volatilidade implícita (Theta decay).',
+    },
+    didacticRationale,
+    formattedTextOutput,
+    smileCurve,
+    dataQuality: {
+      pricedFromRealQuotes: true,
+      greeksAvailable: allSoldHaveDelta,
+      smileAvailable: smileCurve != null,
+    },
+  };
 }
 
-export const volatilityEngine = new VolatilityEngine();
+/**
+ * Constrói a curva de smile a partir de IV REAL por strike (streaming DXLink Greeks),
+ * substituindo a antiga `generateSmile()` (fórmula com `skewFactor` arbitrário — uma
+ * terceira fabricação encontrada nesta reescrita, além de strike/DTE e preço). Só
+ * inclui pontos para os quais existe IV real; retorna null se não houver pontos
+ * suficientes para um gráfico minimamente informativo.
+ */
+function buildRealSmile(
+  spot: number,
+  expiration: OptionChainExpiration,
+  smileGreeks: Map<string, RealGreeksQuote>
+): VolatilitySmilePoint[] | null {
+  const points: VolatilitySmilePoint[] = [];
+
+  for (const s of expiration.strikes) {
+    const isBelow = s.strike < spot;
+    const preferred = isBelow ? smileGreeks.get(s.putStreamerSymbol) : smileGreeks.get(s.callStreamerSymbol);
+    const fallback = isBelow ? smileGreeks.get(s.callStreamerSymbol) : smileGreeks.get(s.putStreamerSymbol);
+    const g = preferred?.iv != null ? preferred : fallback?.iv != null ? fallback : null;
+    if (!g || g.iv == null) continue;
+
+    const moneyness = Number((s.strike / spot).toFixed(2));
+    let type: 'PUT_OTM' | 'ATM' | 'CALL_OTM' = 'ATM';
+    if (moneyness < 0.99) type = 'PUT_OTM';
+    else if (moneyness > 1.01) type = 'CALL_OTM';
+
+    const deltaLabel = g.delta != null ? `${Math.round(Math.abs(g.delta) * 100)}Δ ${type === 'PUT_OTM' ? 'Put' : type === 'CALL_OTM' ? 'Call' : 'ATM'}` : `${type === 'PUT_OTM' ? 'Put' : type === 'CALL_OTM' ? 'Call' : 'ATM'} (Δ indisponível)`;
+
+    points.push({ strike: s.strike, moneyness, deltaLabel, iv: Number((g.iv * 100).toFixed(1)), type });
+  }
+
+  if (points.length < 3) return null;
+  return points.sort((a, b) => a.strike - b.strike);
+}

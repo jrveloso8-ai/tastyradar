@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { AlertTriangle, Info, Shield } from 'lucide-react';
+import { VolatilityRecommendation } from '@/lib/domain/volatility-engine';
 
 export interface OptionLegData {
   action: 'COMPRA' | 'VENDA';
@@ -30,6 +31,8 @@ export interface ElectedStrategyData {
   spreadWidth: number;
   returnOnRiskPct: number;
   breakEven: number;
+  /** Segundo ponto de equilíbrio (estruturas de 2 pernas testadas, ex.: Iron Condor). */
+  breakEvenUpper?: number;
   maxProfitLot: number;
   maxLossLot: number;
   legs: OptionLegData[];
@@ -65,6 +68,7 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
     maxProfitLot,
     maxLossLot,
     breakEven,
+    breakEvenUpper,
     isCredit,
     title,
     bias,
@@ -114,7 +118,7 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
     points.push({ s, unitP, lotP });
   }
 
-  const specialPrices = [...allStrikes, spot, breakEven].filter(
+  const specialPrices = [...allStrikes, spot, breakEven, ...(breakEvenUpper !== undefined ? [breakEvenUpper] : [])].filter(
     (p) => p >= minX && p <= maxX
   );
 
@@ -160,6 +164,7 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
 
   const spotX = getX(spot);
   const breakEvenX = getX(breakEven);
+  const breakEvenUpperX = breakEvenUpper !== undefined ? getX(breakEvenUpper) : null;
   const spotPayoff = calculateUnitPayoffAt(spot) * 100;
 
   const biasBadge =
@@ -181,9 +186,15 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
             <span className={`px-2 py-0.5 rounded text-[11px] font-bold font-mono border ${biasBadge.color}`}>
               [{biasBadge.label}]
             </span>
+            <span
+              className="px-1.5 py-0.5 text-[9px] font-bold font-mono rounded bg-amber-500/20 text-amber-300 border border-amber-500/40"
+              title="Estrutura ilustrativa: strikes e prêmios gerados por modelo interno a partir do preço à vista, sem consulta a book de opções real. Não usar para decisão de alocação."
+            >
+              SIMULADO
+            </span>
           </div>
           <p className="text-xs text-gray-400 mt-1 font-mono">
-            Prêmios Tastytrade · ativo a ${spot.toFixed(2)} naquele fechamento · Perfil de Lucro e Prejuízo no Vencimento (Contrato 100 cotas)
+            Estrutura Ilustrativa (Modelo Interno) · ativo a ${spot.toFixed(2)} naquele fechamento · Perfil de Lucro e Prejuízo no Vencimento (Contrato 100 cotas)
           </p>
         </div>
 
@@ -339,7 +350,34 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
                 fontWeight="bold"
                 fontFamily="monospace"
               >
-                Break-Even (${breakEven.toFixed(2)})
+                Break-Even {breakEvenUpperX !== null ? 'Inferior ' : ''}(${breakEven.toFixed(2)})
+              </text>
+            </g>
+          )}
+
+          {/* Segundo Break-Even (estruturas com 2 pontos de equilíbrio, ex.: Iron Condor) */}
+          {breakEvenUpperX !== null && breakEvenUpper! >= minX && breakEvenUpper! <= maxX && (
+            <g>
+              <line
+                x1={breakEvenUpperX}
+                y1={padT + 20}
+                x2={breakEvenUpperX}
+                y2={height - padB}
+                stroke="#f59e0b"
+                strokeWidth="1.5"
+                strokeDasharray="3 3"
+              />
+              <circle cx={breakEvenUpperX} cy={yZero} r="4" fill="#f59e0b" stroke="#ffffff" strokeWidth="1.5" />
+              <text
+                x={breakEvenUpperX}
+                y={yZero - 8}
+                textAnchor="middle"
+                fill="#fbbf24"
+                fontSize="9"
+                fontWeight="bold"
+                fontFamily="monospace"
+              >
+                Break-Even Superior (${breakEvenUpper!.toFixed(2)})
               </text>
             </g>
           )}
@@ -382,7 +420,9 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
           <span className="text-[10px] text-amber-400 font-bold block font-sans">
             ⚖️ PONTO DE EQUILÍBRIO (ZERO A ZERO)
           </span>
-          <p className="text-amber-300 font-bold">${breakEven.toFixed(2)}</p>
+          <p className="text-amber-300 font-bold">
+            ${breakEven.toFixed(2)}{breakEvenUpper !== undefined ? ` e $${breakEvenUpper.toFixed(2)}` : ''}
+          </p>
           <span className="text-[10px] text-gray-400 block font-sans">
             Preço exato onde o ganho da opção anula o custo de montagem.
           </span>
@@ -403,3 +443,98 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
     </div>
   );
 };
+/**
+ * Converte o resultado do volatilityEngine (motor real: IV/HV, GEX, Walls de OI e
+ * apreçamento BSM) para o formato que a tela de Cotação/Payoff consome.
+ *
+ * Substitui, para os tickers cobertos pelo SP500_DATASET, a antiga "Estratégia Eleita"
+ * de QuoteView.tsx que montava pernas com `spot × constante` fixo (Achado D-01 do
+ * laudo Ciclo 4) — aqui toda perna, prêmio, strike, breakeven e regra de saída vem do
+ * motor testado (`volatility-engine.test.ts` cobre a árvore de decisão e o apreçamento).
+ *
+ * `avgOptionVolume` (campo real e específico do ativo em SP500_DATASET) é usado como
+ * proxy de liquidez para o OI exibido por perna — não é Open Interest ao vivo (o motor
+ * não modela OI por strike), por isso o rótulo na tela deixou de citar "Tastytrade" e
+ * o role de cada perna mostra Delta/IV reais em vez de um número de OI decorativo.
+ */
+export function buildElectedStrategyFromRecommendation(
+  rec: VolatilityRecommendation,
+  underlyingSymbol: string,
+  avgOptionVolume: number
+): ElectedStrategyData {
+  const strikes = rec.legs.map((l) => l.strike);
+  const spreadWidth = strikes.length
+    ? Number((Math.max(...strikes) - Math.min(...strikes)).toFixed(2))
+    : 0;
+
+  const bias: 'ALTA' | 'BAIXA' | 'LATERAL' =
+    rec.strategy.bias === 'ALTA' || rec.strategy.bias === 'BAIXA' ? rec.strategy.bias : 'LATERAL';
+
+  const returnOnRiskPct = rec.maxLoss > 0 ? Number(((rec.maxProfit / rec.maxLoss) * 100).toFixed(1)) : 0;
+
+  // rec.expirationDate já é a data REAL do vencimento escolhido na cadeia da Tastytrade
+  // (antes esta função somava `hoje + targetDte dias`, o que dava uma data aproximada
+  // e podia divergir do vencimento real de fato usado nos strikes — corrigido junto
+  // com a reescrita do motor para strikes/vencimento reais).
+  const expirationDate = rec.expirationDate;
+
+  const status = rec.meetsCreditRule ? 'AUTORIZADA' : 'CONDICIONAL (fora da regra de 1/3)';
+
+  const strikeRange = strikes.length
+    ? `$${Math.min(...strikes).toFixed(2)} a $${Math.max(...strikes).toFixed(2)}`
+    : '';
+
+  return {
+    id: rec.strategy.id,
+    title: `${rec.strategy.name} (${strikeRange})`,
+    bias,
+    category: rec.strategy.category,
+    underlyingSymbol,
+    underlyingPrice: rec.spot,
+    dte: rec.targetDte,
+    expirationDate,
+    status,
+    isCredit: rec.isCredit,
+    netCostOrCredit: rec.netCredit,
+    totalCostOrCreditForLot: Number((rec.netCredit * 100).toFixed(2)),
+    spreadWidth,
+    returnOnRiskPct,
+    breakEven: rec.lowerBreakeven,
+    breakEvenUpper: rec.upperBreakeven ?? undefined,
+    maxProfitLot: rec.maxProfit,
+    maxLossLot: rec.maxLoss,
+    legs: rec.legs.map((l) => ({
+      action: l.action === 'BUY' ? 'COMPRA' : 'VENDA',
+      symbol: `${underlyingSymbol} ${l.type}${l.strike.toFixed(0)}`,
+      type: l.type,
+      strike: l.strike,
+      unitPrice: l.midPrice,
+      totalFinancial: Number((l.midPrice * 100).toFixed(2)),
+      // OI real via streaming DXLink quando disponível; se não vier na janela de
+      // coleta, cai para o proxy de liquidez documentado (avgOptionVolume * 0.15) —
+      // nunca apresentado como "real" nesse caso (ver roleDescription abaixo).
+      openInterest: l.openInterest ?? Math.round(avgOptionVolume * 0.15),
+      roleDescription: `${l.description} · Δ ${l.delta != null ? l.delta.toFixed(2) : 'indisponível'} · IV ${l.iv != null ? l.iv.toFixed(1) + '%' : 'indisponível'}${l.openInterest == null ? ' · OI: proxy de liquidez (não é OI real)' : ''}`,
+    })),
+    tradeCheckGuide: rec.didacticRationale.whyThisStructure,
+    pricingViability: {
+      isAdequate: rec.meetsCreditRule,
+      statusLabel: rec.meetsCreditRule ? '✓ Crédito/Débito Adequado' : '⚠ Fora da Regra de 1/3',
+      ratioToWidthPct: Number((rec.creditWidthRatio * 100).toFixed(1)),
+      recommendationRule:
+        'Regra institucional Tastytrade: crédito recebido deve cobrir ao menos 1/3 (33%) da largura das asas vendidas.',
+    },
+    takeProfitRule: {
+      profitGoal: `${rec.lifecycle.profitTargetPct}% do prêmio (+$${(rec.lifecycle.profitTargetDollar * 100).toFixed(2)} por contrato)`,
+      description: 'Realizar lucro quando a passagem do tempo consumir a fração-alvo do prêmio das opções.',
+    },
+    stopLossRule: {
+      lossLimit: `Perda máxima travada em -$${rec.maxLoss.toFixed(2)} por contrato`,
+      description: rec.lifecycle.whatMakesItLose,
+    },
+    timeStopRule: {
+      dteLimit: rec.lifecycle.defenseDte,
+      description: rec.lifecycle.defenseDateNotice,
+    },
+  };
+}

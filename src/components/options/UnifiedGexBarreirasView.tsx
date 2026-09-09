@@ -12,6 +12,7 @@ import {
   Calendar,
   ArrowLeft
 } from 'lucide-react';
+import { calculateGex, RawOptionData } from '@/lib/domain/gex-engine';
 
 export interface ExpirationOptionItem {
   id: string;
@@ -75,9 +76,27 @@ export function UnifiedGexBarreirasView({
     return TASTYTRADE_EXPIRATIONS.find(e => e.id === selectedExpId) || TASTYTRADE_EXPIRATIONS[2];
   }, [selectedExpId]);
 
-  // Recálculo dinâmico da cadeia de opções e GEX dependendo do Vencimento Selecionado
-  const strikesData: StrikeDerivativesData[] = useMemo(() => {
-    const list: StrikeDerivativesData[] = [];
+  // Camada sintética "MODELO CALIBRADO": OI, volume, IV, delta e gamma por strike.
+  // Isso NÃO é dado de mercado real (ver badge no header) — é a mesma geração
+  // determinística de antes. O que muda nesta etapa é o cálculo do GEX em si:
+  // em vez da fórmula própria com escala arbitrária (1e-8, chutada), os dólares
+  // de GEX agora vêm do calculateGex() do gex-engine.ts — o mesmo motor testado
+  // (gex-engine.test.ts) e usado como fonte única de verdade para essa conta.
+  const syntheticStrikes = useMemo(() => {
+    const list: {
+      strike: number;
+      callSymbol: string;
+      putSymbol: string;
+      callOi: number;
+      putOi: number;
+      callVol: number;
+      putVol: number;
+      callIv: number;
+      putIv: number;
+      callDelta: number;
+      putDelta: number;
+      gamma: number;
+    }[] = [];
     const step = spotPrice > 500 ? 10 : spotPrice > 200 ? 5 : spotPrice > 50 ? 2.5 : 1;
     const numStrikes = 25;
     const centerK = Math.round(spotPrice / step) * step;
@@ -90,10 +109,10 @@ export function UnifiedGexBarreirasView({
     for (let i = 0; i < numStrikes; i++) {
       const strike = Number((minK + i * step).toFixed(2));
       const dist = (strike - spotPrice) / spotPrice;
-      
+
       const callOiWeight = Math.exp(-Math.pow(dist - (0.03 * (currentExp.dte / 17)), 2) / 0.008);
       const putOiWeight = Math.exp(-Math.pow(dist + (0.03 * (currentExp.dte / 17)), 2) / 0.008);
-      
+
       const callOi = Math.round((1500 + callOiWeight * 42000 + (strike === centerK + step ? 22000 : 0)) * oiScale);
       const putOi = Math.round((1400 + putOiWeight * 39000 + (strike === centerK - step ? 20000 : 0)) * oiScale);
 
@@ -101,12 +120,6 @@ export function UnifiedGexBarreirasView({
       const putVol = Math.round(putOi * (0.2 + (1 / Math.max(2, currentExp.dte)) * 0.4));
 
       const gamma = (Math.exp(-Math.pow(dist, 2) / (0.003 / dteFactor)) / (spotPrice * 0.15)) * dteFactor;
-      const dollarGexCall = (callOi * 100 * (spotPrice * spotPrice) * gamma * 0.00000001);
-      const dollarGexPut = (-putOi * 100 * (spotPrice * spotPrice) * gamma * 0.00000001);
-
-      const callGex = Number(dollarGexCall.toFixed(2));
-      const putGex = Number(dollarGexPut.toFixed(2));
-      const netGex = Number((callGex + putGex).toFixed(2));
 
       const baseIv = currentExp.baseIv + Math.pow(dist * 8, 2) * 1.8;
       const callIv = Number((baseIv - dist * 6).toFixed(1));
@@ -125,45 +138,73 @@ export function UnifiedGexBarreirasView({
         putOi,
         callVol,
         putVol,
-        callGex,
-        putGex,
-        netGex,
         callIv,
         putIv,
         callDelta,
         putDelta,
+        gamma,
       });
     }
 
     return list;
   }, [symbol, spotPrice, currentExp]);
 
-  const totalCallGex = useMemo(() => Number(strikesData.reduce((acc, s) => acc + s.callGex, 0).toFixed(2)), [strikesData]);
-  const totalPutGex = useMemo(() => Number(Math.abs(strikesData.reduce((acc, s) => acc + s.putGex, 0)).toFixed(2)), [strikesData]);
-  const netGexTotal = useMemo(() => Number((totalCallGex - totalPutGex).toFixed(2)), [totalCallGex, totalPutGex]);
-
-  const maxGexStrike = useMemo(() => {
-    let maxS = strikesData[0].strike;
-    let maxVal = -Infinity;
-    strikesData.forEach(s => {
-      if (Math.abs(s.netGex) > maxVal) {
-        maxVal = Math.abs(s.netGex);
-        maxS = s.strike;
-      }
+  // Cada strike sintético vira duas pontas (CALL/PUT) de RawOptionData, alimentando
+  // o motor único de GEX em vez de uma conta local divergente.
+  const rawOptionsForGex: RawOptionData[] = useMemo(() => {
+    const raw: RawOptionData[] = [];
+    syntheticStrikes.forEach(s => {
+      raw.push({ symbol: s.callSymbol, strike: s.strike, type: 'CALL', gamma: s.gamma, openInterest: s.callOi, volume: s.callVol, delta: s.callDelta, iv: s.callIv });
+      raw.push({ symbol: s.putSymbol, strike: s.strike, type: 'PUT', gamma: s.gamma, openInterest: s.putOi, volume: s.putVol, delta: s.putDelta, iv: s.putIv });
     });
-    return maxS;
-  }, [strikesData]);
+    return raw;
+  }, [syntheticStrikes]);
 
-  const zeroGammaFlip = useMemo(() => {
-    for (let i = 0; i < strikesData.length - 1; i++) {
-      const s1 = strikesData[i];
-      const s2 = strikesData[i + 1];
-      if ((s1.netGex <= 0 && s2.netGex >= 0) || (s1.netGex >= 0 && s2.netGex <= 0)) {
-        return Number(((s1.strike + s2.strike) / 2).toFixed(2));
-      }
-    }
-    return Number((spotPrice * 0.985).toFixed(2));
-  }, [strikesData, spotPrice]);
+  const gexResult = useMemo(
+    () => calculateGex(symbol, spotPrice, rawOptionsForGex, 'calibrated-model'),
+    [symbol, spotPrice, rawOptionsForGex]
+  );
+
+  const strikesData: StrikeDerivativesData[] = useMemo(() => {
+    const gexByStrike = new Map(gexResult.strikes.map(s => [s.strike, s]));
+    return syntheticStrikes.map(s => {
+      const g = gexByStrike.get(s.strike);
+      const callGex = Number((g?.callGex ?? 0).toFixed(2));
+      const putGex = Number((g?.putGex ?? 0).toFixed(2));
+      return {
+        strike: s.strike,
+        callSymbol: s.callSymbol,
+        putSymbol: s.putSymbol,
+        callOi: s.callOi,
+        putOi: s.putOi,
+        callVol: s.callVol,
+        putVol: s.putVol,
+        callGex,
+        putGex,
+        netGex: Number((callGex + putGex).toFixed(2)),
+        callIv: s.callIv,
+        putIv: s.putIv,
+        callDelta: s.callDelta,
+        putDelta: s.putDelta,
+      };
+    });
+  }, [syntheticStrikes, gexResult]);
+
+  // Totais, strike de maior GEX e zero gamma flip agora vêm direto do calculateGex(),
+  // não de uma reconta local — única fonte de verdade por campo (REGRA 00).
+  const totalCallGex = useMemo(() => Number(gexResult.totalCallGex.toFixed(2)), [gexResult]);
+  // totalPutGex no motor é armazenado negativo (convenção de "GEX vendido pelo MM");
+  // a UI aqui sempre exibiu a magnitude positiva, então aplicamos Math.abs().
+  const totalPutGex = useMemo(() => Number(Math.abs(gexResult.totalPutGex).toFixed(2)), [gexResult]);
+  const netGexTotal = useMemo(() => Number(gexResult.totalNetGex.toFixed(2)), [gexResult]);
+
+  // Nota: maxGexMagnetStrike do motor ranqueia por magnitude BRUTA (|call|+|put|),
+  // enquanto a versão local anterior ranqueava por magnitude do GEX LÍQUIDO por strike.
+  // São definições diferentes de "strike mais relevante"; adotamos a do motor testado
+  // por ser a fonte única e documentada (ver gex-engine.ts).
+  const maxGexStrike = useMemo(() => gexResult.maxGexMagnetStrike, [gexResult]);
+
+  const zeroGammaFlip = useMemo(() => Number(gexResult.zeroGammaFlip.toFixed(2)), [gexResult]);
 
   const maxPain = useMemo(() => {
     let minLoss = Infinity;
@@ -265,15 +306,18 @@ export function UnifiedGexBarreirasView({
               <Layers className="w-4 h-4 text-cyan-300" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-sm font-bold text-white font-mono uppercase tracking-tight">
-                  PAINEL UNIFICADO: BARREIRAS DE OI & MOTOR GEX (TASTYTRADE)
+                  PAINEL UNIFICADO: BARREIRAS DE OI & MOTOR GEX
                 </h3>
                 <span className="px-1.5 py-0.5 text-[9px] font-bold font-mono rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
                   PRO-GEX v3.0
                 </span>
-                <span className="px-1.5 py-0.5 text-[9px] font-bold font-mono rounded bg-amber-500/20 text-amber-300 border border-amber-500/40" title="Cadeia de opções calculada via modelo paramétrico calibrado">
-                  MODELO CALIBRADO
+                <span
+                  className="px-2 py-0.5 text-[11px] font-bold font-mono rounded bg-amber-500/30 text-amber-200 border border-amber-500/60"
+                  title="Open Interest, gamma e IV desta grade são gerados por modelo paramétrico interno a partir do preço à vista — a API oficial da Tastytrade não entrega esses campos hoje. Não representa posicionamento real de mercado."
+                >
+                  ⚠ MODELO CALIBRADO — NÃO É DADO DE MERCADO REAL
                 </span>
               </div>
               <p className="text-xs text-gray-400 mt-0.5">

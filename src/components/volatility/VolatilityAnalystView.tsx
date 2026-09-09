@@ -29,7 +29,7 @@ import {
   Wifi,
   Radio
 } from 'lucide-react';
-import { volatilityEngine, VolatilityAssetInput, VolatilityRecommendation } from '@/lib/domain/volatility-engine';
+import { classifyRegime, VolatilityAssetInput, VolatilityRecommendation } from '@/lib/domain/volatility-engine';
 import { generateCandlesticks, CandleDataPoint } from '@/lib/domain/us-market-data';
 
 import { 
@@ -135,9 +135,11 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
         daysToEarnings: live.daysToEarnings !== undefined ? live.daysToEarnings : item.daysToEarnings,
       } : item;
 
+      // Só classificação de regime (VRP/GEX/estratégia elegível) — não abre cadeia real
+      // nem streaming DXLink por linha da tabela (ver classifyRegime() no motor).
       return {
         ...enrichedItem,
-        evaluation: volatilityEngine.evaluate(enrichedItem)
+        evaluation: classifyRegime(enrichedItem)
       };
     });
   }, [baseList, searchTerm, liveMetricsMap]);
@@ -162,17 +164,79 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
     };
   }, [selectedSymbol, liveMetricsMap]);
 
-  // Avaliação determinística completa do ativo ativo
-  const rec = useMemo(() => {
-    return volatilityEngine.evaluate(selectedAsset);
-  }, [selectedAsset]);
+  // Recomendação real e completa do ativo selecionado (strikes/vencimento/preço/
+  // gregas reais da Tastytrade — ver /api/market/option-recommendation). Antes era
+  // uma chamada síncrona (volatilityEngine.evaluate) que sempre "resolvia" para algo,
+  // mesmo fabricado; agora é uma consulta real que pode legitimamente não retornar
+  // nada. `includeSmile` só é pedido quando o usuário abre a aba de Smile/Skew — pedir
+  // sempre encareceria a consulta (assina gregas de dezenas de strikes via DXLink) sem
+  // necessidade na maior parte do tempo.
+  const [rec, setRec] = useState<VolatilityRecommendation | null>(null);
+  const [recStatus, setRecStatus] = useState<'loading' | 'unavailable' | 'ready'>('loading');
+  const [recReason, setRecReason] = useState<string>('');
 
-  const rationale = rec.didacticRationale;
+  useEffect(() => {
+    let cancelled = false;
+    setRecStatus('loading');
+    fetch('/api/market/option-recommendation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...selectedAsset, includeSmile: activeChartTab === 'VOL_SMILE' }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data.available) {
+          setRec(data.recommendation);
+          setRecStatus('ready');
+        } else {
+          setRec(null);
+          setRecStatus('unavailable');
+          setRecReason(data.reason || 'Dado real indisponível no momento.');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRec(null);
+          setRecStatus('unavailable');
+          setRecReason('Falha ao consultar a API real da Tastytrade.');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAsset, activeChartTab === 'VOL_SMILE']);
 
   // Candlesticks simulados dos últimos 40 dias para o gráfico de preço com OI
   const candles: CandleDataPoint[] = useMemo(() => {
     return generateCandlesticks(selectedAsset.symbol, selectedAsset.spot, 40);
   }, [selectedAsset.symbol, selectedAsset.spot]);
+
+  // A partir daqui, `rec` é garantidamente real (não fabricado) — sem ele, mostramos
+  // um estado de carregamento/indisponibilidade em vez do painel de análise completo.
+  if (recStatus !== 'ready' || !rec) {
+    return (
+      <section className="space-y-6">
+        <div className="bg-[#0b101b] border border-gray-800 rounded-2xl p-8 flex flex-col items-center justify-center text-center gap-3 min-h-[300px]">
+          {recStatus === 'loading' ? (
+            <>
+              <RefreshCw className="w-6 h-6 text-cyan-400 animate-spin" />
+              <p className="text-gray-300 text-sm">Consultando cadeia de opções e cotações reais da Tastytrade para {selectedAsset.symbol}...</p>
+            </>
+          ) : (
+            <>
+              <AlertTriangle className="w-6 h-6 text-amber-400" />
+              <p className="text-gray-200 text-sm font-semibold">Sem dado real de opções disponível para {selectedAsset.symbol} agora.</p>
+              <p className="text-gray-400 text-xs max-w-md">{recReason}</p>
+            </>
+          )}
+        </div>
+      </section>
+    );
+  }
+
+  const rationale = rec.didacticRationale;
 
   // Parâmetros de escala do gráfico de preço
   const chartMinPrice = Math.min(...candles.map(c => c.low), rec.putWall * 0.97);
@@ -839,15 +903,32 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
               </div>
             )}
 
-            {/* Renderização do Gráfico 3: Volatility Smile & Skew por Strike */}
-            {activeChartTab === 'VOL_SMILE' && (
+            {/* Renderização do Gráfico 3: Volatility Smile & Skew por Strike — só com IV
+                real por strike (streaming DXLink, ver buildRealSmile() no motor). Antes
+                era uma curva 100% sintética (fórmula com skewFactor arbitrário) — achado
+                desta reescrita, corrigido junto com strike/DTE/preço. */}
+            {activeChartTab === 'VOL_SMILE' && !rec.smileCurve && (
+              <div className="bg-amber-500/10 border border-amber-500/40 text-amber-200 text-sm rounded-2xl p-4 flex items-start gap-3">
+                <span className="text-lg leading-none">⚠️</span>
+                <div>
+                  <p className="font-bold">IV real por strike indisponível para {selectedAsset.symbol} agora.</p>
+                  <p className="text-amber-300/90 mt-1">
+                    O smile/skew só é exibido com volatilidade implícita real por contrato (streaming DXLink da
+                    Tastytrade). Sem confirmação desse dado, o RADAR não desenha uma curva estimada.
+                  </p>
+                </div>
+              </div>
+            )}
+            {activeChartTab === 'VOL_SMILE' && rec.smileCurve && (() => {
+              const smileCurve = rec.smileCurve!;
+              return (
               <div className="space-y-3">
                 {/* Métricas do Smile */}
                 <div className="flex flex-wrap items-center justify-between text-[11px] font-mono bg-[#070b14] p-2.5 rounded-xl border border-gray-800/80 gap-2">
                   <div className="flex items-center gap-3">
                     <span className="text-amber-400 font-bold flex items-center gap-1">
                       <Sparkles className="w-3.5 h-3.5" />
-                      25Δ Skew: +{selectedAsset.skew25?.toFixed(1) || '4.8'} pts
+                      25Δ Skew: {selectedAsset.skew25 != null ? `+${selectedAsset.skew25.toFixed(1)} pts` : 'indisponível'}
                     </span>
                     <span className="text-emerald-400 font-bold text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30">
                       PUT SKEW INSTITUCIONAL (Proteção de Cauda)
@@ -889,8 +970,8 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                     <polygon
                       points={`
                         30,125
-                        ${rec.smileCurve.map((pt, idx) => {
-                          const x = 30 + (idx / (rec.smileCurve.length - 1)) * 460;
+                        ${smileCurve.map((pt, idx) => {
+                          const x = 30 + (idx / (smileCurve.length - 1)) * 460;
                           const y = 120 - ((pt.iv - (selectedAsset.iv30 * 0.75)) / (selectedAsset.iv30 * 0.8)) * 90;
                           return `${x},${Math.max(15, Math.min(125, y))}`;
                         }).join(' ')}
@@ -902,8 +983,8 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
 
                     {/* Curva de Volatilidade (Smile / Skew) */}
                     <path
-                      d={rec.smileCurve.map((pt, idx) => {
-                        const x = 30 + (idx / (rec.smileCurve.length - 1)) * 460;
+                      d={smileCurve.map((pt, idx) => {
+                        const x = 30 + (idx / (smileCurve.length - 1)) * 460;
                         const y = 120 - ((pt.iv - (selectedAsset.iv30 * 0.75)) / (selectedAsset.iv30 * 0.8)) * 90;
                         return `${idx === 0 ? 'M' : 'L'} ${x} ${Math.max(15, Math.min(125, y))}`;
                       }).join(' ')}
@@ -914,8 +995,8 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                     />
 
                     {/* Pontos da Curva com Deltas */}
-                    {rec.smileCurve.map((pt, idx) => {
-                      const x = 30 + (idx / (rec.smileCurve.length - 1)) * 460;
+                    {smileCurve.map((pt, idx) => {
+                      const x = 30 + (idx / (smileCurve.length - 1)) * 460;
                       const y = 120 - ((pt.iv - (selectedAsset.iv30 * 0.75)) / (selectedAsset.iv30 * 0.8)) * 90;
                       const clampedY = Math.max(15, Math.min(125, y));
                       const isAtm = pt.type === 'ATM';
@@ -933,11 +1014,11 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                     })}
 
                     {/* Destaque das Pernas Recomendadas no Smile */}
-                    {rec.legs.map((leg, lIdx) => {
+                    {rec.legs.filter((leg) => leg.iv != null).map((leg, lIdx) => {
                       const distMoneyness = leg.strike / selectedAsset.spot;
                       const normX = Math.max(0, Math.min(1, (distMoneyness - 0.85) / 0.30));
                       const x = 30 + normX * 460;
-                      const y = 120 - ((leg.iv - (selectedAsset.iv30 * 0.75)) / (selectedAsset.iv30 * 0.8)) * 90;
+                      const y = 120 - ((leg.iv! - (selectedAsset.iv30 * 0.75)) / (selectedAsset.iv30 * 0.8)) * 90;
                       const clampedY = Math.max(20, Math.min(120, y));
                       const isSell = leg.action === 'SELL';
 
@@ -979,10 +1060,11 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                 </div>
 
                 <p className="text-[10px] font-mono text-gray-400">
-                  🛡️ <strong>Leitura do Smile/Skew:</strong> No mercado acionário americano, a curva exibe uma inclinação acentuada para a esquerda (Put Skew). Os investidores institucionais pagam um prêmio de volatilidade expressivo por Puts OTM (seguro de queda). A estrutura eleita ({rec.strategy.name}) aproveita essa assimetria vendendo opções onde a volatilidade está cara e protegendo o spread.
+                  🛡️ <strong>Leitura do Smile/Skew:</strong> No mercado acionário americano, a curva costuma exibir uma inclinação para a esquerda (Put Skew) quando presente. A estrutura eleita ({rec.strategy.name}) foi montada considerando os strikes reais disponíveis, independente do formato exato desta curva.
                 </p>
               </div>
-            )}
+              );
+            })()}
 
           </div>
 
@@ -1130,7 +1212,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                 </div>
                 <div>
                   <span className="text-gray-400">Prob. Lucro (POP):</span>
-                  <strong className="text-cyan-300 font-bold ml-1">{rec.popEstimate}%</strong>
+                  <strong className="text-cyan-300 font-bold ml-1">{rec.popEstimate != null ? `${rec.popEstimate}%` : 'indisponível (sem delta real)'}</strong>
                 </div>
               </div>
             </div>
