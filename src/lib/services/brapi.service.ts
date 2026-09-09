@@ -7,7 +7,13 @@ export class BrapiService {
   private defaultCacheTtl = 600; // 10 minutes
 
   constructor() {
-    this.token = process.env.BRAPI_TOKEN || process.env.NEXT_PUBLIC_BRAPI_TOKEN || '';
+    // Só BRAPI_TOKEN (server-only). NEXT_PUBLIC_BRAPI_TOKEN foi removido do fallback:
+    // qualquer env var com prefixo NEXT_PUBLIC_ é embutida no bundle JS enviado ao
+    // navegador pelo Next.js — usá-la aqui vazaria o token para qualquer visitante
+    // via devtools, mesmo este serviço só sendo chamado a partir de rotas server-side
+    // (Achado Nível 4, Ciclo 4). Se alguém configurar só NEXT_PUBLIC_BRAPI_TOKEN por
+    // engano, o token fica indisponível aqui em vez de vazado.
+    this.token = process.env.BRAPI_TOKEN || '';
   }
 
   private buildUrl(path: string, params: Record<string, string> = {}): string {
