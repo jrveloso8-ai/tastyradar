@@ -14,6 +14,7 @@ O sistema segue rigorosamente o princípio da **transparência e integridade do 
 | **Breakeven e Perda Máxima** | Parâmetros contratuais dos strikes | 🟣 **DERIVADO** | Cálculo exato: `strike - crédito` (puts) e `strike + crédito` (calls); sem aproximações lineares. |
 | **GEX e Barreiras de Strike** | Modelo Paramétrico Calibrado | 🟡 **ESTIMADO (MODELO)** | A API REST `/nested` entrega a grade de strikes e símbolos OCC, mas não entrega Open Interest. O GEX é estimado analiticamente até a conexão do streamer WebSocket DXLink. |
 | **Série de Candlesticks** | Gerador Determinístico | 🟡 **DIDÁTICA MODELADA** | Série sintética determinística para visualização gráfica e cálculo de indicadores canônicos (SMA, RSI de Wilder, MACD de Gerald Appel). |
+| **Cotação / Fundamentos (Screener e QuoteView)** | Catálogo Estático (`US_STOCKS_DATASET` / `SP500_DATASET`) | 🟡 **ESTIMADO (CATÁLOGO)** | Dados de referência com marca-d'água `dataAsOf` (2026-09-08). Tickers fora da cobertura do catálogo são explicitamente alertados. |
 
 ---
 
