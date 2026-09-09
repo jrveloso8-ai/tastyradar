@@ -64,9 +64,13 @@ export function calculateGex(
   let totalCallVol = 0;
   let totalPutVol = 0;
 
-  // Formula rigorosa institucional:
-  // Dollar GEX = Gamma * Open Interest * Spot^2 * Contract Size (100) / 1,000,000 (em $ Milhões)
+  // Formula rigorosa institucional (convenção SqueezeMetrics/SpotGamma):
+  // Dollar GEX = Gamma * Open Interest * Spot^2 * Contract Size (100) * 0.01 / 1,000,000 (em $ Milhões)
+  // O fator 0,01 representa a exposição para 1% de movimento no ativo-base — sem ele,
+  // o resultado fica inflado em 100x em relação à convenção de mercado (Achado M-01,
+  // corrigido nesta sessão junto com a unificação do motor no UnifiedGexBarreirasView).
   const contractSize = 100;
+  const PERCENT_MOVE_FACTOR = 0.01;
   const spotSquared = spotPrice * spotPrice;
 
   for (const opt of options) {
@@ -94,7 +98,7 @@ export function calculateGex(
       strikeMap.set(opt.strike, item);
     }
 
-    const dollarGamma = (opt.gamma * opt.openInterest * spotSquared * contractSize) / 1000000;
+    const dollarGamma = (opt.gamma * opt.openInterest * spotSquared * contractSize * PERCENT_MOVE_FACTOR) / 1000000;
 
     if (opt.type === 'CALL') {
       item.callGex += dollarGamma;
@@ -103,6 +107,7 @@ export function calculateGex(
       item.callVolume += opt.volume;
       item.callIv = opt.iv;
       item.callDelta = opt.delta;
+      (item as any).callSymbol = opt.symbol;
       totalCallGex += dollarGamma;
       totalCallOi += opt.openInterest;
       totalCallVol += opt.volume;
@@ -114,6 +119,7 @@ export function calculateGex(
       item.putVolume += opt.volume;
       item.putIv = opt.iv;
       item.putDelta = opt.delta;
+      (item as any).putSymbol = opt.symbol;
       totalPutGex -= dollarGamma;
       totalPutOi += opt.openInterest;
       totalPutVol += opt.volume;
@@ -131,31 +137,29 @@ export function calculateGex(
   const topPutStrikes = [...sortedStrikes].sort((a, b) => Math.abs(b.putGex) - Math.abs(a.putGex)).slice(0, 5);
 
   const callWalls = topCallStrikes.map(s => {
-    const strikeStr = String(Math.round(s.strike * 1000)).padStart(8, '0');
     return {
       strike: s.strike,
-      symbol: `.${symbol.toUpperCase()}260918C${strikeStr}`,
-      contracts: s.callOi || s.callOpenInterest || 0,
-      delta: s.callDelta || 0.5,
-      iv: s.callIv || 35,
+      symbol: (s as any).callSymbol || '',
+      contracts: s.callOpenInterest ?? s.callOi ?? 0,
+      delta: s.callDelta,
+      iv: s.callIv,
       distancePct: Number((((s.strike - spotPrice) / spotPrice) * 100).toFixed(1)),
     };
   });
 
   const putWalls = topPutStrikes.map(s => {
-    const strikeStr = String(Math.round(s.strike * 1000)).padStart(8, '0');
     return {
       strike: s.strike,
-      symbol: `.${symbol.toUpperCase()}260918P${strikeStr}`,
-      contracts: s.putOi || s.putOpenInterest || 0,
-      delta: s.putDelta || -0.5,
-      iv: s.putIv || 35,
+      symbol: (s as any).putSymbol || '',
+      contracts: s.putOpenInterest ?? s.putOi ?? 0,
+      delta: s.putDelta,
+      iv: s.putIv,
       distancePct: Number((((s.strike - spotPrice) / spotPrice) * 100).toFixed(1)),
     };
   });
 
-  const topCallWall = topCallStrikes[0]?.strike || spotPrice * 1.05;
-  const topPutWall = topPutStrikes[0]?.strike || spotPrice * 0.95;
+  const topCallWall = topCallStrikes[0]?.strike ?? spotPrice;
+  const topPutWall = topPutStrikes[0]?.strike ?? spotPrice;
 
   // Pin Candidate (Ancoragem por maior Open Interest consolidado)
   const pinCandidate = [...sortedStrikes].sort((a, b) => (b.callOpenInterest + b.putOpenInterest) - (a.callOpenInterest + a.putOpenInterest))[0]?.strike || spotPrice;
