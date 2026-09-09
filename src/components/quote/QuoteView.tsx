@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Activity, 
   TrendingUp, 
@@ -31,13 +31,30 @@ import {
 
 
 import { CandlestickChart } from './CandlestickChart';
-import { OptionPayoffChart, ElectedStrategyData } from '../options/OptionPayoffChart';
+import { OptionPayoffChart, ElectedStrategyData, buildElectedStrategyFromRecommendation } from '../options/OptionPayoffChart';
+import { SP500_DATASET } from '@/lib/domain/sp500-dataset';
+import { VolatilityRecommendation } from '@/lib/domain/volatility-engine';
 import { UnifiedGexBarreirasView } from '../options/UnifiedGexBarreirasView';
 import { US_STOCKS_DATASET, USStockItem, generateCandlesticks } from '@/lib/domain/us-market-data';
 import { CME_25_STRATEGIES, StrategySpec } from '@/lib/domain/cme-catalog';
 import { fundamentalsEngine } from '@/lib/domain/fundamentals-engine';
 import { RawFundamentalData } from '@/lib/types/financial';
 import { aiConsultantEngine } from '@/lib/domain/ai-consultant';
+import { ProvenanceBadge, combineProvenance } from '@/lib/types/provenance';
+
+function ProvenanceTag({ badge }: { badge: ProvenanceBadge }) {
+  const colorMap: Record<ProvenanceBadge, string> = {
+    MEDIDO: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+    DERIVADO: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
+    ESTIMADO: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+    SIMULADO: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+  };
+  return (
+    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold font-mono border ${colorMap[badge]}`}>
+      {badge}
+    </span>
+  );
+}
 
 interface QuoteViewProps {
   initialSymbol?: string;
@@ -58,14 +75,23 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
   const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; text: string }>>([
     {
       role: 'assistant',
-      text: `Olá! Sou o Consultor Quantitativo IA para ${symbol.toUpperCase()}. Posso responder sobre a leitura de Gamma Exposure (GEX), viés técnico pelo checklist CNPI-T, múltiplos contábeis e as 25 estratégias de opções. O que deseja analisar?`,
+      text: `Olá! Sou o Consultor Quantitativo IA para ${symbol.toUpperCase()}. Posso responder sobre a leitura de Gamma Exposure (GEX), viés técnico pelo checklist CNPI-T, múltiplos contábeis e as ${CME_25_STRATEGIES.length} estratégias de opções. O que deseja analisar?`,
     },
   ]);
   const [inputMessage, setInputMessage] = useState('');
 
+  const isKnownTicker = useMemo(
+    () => US_STOCKS_DATASET.some(s => s.symbol === symbol.toUpperCase().trim()),
+    [symbol]
+  );
+
   const currentStock: USStockItem = useMemo(() => {
     const found = US_STOCKS_DATASET.find(s => s.symbol === symbol.toUpperCase().trim());
     if (found) return found;
+    // Fora da cobertura do RADAR (~66 ativos monitorados) — este objeto é usado só para
+    // a página não quebrar (gráfico/abas exigem os campos); o banner logo no início do
+    // render avisa que os números abaixo são ilustrativos, não dado real deste ticker
+    // (Achado D-04/parte de C-03 do laudo Ciclo 4).
     return {
       symbol: symbol.toUpperCase().trim(),
       name: `${symbol.toUpperCase().trim()} Stock`,
@@ -101,9 +127,15 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
       financialDebtToEbitda: currentStock.debtToEbitda !== undefined ? Math.min(currentStock.debtToEbitda, 1.2) : null,
       priceEarnings: currentStock.peRatio ?? null,
       dividendYield: currentStock.dividendYield !== undefined ? currentStock.dividendYield / 100 : null,
-      currentRatio: 1.45,
-      ebitdaMargin: 0.28,
-      priceToBook: currentStock.peRatio ? Number((currentStock.peRatio / 18).toFixed(2)) : null,
+      // Mesma correção de fundamentals/route.ts (Nível 3, Ciclo 4): estes 3 campos não
+      // são levantados para US_STOCKS_DATASET. Antes esta tela tinha sua PRÓPRIA cópia
+      // divergente das constantes fabricadas (1.45/0.28, e um P/VP estimado por
+      // peRatio/18 — uma heurística sem base declarada), dando nota diferente do que a
+      // API mostrava para o mesmo ticker. Agora null nos dois lugares, e o
+      // fundamentals-engine já trata isso como "Dado não disponível na fonte".
+      currentRatio: null,
+      ebitdaMargin: null,
+      priceToBook: null,
     };
     return fundamentalsEngine.evaluate(rawData);
   }, [currentStock]);
@@ -114,172 +146,72 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
     return generateCandlesticks(currentStock.symbol, currentStock.spot, 90);
   }, [currentStock.symbol, currentStock.spot]);
 
-  const electedStrategy: ElectedStrategyData = useMemo(() => {
-    const spot = currentStock.spot;
-    const isLateral = currentStock.category === 'LATERAL';
-    const isAlta = currentStock.category === 'ALTA';
+  // Cobertura real de opções: só os tickers presentes no SP500_DATASET têm os campos
+  // (IV30/RV20/IVR/IVP, GEX, Walls de OI) exigidos pelo volatilityEngine. Fora dessa
+  // lista (33 dos 64 tickers de US_STOCKS_DATASET), a aba Opções mostra aviso de falta
+  // de cobertura em vez de fabricar strikes/prêmios com `spot × constante` (Achado D-01
+  // do laudo Ciclo 4 — corrigido nesta etapa, Nível 1 Parte 3).
+  const sp500Stock = useMemo(
+    () => SP500_DATASET.find(s => s.symbol === symbol.toUpperCase().trim()),
+    [symbol]
+  );
+  const hasOptionsCoverage = !!sp500Stock;
 
-    if (isLateral) {
-      const putLongK = Number((spot * 0.94).toFixed(2));
-      const putShortK = Number((spot * 0.97).toFixed(2));
-      const callShortK = Number((spot * 1.03).toFixed(2));
-      const callLongK = Number((spot * 1.06).toFixed(2));
+  // Recomendação real: motor de volatilidade reescrito (2026-09-08) para exigir
+  // strike/vencimento/preço reais da Tastytrade (cadeia real + cotação real por
+  // contrato via REST). Antes esta chamada era síncrona (volatilityEngine.evaluate)
+  // e sempre "resolvia" para algo, mesmo que fabricado; agora é uma consulta real via
+  // API (/api/market/option-recommendation), que pode legitimamente não retornar nada
+  // se a Tastytrade não confirmar dado real no momento — daí os 3 estados abaixo.
+  const [volRecommendation, setVolRecommendation] = useState<VolatilityRecommendation | null>(null);
+  const [volRecStatus, setVolRecStatus] = useState<'idle' | 'loading' | 'unavailable' | 'ready'>('idle');
+  const [volRecReason, setVolRecReason] = useState<string>('');
 
-      const putLongPrice = Number((spot * 0.006).toFixed(2));
-      const putShortPrice = Number((spot * 0.015).toFixed(2));
-      const callShortPrice = Number((spot * 0.016).toFixed(2));
-      const callLongPrice = Number((spot * 0.005).toFixed(2));
-
-      const netCredit = Number((putShortPrice + callShortPrice - putLongPrice - callLongPrice).toFixed(2));
-      const spreadWidth = Number((putShortK - putLongK).toFixed(2));
-
-      return {
-        id: 20,
-        title: `Iron Condor a Crédito (Faixa $${putShortK} a $${callShortK})`,
-        bias: 'LATERAL',
-        category: 'Precisão',
-        underlyingSymbol: currentStock.symbol,
-        underlyingPrice: spot,
-        dte: 17,
-        expirationDate: '2026-09-18',
-        status: 'AUTORIZADA',
-        isCredit: true,
-        netCostOrCredit: netCredit,
-        totalCostOrCreditForLot: Number((netCredit * 100).toFixed(2)),
-        spreadWidth,
-        returnOnRiskPct: Number(((netCredit / spreadWidth) * 100).toFixed(1)),
-        breakEven: Number((spot).toFixed(2)),
-        maxProfitLot: Number((netCredit * 100).toFixed(2)),
-        maxLossLot: Number(((spreadWidth - netCredit) * 100).toFixed(2)),
-        legs: [
-          { action: 'COMPRA', symbol: `${currentStock.symbol} 260918P${putLongK.toFixed(0)}`, type: 'PUT', strike: putLongK, unitPrice: putLongPrice, totalFinancial: putLongPrice * 100, openInterest: 4520, roleDescription: 'proteção inferior' },
-          { action: 'VENDA', symbol: `${currentStock.symbol} 260918P${putShortK.toFixed(0)}`, type: 'PUT', strike: putShortK, unitPrice: putShortPrice, totalFinancial: putShortPrice * 100, openInterest: 12800, roleDescription: `strike ${putShortK} d: -0.32` },
-          { action: 'VENDA', symbol: `${currentStock.symbol} 260918C${callShortK.toFixed(0)}`, type: 'CALL', strike: callShortK, unitPrice: callShortPrice, totalFinancial: callShortPrice * 100, openInterest: 14200, roleDescription: `strike ${callShortK} d: 0.28` },
-          { action: 'COMPRA', symbol: `${currentStock.symbol} 260918C${callLongK.toFixed(0)}`, type: 'CALL', strike: callLongK, unitPrice: callLongPrice, totalFinancial: callLongPrice * 100, openInterest: 5100, roleDescription: 'proteção superior' },
-        ],
-        tradeCheckGuide: `Estrutura de 4 pernas: vendendo as opções intermediárias [$${putShortK} PUT e $${callShortK} CALL] e comprando as extremidades para limitar risco total.`,
-        pricingViability: {
-          isAdequate: true,
-          statusLabel: '✓ Crédito Balanceado',
-          ratioToWidthPct: Number(((netCredit / spreadWidth) * 100).toFixed(1)),
-          recommendationRule: 'Iron Condor (EUA): Capturar entre 33% (1/3) a 50% da largura da asa (vs 25%-30% no Brasil devido à inflação e juros).',
-        },
-        takeProfitRule: {
-          profitGoal: `50% a 60% do crédito recebido (+$${(netCredit * 55).toFixed(2)})`,
-          description: 'Realizar lucro quando a passagem do tempo consumir mais de metade do prêmio das opções.',
-        },
-        stopLossRule: {
-          lossLimit: `Perda máxima de 1.5x a 2x o crédito (-$${(netCredit * 150).toFixed(2)})`,
-          description: 'Encerrar se a ação romper com volume qualquer um dos strikes vendidos.',
-        },
-        timeStopRule: {
-          dteLimit: 7,
-          description: 'Desmontar a 7 dias úteis do vencimento para evitar risco gama terminal acelerado.',
-        },
-      };
-    } else if (isAlta) {
-      const strikeA = Number((spot * 0.99).toFixed(2));
-      const strikeB = Number((spot * 1.05).toFixed(2));
-      const priceA = Number((spot * 0.035).toFixed(2));
-      const priceB = Number((spot * 0.012).toFixed(2));
-      const netDebit = Number((priceA - priceB).toFixed(2));
-      const spreadWidth = Number((strikeB - strikeA).toFixed(2));
-
-      return {
-        id: 1,
-        title: `Trava de Alta com Call (Bull Call Spread $${strikeA} / $${strikeB})`,
-        bias: 'ALTA',
-        category: 'Direcional',
-        underlyingSymbol: currentStock.symbol,
-        underlyingPrice: spot,
-        dte: 18,
-        expirationDate: '2026-09-18',
-        status: 'AUTORIZADA',
-        isCredit: false,
-        netCostOrCredit: -netDebit,
-        totalCostOrCreditForLot: Number((netDebit * 100).toFixed(2)),
-        spreadWidth,
-        returnOnRiskPct: Number((((spreadWidth - netDebit) / netDebit) * 100).toFixed(1)),
-        breakEven: Number((strikeA + netDebit).toFixed(2)),
-        maxProfitLot: Number(((spreadWidth - netDebit) * 100).toFixed(2)),
-        maxLossLot: Number((netDebit * 100).toFixed(2)),
-        legs: [
-          { action: 'COMPRA', symbol: `${currentStock.symbol} 260918C${strikeA.toFixed(0)}`, type: 'CALL', strike: strikeA, unitPrice: priceA, totalFinancial: priceA * 100, openInterest: 8900, roleDescription: 'call comprada direcionadora' },
-          { action: 'VENDA', symbol: `${currentStock.symbol} 260918C${strikeB.toFixed(0)}`, type: 'CALL', strike: strikeB, unitPrice: priceB, totalFinancial: priceB * 100, openInterest: 11400, roleDescription: 'call vendida financiadora' },
-        ],
-        tradeCheckGuide: `Compra de Call no strike ATM $${strikeA} financiada pela venda de Call no alvo $${strikeB} com risco limitado.`,
-        pricingViability: {
-          isAdequate: true,
-          statusLabel: '✓ Custo Otimizado',
-          ratioToWidthPct: Number(((netDebit / spreadWidth) * 100).toFixed(1)),
-          recommendationRule: 'Bull Call (EUA): Pagar até 50% da largura da asa no débito (máximo aceitável no mercado americano).',
-        },
-        takeProfitRule: {
-          profitGoal: `70% a 80% do ganho máximo (+$${((spreadWidth - netDebit) * 75).toFixed(2)})`,
-          description: 'Encerrar com antecedência quando o papel se aproximar da resistência.',
-        },
-        stopLossRule: {
-          lossLimit: `50% do débito pago (-$${(netDebit * 50).toFixed(2)})`,
-          description: 'Stop técnico caso a ação perca a média móvel curta.',
-        },
-        timeStopRule: {
-          dteLimit: 5,
-          description: 'Desmontar a 5 dias úteis do vencimento.',
-        },
-      };
-    } else {
-      // BAIXA
-      const strikeB = Number((spot * 1.01).toFixed(2));
-      const strikeA = Number((spot * 0.95).toFixed(2));
-      const priceB = Number((spot * 0.038).toFixed(2));
-      const priceA = Number((spot * 0.014).toFixed(2));
-      const netDebit = Number((priceB - priceA).toFixed(2));
-      const spreadWidth = Number((strikeB - strikeA).toFixed(2));
-
-      return {
-        id: 2,
-        title: `Trava de Baixa com Put (Bear Put Spread $${strikeB} / $${strikeA})`,
-        bias: 'BAIXA',
-        category: 'Direcional',
-        underlyingSymbol: currentStock.symbol,
-        underlyingPrice: spot,
-        dte: 18,
-        expirationDate: '2026-09-18',
-        status: 'AUTORIZADA',
-        isCredit: false,
-        netCostOrCredit: -netDebit,
-        totalCostOrCreditForLot: Number((netDebit * 100).toFixed(2)),
-        spreadWidth,
-        returnOnRiskPct: Number((((spreadWidth - netDebit) / netDebit) * 100).toFixed(1)),
-        breakEven: Number((strikeB - netDebit).toFixed(2)),
-        maxProfitLot: Number(((spreadWidth - netDebit) * 100).toFixed(2)),
-        maxLossLot: Number((netDebit * 100).toFixed(2)),
-        legs: [
-          { action: 'COMPRA', symbol: `${currentStock.symbol} 260918P${strikeB.toFixed(0)}`, type: 'PUT', strike: strikeB, unitPrice: priceB, totalFinancial: priceB * 100, openInterest: 9200, roleDescription: 'put comprada direcionadora' },
-          { action: 'VENDA', symbol: `${currentStock.symbol} 260918P${strikeA.toFixed(0)}`, type: 'PUT', strike: strikeA, unitPrice: priceA, totalFinancial: priceA * 100, openInterest: 10800, roleDescription: 'put vendida financiadora' },
-        ],
-        tradeCheckGuide: `Compra de Put no strike $${strikeB} financiada pela venda de Put no suporte $${strikeA}.`,
-        pricingViability: {
-          isAdequate: true,
-          statusLabel: '✓ Risco Controlado',
-          ratioToWidthPct: Number(((netDebit / spreadWidth) * 100).toFixed(1)),
-          recommendationRule: 'Bear Put: Risco máximo estritamente blindado ao capital investido.',
-        },
-        takeProfitRule: {
-          profitGoal: `70% do ganho máximo (+$${((spreadWidth - netDebit) * 70).toFixed(2)})`,
-          description: 'Realização nos primeiros testes do suporte.',
-        },
-        stopLossRule: {
-          lossLimit: `50% do débito pago (-$${(netDebit * 50).toFixed(2)})`,
-          description: 'Stop se o papel retomar força acima da MM50.',
-        },
-        timeStopRule: {
-          dteLimit: 5,
-          description: 'Desmontar a 5 dias úteis do vencimento.',
-        },
-      };
+  useEffect(() => {
+    if (!sp500Stock) {
+      setVolRecommendation(null);
+      setVolRecStatus('idle');
+      return;
     }
-  }, [currentStock]);
+    let cancelled = false;
+    setVolRecStatus('loading');
+    fetch('/api/market/option-recommendation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sp500Stock),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data.available) {
+          setVolRecommendation(data.recommendation);
+          setVolRecStatus('ready');
+        } else {
+          setVolRecommendation(null);
+          setVolRecStatus('unavailable');
+          setVolRecReason(data.reason || 'Dado real indisponível no momento.');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setVolRecommendation(null);
+          setVolRecStatus('unavailable');
+          setVolRecReason('Falha ao consultar a API real da Tastytrade.');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sp500Stock]);
+
+  const electedStrategy: ElectedStrategyData | null = useMemo(() => {
+    if (!volRecommendation || !sp500Stock) return null;
+    return buildElectedStrategyFromRecommendation(
+      volRecommendation,
+      sp500Stock.symbol,
+      sp500Stock.avgOptionVolume
+    );
+  }, [volRecommendation, sp500Stock]);
 
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [generatingVideoIndex, setGeneratingVideoIndex] = useState<number | null>(null);
@@ -403,6 +335,22 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
 
   return (
     <section className="space-y-5">
+      {!isKnownTicker && (
+        <div className="bg-amber-500/10 border border-amber-500/40 text-amber-200 text-sm rounded-2xl p-4 flex items-start gap-3">
+          <span className="text-lg leading-none">⚠️</span>
+          <div>
+            <p className="font-bold">
+              {symbol.toUpperCase().trim()} está fora da cobertura atual do RADAR (~66 ativos monitorados).
+            </p>
+            <p className="text-amber-300/90 mt-1">
+              Cotação, gráfico, fundamentos e estrutura de opções exibidos abaixo são valores
+              ilustrativos de referência, não foram calculados a partir de dado real deste ativo,
+              e não devem ser usados para decisão de investimento.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Top Header Card */}
       <div className="bg-[#0c1322] border border-gray-800 p-5 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl">
         <div>
@@ -422,30 +370,54 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
               SINCRONIZADO COM RASTREADOR
             </span>
           </div>
+          {/* Checklist antes fixo (achado C5-01, laudo Ciclo 5): "SPOT: REAL (TASTYTRADE)",
+              "OPÇÕES: NET GEX POSITIVO" e "MACRO: FED 4.50%" eram strings estáticas, nunca
+              recalculadas por ticker — inclusive aparecendo "GEX POSITIVO" para ativos com
+              GEX negativo. Corrigido para refletir a fonte real de cada dado: spot vem do
+              catálogo estático (não é cotação live desta tela — diferente da cadeia de
+              opções, que agora É real via Tastytrade), o regime de GEX vem da recomendação
+              real quando disponível, e a taxa de juros não tem fonte no RADAR hoje, então
+              deixou de ser exibida como se fosse. */}
           <div className="flex items-center gap-2 text-[11px] font-mono text-gray-400 mt-2">
-            <span>1. SPOT: REAL (TASTYTRADE)</span>
+            <span>1. SPOT: CATÁLOGO (US_STOCKS_DATASET)</span>
             <span>•</span>
             <span>2. FUNDAM: {currentStock.fundStatus}</span>
             <span>•</span>
-            <span>3. OPÇÕES: NET GEX POSITIVO</span>
+            <span>
+              3. OPÇÕES:{' '}
+              {volRecStatus === 'ready' && volRecommendation
+                ? `${volRecommendation.gexRegime} (real, Tastytrade)`
+                : hasOptionsCoverage
+                ? 'aguardando dado real'
+                : 'sem cobertura'}
+            </span>
             <span>•</span>
-            <span>4. MACRO: FED 4.50%</span>
+            <span>4. MACRO: não monitorado pelo RADAR</span>
           </div>
         </div>
 
         <div className="flex items-center gap-6 bg-[#070b14] px-5 py-3 rounded-xl border border-gray-800 text-right">
           <div>
-            <div className="text-[10px] font-mono text-gray-400">SPOT</div>
+            <div className="text-[10px] font-mono text-gray-400 flex items-center gap-1.5 justify-end">
+              <span>SPOT</span>
+              <ProvenanceTag badge="ESTIMADO" />
+            </div>
             <div className="text-xl font-bold font-mono text-white">${currentStock.spot.toFixed(2)}</div>
           </div>
           <div>
-            <div className="text-[10px] font-mono text-gray-400">VARIAÇÃO</div>
+            <div className="text-[10px] font-mono text-gray-400 flex items-center gap-1.5 justify-end">
+              <span>VARIAÇÃO</span>
+              <ProvenanceTag badge="ESTIMADO" />
+            </div>
             <div className={`text-sm font-bold font-mono ${currentStock.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
               {currentStock.change >= 0 ? '+' : ''}{currentStock.change.toFixed(2)}%
             </div>
           </div>
           <div className="border-l border-gray-800 pl-4">
-            <div className="text-[10px] font-mono text-gray-400">VENCIMENTO OPÇÕES</div>
+            <div className="text-[10px] font-mono text-gray-400 flex items-center gap-1.5 justify-end">
+              <span>OPÇÕES</span>
+              <ProvenanceTag badge={combineProvenance(['ESTIMADO', volRecStatus === 'ready' && volRecommendation ? 'MEDIDO' : 'ESTIMADO'])} />
+            </div>
             <div className="text-xs font-bold font-mono text-cyan-300">2026-09-18 (12 DTE)</div>
           </div>
         </div>
@@ -765,8 +737,10 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
         <div className="bg-[#0c1322] border border-gray-800 p-6 rounded-2xl space-y-6">
           <div className="flex flex-wrap justify-between items-center gap-3 border-b border-gray-800 pb-3">
             <div>
-              <h3 className="text-sm font-bold text-white font-mono">OPÇÕES & GAMMA EXPOSURE (TASTYTRADE API)</h3>
-              <p className="text-xs text-gray-400 mt-0.5">Métricas de volatilidade implícita e exposição gama em tempo real.</p>
+              <h3 className="text-sm font-bold text-white font-mono">OPÇÕES & GAMMA EXPOSURE</h3>
+              <p className="text-xs text-gray-400 mt-0.5">
+                IV Rank/ATM: dado do dataset monitorado. Regime GEX: modelo calibrado (calculateGex), quando o ticker tem cobertura de opções.
+              </p>
             </div>
             {navGexFn && (
               <button
@@ -792,13 +766,29 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
             </div>
             <div className="p-4 bg-[#070b14] rounded-xl border border-gray-800">
               <span className="text-gray-400 text-[10px] block font-sans">Put/Call Ratio</span>
-              <span className="text-lg font-bold text-emerald-400 mt-1 block">0.68</span>
-              <span className="text-[10px] text-emerald-400">Sentimento Altista</span>
+              {/* Removido o valor fixo "0.68" (Achado Nível 4, Ciclo 4): nenhuma fonte no
+                  projeto calcula Put/Call Ratio real por ticker — mostrar N/D é mais
+                  honesto que um número igual para todo ativo. */}
+              <span className="text-lg font-bold text-gray-500 mt-1 block">N/D</span>
+              <span className="text-[10px] text-gray-500">Sem fonte de dado no sistema</span>
             </div>
             <div className="p-4 bg-[#070b14] rounded-xl border border-gray-800">
               <span className="text-gray-400 text-[10px] block font-sans">Regime GEX</span>
-              <span className="text-lg font-bold text-emerald-400 mt-1 block">+GEX POSITIVO</span>
-              <span className="text-[10px] text-emerald-400">Volatilidade Suprimida</span>
+              {volRecommendation ? (
+                <>
+                  <span className={`text-lg font-bold mt-1 block ${volRecommendation.gexRegime === '+GEX' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {volRecommendation.gexRegime}
+                  </span>
+                  <span className={`text-[10px] ${volRecommendation.gexRegime === '+GEX' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {volRecommendation.gexRegime === '+GEX' ? 'Volatilidade Suprimida' : 'Volatilidade Explosiva'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-lg font-bold text-gray-500 mt-1 block">N/D</span>
+                  <span className="text-[10px] text-gray-500">{currentStock.symbol} sem cobertura de opções</span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -847,7 +837,35 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
           </div>
 
           {/* MODO OPÇÕES ELEITA */}
-          {execMode === 'OPTIONS' && (
+          {execMode === 'OPTIONS' && !hasOptionsCoverage && (
+            <div className="bg-amber-500/10 border border-amber-500/40 text-amber-200 text-sm rounded-2xl p-4 flex items-start gap-3">
+              <span className="text-lg leading-none">⚠️</span>
+              <div>
+                <p className="font-bold">{currentStock.symbol} sem cobertura para gerar estrutura de opções.</p>
+                <p className="text-amber-300/90 mt-1">
+                  A Estratégia Eleita depende de IV/HV, GEX e Walls de OI reais por ativo (SP500_DATASET), disponíveis hoje
+                  para 48 dos tickers monitorados. {currentStock.symbol} não está nessa lista — em vez de estimar strikes e
+                  prêmios artificialmente, o RADAR não gera uma estrutura para este ativo.
+                </p>
+              </div>
+            </div>
+          )}
+          {execMode === 'OPTIONS' && hasOptionsCoverage && volRecStatus === 'loading' && (
+            <div className="bg-cyan-500/10 border border-cyan-500/40 text-cyan-200 text-sm rounded-2xl p-4 flex items-center gap-3">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <p>Consultando cadeia de opções e cotações reais na Tastytrade...</p>
+            </div>
+          )}
+          {execMode === 'OPTIONS' && hasOptionsCoverage && volRecStatus === 'unavailable' && (
+            <div className="bg-amber-500/10 border border-amber-500/40 text-amber-200 text-sm rounded-2xl p-4 flex items-start gap-3">
+              <span className="text-lg leading-none">⚠️</span>
+              <div>
+                <p className="font-bold">Sem dado real de opções disponível para {currentStock.symbol} agora.</p>
+                <p className="text-amber-300/90 mt-1">{volRecReason}</p>
+              </div>
+            </div>
+          )}
+          {execMode === 'OPTIONS' && electedStrategy && (
             <div className="space-y-4">
               {/* CARD PRINCIPAL DA ESTRATÉGIA ELEITA */}
               <div className="p-5 bg-[#0b101b] border border-cyan-500/40 rounded-2xl shadow-2xl space-y-4 font-sans">
@@ -927,7 +945,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                 {/* PERNAS DA MONTAGEM COM STRIKES REAIS TASTYTRADE */}
                 <div className="p-4 bg-[#111827] rounded-xl border border-gray-800 space-y-3 font-mono">
                   <div className="flex items-center justify-between text-xs font-bold text-gray-300 font-sans">
-                    <span>Pernas do Estudo (Tastytrade):</span>
+                    <span>Pernas do Estudo (Modelo Interno · BSM):</span>
                     <span className="text-[11px] text-gray-500 font-mono">Tamanho Padrão: Contrato de 100 cotas</span>
                   </div>
 
@@ -1055,7 +1073,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                     className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 font-medium px-4 py-2 rounded-xl bg-[#111827] hover:bg-gray-800 border border-gray-800 transition"
                   >
                     <BookOpen className="w-3.5 h-3.5" />
-                    <span>{showFullOptionCatalog ? 'Ocultar Catálogo das 25 Estratégias' : 'Consultar Catálogo Oficial das 25 Estratégias de Opções'}</span>
+                    <span>{showFullOptionCatalog ? `Ocultar Catálogo das ${CME_25_STRATEGIES.length} Estratégias` : `Consultar Catálogo Oficial das ${CME_25_STRATEGIES.length} Estratégias de Opções`}</span>
                     {showFullOptionCatalog ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                   </button>
                 </div>
@@ -1067,7 +1085,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-800 pb-3">
                     <div>
                       <h4 className="font-bold text-white text-base">
-                        Catálogo Oficial: 25 Estratégias Comprovadas de Opções (CME & OCC)
+                        Catálogo Oficial: {CME_25_STRATEGIES.length} Estratégias Comprovadas de Opções (CME & OCC)
                       </h4>
                       <p className="text-xs text-gray-400">
                         Consulte o referencial teórico e perfil de Payoff de cada estratégia.
