@@ -39,6 +39,7 @@ import {
   getSP500Asset, 
   SP500StockData 
 } from '@/lib/domain/sp500-dataset';
+import { DataValue } from '@/components/shared/DataValue';
 
 interface VolatilityAnalystViewProps {
   onNavigateToQuote?: (symbol: string) => void;
@@ -173,6 +174,10 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
   // necessidade na maior parte do tempo.
   const [rec, setRec] = useState<VolatilityRecommendation | null>(null);
   const [recStatus, setRecStatus] = useState<'loading' | 'unavailable' | 'ready'>('loading');
+
+  const isSelectedLive = liveMetricsMap[selectedSymbol.toUpperCase()]?.source === 'tastytrade-live';
+  const liveSourceDesc = isSelectedLive ? 'Tastytrade REST (option-recommendation)' : 'Modelo calibrado interno';
+  const liveProv = isSelectedLive ? 'MEDIDO' : 'ESTIMADO';
   const [recReason, setRecReason] = useState<string>('');
 
   useEffect(() => {
@@ -1061,11 +1066,23 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                   <h2 className="text-2xl font-black font-mono text-white">{selectedAsset.symbol}</h2>
                   <span className="text-xs text-gray-400 font-sans">{selectedAsset.name}</span>
                 </div>
-                <div className="flex flex-wrap items-center gap-3 font-mono text-xs mt-1">
-                  <span>Spot: <strong className="text-white">${selectedAsset.spot.toFixed(2)}</strong></span>
-                  <span className={`font-semibold ${selectedAsset.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {selectedAsset.change >= 0 ? '+' : ''}{selectedAsset.change.toFixed(2)}%
-                  </span>
+                <div className="flex flex-wrap items-center gap-4 font-mono text-xs mt-2">
+                  <DataValue
+                    label="Spot"
+                    value={selectedAsset.spot}
+                    provenance="ESTIMADO"
+                    source="SP500_DATASET (catálogo estático)"
+                    format="currency"
+                    size="sm"
+                  />
+                  <DataValue
+                    label="Variação"
+                    value={selectedAsset.change}
+                    provenance="ESTIMADO"
+                    source="SP500_DATASET (catálogo estático)"
+                    format="percent"
+                    size="sm"
+                  />
                 </div>
               </div>
 
@@ -1085,42 +1102,64 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
 
             {/* Métricas Chave do Veredito (Com IV Rank, IV %, IV Percentil, VRP e Zero Gamma Flip) */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-center font-mono text-xs">
-              <div className="bg-[#070b14] p-2.5 rounded-xl border border-gray-800">
-                <div className="text-[10px] text-gray-400">IV Rank (252d)</div>
-                <div className={`text-base font-bold mt-0.5 ${selectedAsset.ivr >= 50 ? 'text-rose-400' : 'text-cyan-300'}`}>
-                  {selectedAsset.ivr.toFixed(1)}%
-                </div>
-                <div className="text-[9px] text-gray-400">{selectedAsset.ivr >= 50 ? 'Prêmio Inflado' : 'Prêmio Barato'}</div>
+              <div className="bg-[#070b14] p-2.5 rounded-xl border border-gray-800 flex flex-col items-center justify-center">
+                <DataValue
+                  label="IV Rank (252d)"
+                  value={selectedAsset.ivr}
+                  provenance={liveProv}
+                  source={liveSourceDesc}
+                  format="percent"
+                  size="sm"
+                />
+                <div className="text-[9px] text-gray-400 mt-1">{selectedAsset.ivr >= 50 ? 'Prêmio Inflado' : 'Prêmio Barato'}</div>
               </div>
 
-              <div className="bg-[#070b14] p-2.5 rounded-xl border border-gray-800">
-                <div className="text-[10px] text-gray-400">IV % (Atual 30d)</div>
-                <div className="text-base font-bold text-amber-300 mt-0.5">
-                  {selectedAsset.iv30.toFixed(1)}%
-                </div>
-                <div className="text-[9px] text-gray-400">Vol Implícita ATM</div>
+              <div className="bg-[#070b14] p-2.5 rounded-xl border border-gray-800 flex flex-col items-center justify-center">
+                <DataValue
+                  label="IV % (Atual 30d)"
+                  value={selectedAsset.iv30}
+                  provenance={liveProv}
+                  source={liveSourceDesc}
+                  format="percent"
+                  size="sm"
+                />
+                <div className="text-[9px] text-gray-400 mt-1">Vol Implícita ATM</div>
               </div>
 
-              <div className="bg-[#070b14] p-2.5 rounded-xl border border-gray-800">
-                <div className="text-[10px] text-gray-400">IV Percentil</div>
-                <div className="text-base font-bold text-purple-300 mt-0.5">
-                  {selectedAsset.ivp.toFixed(0)}%
-                </div>
-                <div className="text-[9px] text-gray-400">Freq. Histórica</div>
+              <div className="bg-[#070b14] p-2.5 rounded-xl border border-gray-800 flex flex-col items-center justify-center">
+                <DataValue
+                  label="IV Percentil"
+                  value={selectedAsset.ivp}
+                  provenance={liveProv}
+                  source={liveSourceDesc}
+                  format="percent"
+                  size="sm"
+                />
+                <div className="text-[9px] text-gray-400 mt-1">Freq. Histórica</div>
               </div>
 
-              <div className="bg-[#070b14] p-2.5 rounded-xl border border-gray-800">
-                <div className="text-[10px] text-gray-400">VRP (Prêmio Risco)</div>
-                <div className={`text-base font-bold mt-0.5 ${rec.vrp >= 4 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {rec.vrp >= 0 ? '+' : ''}{rec.vrp.toFixed(1)} pts
-                </div>
-                <div className="text-[9px] text-gray-400">{rec.vrp >= 0 ? 'IV > RV Yang-Zhang' : 'IV < RV'}</div>
+              <div className="bg-[#070b14] p-2.5 rounded-xl border border-gray-800 flex flex-col items-center justify-center">
+                <DataValue
+                  label="VRP (Prêmio Risco)"
+                  value={rec.vrp}
+                  provenance="DERIVADO"
+                  source="Cálculo VRP: IV 30d - HV 20d (YZ)"
+                  format="number"
+                  size="sm"
+                />
+                <div className="text-[9px] text-gray-400 mt-1">{rec.vrp >= 0 ? 'IV > RV Yang-Zhang' : 'IV < RV'}</div>
               </div>
 
-              <div className="bg-[#070b14] p-2.5 rounded-xl border border-gray-800 col-span-2 sm:col-span-1">
-                <div className="text-[10px] text-gray-400">Zero Gamma Flip</div>
-                <div className="text-base font-bold text-cyan-300 mt-0.5">${rec.zeroGammaFlip.toFixed(2)}</div>
-                <div className="text-[9px] text-gray-400">Divisor de Águas</div>
+              <div className="bg-[#070b14] p-2.5 rounded-xl border border-gray-800 col-span-2 sm:col-span-1 flex flex-col items-center justify-center">
+                <DataValue
+                  label="Zero Gamma Flip"
+                  value={rec.zeroGammaFlip}
+                  provenance="ESTIMADO"
+                  source="Modelo paramétrico de GEX"
+                  format="currency"
+                  size="sm"
+                />
+                <div className="text-[9px] text-gray-400 mt-1">Divisor de Águas</div>
               </div>
             </div>
 
@@ -1154,9 +1193,14 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                       </span>
                     </div>
                     <span className="text-gray-400 text-[11px]">{leg.description}</span>
-                    <span className={`font-bold ${leg.action === 'SELL' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {leg.action === 'SELL' ? '+' : '-'}${leg.midPrice.toFixed(2)}
-                    </span>
+                    <DataValue
+                      label={leg.action === 'SELL' ? 'Crédito' : 'Débito'}
+                      value={leg.midPrice}
+                      provenance="MEDIDO"
+                      source="Tastytrade REST (option-recommendation)"
+                      format="currency"
+                      size="sm"
+                    />
                   </div>
                 ))}
               </div>
@@ -1164,10 +1208,14 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
               {/* Payoff & Regra de Ouro do Crédito (§6.4) */}
               <div className="pt-2 border-t border-gray-800 flex justify-between items-center font-mono text-xs">
                 <div>
-                  <span className="text-gray-400">{rec.isCredit ? 'Crédito Líquido:' : 'Custo Líquido:'}</span>
-                  <strong className={`font-bold text-sm ml-1 ${rec.isCredit ? 'text-emerald-400' : 'text-cyan-300'}`}>
-                    ${Math.abs(rec.netCredit).toFixed(2)}
-                  </strong>
+                  <DataValue
+                    label={rec.isCredit ? 'Crédito Líquido' : 'Custo Líquido'}
+                    value={Math.abs(rec.netCredit)}
+                    provenance="DERIVADO"
+                    source="Soma algébrica das pernas Tastytrade"
+                    format="currency"
+                    size="sm"
+                  />
                   {rec.isCredit && (
                     <span className="text-[10px] text-emerald-300/80 ml-1">
                       ({rec.meetsCreditRule ? 'Crédito ≥ 1/3: OK' : 'Alerta: Crédito < 1/3'})
@@ -1203,7 +1251,17 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
               </div>
               <ul className="text-[11px] text-gray-300 space-y-1.5 list-disc list-inside">
                 <li>
-                  <strong>Take Profit:</strong> Fechar a ordem com 50% do crédito recebido (<span className="text-emerald-400 font-bold">${rec.lifecycle.profitTargetDollar.toFixed(2)}</span>).
+                  <div className="inline-flex items-center gap-2 flex-wrap">
+                    <span><strong>Take Profit:</strong> Fechar a ordem com 50% do crédito recebido:</span>
+                    <DataValue
+                      label="Take Profit"
+                      value={rec.lifecycle.profitTargetDollar}
+                      provenance="DERIVADO"
+                      source="Regra Tastytrade: 50% do crédito líquido"
+                      format="currency"
+                      size="sm"
+                    />
+                  </div>
                 </li>
                 <li>
                   <strong>Gatilho de Defesa aos 21 DTE:</strong> Encerrar ou rolar para o ciclo seguinte para mitigar aceleração de Gamma e Zomma.
