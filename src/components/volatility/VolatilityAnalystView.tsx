@@ -1069,16 +1069,6 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                   </span>
                   <span className="text-gray-500">|</span>
                   <span className="text-gray-400">SOFR: <strong className="text-gray-200">5.32%</strong></span>
-                  <span className="text-gray-500">|</span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${
-                    liveMetricsMap[selectedSymbol.toUpperCase()]?.source === 'tastytrade-live'
-                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                      : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                  }`}>
-                    {liveMetricsMap[selectedSymbol.toUpperCase()]?.source === 'tastytrade-live'
-                      ? 'Fonte: Tastytrade Live'
-                      : 'Fonte: Modelo Calibrado'}
-                  </span>
                 </div>
               </div>
 
