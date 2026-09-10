@@ -520,6 +520,53 @@ describe('Audit Gate — Ciclo 5', () => {
     ).toBe(false);
   });
 
+  it('FASE2-07: rotulos de tom nao voltam a afirmar Institucional/garantia sobre dado modelado', () => {
+    const gexSrc = read('src/components/options/UnifiedGexBarreirasView.tsx');
+    const volSrc = read('src/components/volatility/VolatilityAnalystView.tsx');
+    const payoffSrc = read('src/components/options/OptionPayoffChart.tsx');
+    const screenerSrc = read('src/components/screener/ScreenerView.tsx');
+
+    // Achado da rodada de tom: walls/exposicao gama/skew sao ESTIMADO (modelo parametrico
+    // interno, sem OI/gamma/IV reais da Tastytrade), mas o rotulo visual dizia "Institucional"
+    // -- palavra que, neste contexto, implica fluxo real de formadores de mercado.
+    expect(
+      /Resistência Institucional|Suporte Institucional|Execução Institucional|gama institucional|SKEW INSTITUCIONAL/i.test(gexSrc + volSrc),
+      'Um rotulo de GEX/skew voltou a usar "Institucional" sobre dado classificado como ESTIMADO ' +
+        '-- contradiz a propria proveniencia declarada ao lado (DataValue). Use linguagem de ' +
+        'estimativa/modelo (ex.: "Resistência Estimada", "SKEW MODELADO").'
+    ).toBe(false);
+
+    // "Regra institucional Tastytrade" e "Playbook institucional Tastytrade" descrevem
+    // convencoes reais e documentadas da propria Tastytrade (regra de 1/3, gerenciamento aos
+    // 21 DTE) -- esses usos de "institucional" sao corretos e NAO devem ser removidos.
+    expect(
+      payoffSrc.includes('Regra institucional Tastytrade'),
+      'A frase "Regra institucional Tastytrade" (regra real de 1/3 da largura das asas) foi ' +
+        'removida -- ela nao e o achado de tom, descreve uma convencao real, deveria ter ficado.'
+    ).toBe(true);
+
+    // Achado de linguagem de garantia: "100% blindado" sobre estrutura SIMULADO.
+    expect(
+      /100% blindado/i.test(payoffSrc),
+      'OptionPayoffChart.tsx voltou a afirmar "100% blindado" sobre risco de uma estrutura ' +
+        'SIMULADO -- perda maxima definida por desenho nao e o mesmo que risco zero garantido.'
+    ).toBe(false);
+
+    // Achados do ScreenerView: capacidade de execucao que a tela nao tem, e rotulo de
+    // confianca sem proveniencia colado a uma estrutura hardcoded.
+    expect(
+      screenerSrc.includes('Execução Tastytrade'),
+      'ScreenerView.tsx voltou a anunciar "Execução Tastytrade" no cabecalho -- a tela roda ' +
+        '100% sobre catalogo estatico (US_STOCKS_DATASET), nao existe execucao acontecendo.'
+    ).toBe(false);
+
+    expect(
+      screenerSrc.includes('Crédito Institucional'),
+      'ScreenerView.tsx voltou a rotular o card LATERAL como "Crédito Institucional" -- rotulo ' +
+        'fixo sem proveniencia declarada, colado a uma estrutura de Iron Condor hardcoded.'
+    ).toBe(false);
+  });
+
   it('C5-16: ESLint tem uma regra contra fallback numerico magico em domain/services', () => {
     const eslintrc = read('.eslintrc.json');
     const hasMagicFallbackRule =
