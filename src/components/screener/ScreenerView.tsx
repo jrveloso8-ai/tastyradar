@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { RefreshCw, Search, ArrowUpRight, TrendingDown, Layers, Filter, Building2 } from 'lucide-react';
+import { Search, ArrowUpRight, TrendingDown, Layers, Filter, Building2 } from 'lucide-react';
 import { US_STOCKS_DATASET, USStockItem } from '@/lib/domain/us-market-data';
 
 interface ScreenerViewProps {
@@ -12,7 +12,6 @@ export function ScreenerView({ onSelectSymbol }: ScreenerViewProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [scanLimit, setScanLimit] = useState<number | 'ALL'>(100);
   const [selectedSector, setSelectedSector] = useState<string>('ALL');
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const sectors = useMemo(() => {
     const sSet = new Set<string>();
@@ -48,11 +47,6 @@ export function ScreenerView({ onSelectSymbol }: ScreenerViewProps) {
   const baixaList = filteredList.filter(item => item.category === 'BAIXA');
   const lateralList = filteredList.filter(item => item.category === 'LATERAL');
 
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    setTimeout(() => setIsRefreshing(false), 400);
-  };
-
   return (
     <section className="space-y-6">
       {/* Search and Filters Header */}
@@ -66,7 +60,7 @@ export function ScreenerView({ onSelectSymbol }: ScreenerViewProps) {
               </span>
             </div>
             <p className="text-xs text-gray-400 mt-0.5">
-              Escaneamento contínuo das ações do S&P 500 filtradas por solvência, alinhamento de médias móveis e liquidez de opções.
+              Lista de ativos do catálogo S&P 500 filtradas por solvência, alinhamento de médias móveis e liquidez de opções.
             </p>
           </div>
 
@@ -90,14 +84,6 @@ export function ScreenerView({ onSelectSymbol }: ScreenerViewProps) {
                 </button>
               ))}
             </div>
-
-            <button
-              onClick={handleRefresh}
-              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-mono font-bold transition flex items-center gap-1.5 shadow-md shadow-emerald-600/20"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>Atualizar</span>
-            </button>
           </div>
         </div>
 
@@ -237,7 +223,7 @@ export function ScreenerView({ onSelectSymbol }: ScreenerViewProps) {
             </span>
           </div>
           <span className="text-[10px] font-mono text-gray-400">
-            Critério: Mercado Lateral + Balanço Aprovado + IV ATM Real Favorável (DTE 14 a 35)
+            Critério: Mercado Lateral + Balanço Aprovado + IV ATM Favorável (DTE 14 a 35)
           </span>
         </div>
 
