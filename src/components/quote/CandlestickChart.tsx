@@ -58,7 +58,9 @@ export function CandlestickChart({ candles, spotPrice }: CandlestickChartProps) 
           <span className="text-amber-400">MA20: <DataValue variant="inline" value={activeCandle.ma20} format="currency" provenance="SIMULADO" source="Série OHLCV modelada parametricamente (semente determinística)" /></span>
           <span className="text-cyan-400">MA50: <DataValue variant="inline" value={activeCandle.ma50} format="currency" provenance="SIMULADO" source="Série OHLCV modelada parametricamente (semente determinística)" /></span>
           <span className="text-purple-400">MA200: <DataValue variant="inline" value={activeCandle.ma200} format="currency" provenance="SIMULADO" source="Série OHLCV modelada parametricamente (semente determinística)" /></span>
-          <span className="text-emerald-400">RSI(14): {activeCandle.rsi}</span>
+          <span className="text-emerald-400">
+            RSI(14): <DataValue variant="inline" value={activeCandle.rsi} format="number" provenance="SIMULADO" source="Série OHLCV modelada parametricamente (semente determinística)" />
+          </span>
           <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-mono" title="Série OHLCV histórica calculada parametricamente por semente determinística">
             SÉRIE HISTÓRICA MODELADA
           </span>
