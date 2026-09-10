@@ -404,20 +404,24 @@ export function UnifiedGexBarreirasView({
 
           <div className="p-3 bg-[#070b14] border border-gray-800 rounded-xl space-y-1">
             <span className="text-[10px] text-gray-400 block font-sans">Total Call GEX</span>
-            <span className="text-base font-bold text-emerald-400 block">+${totalCallGex}M</span>
+            <span className="text-base font-bold text-emerald-400 block">
+              +$<DataValue variant="inline" value={totalCallGex} format="number" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" />M
+            </span>
             <span className="text-[10px] text-emerald-400/80 font-sans">Força Compradora MM</span>
           </div>
 
           <div className="p-3 bg-[#070b14] border border-gray-800 rounded-xl space-y-1">
             <span className="text-[10px] text-gray-400 block font-sans">Total Put GEX</span>
-            <span className="text-base font-bold text-rose-400 block">-${totalPutGex}M</span>
+            <span className="text-base font-bold text-rose-400 block">
+              -$<DataValue variant="inline" value={totalPutGex} format="number" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" />M
+            </span>
             <span className="text-[10px] text-rose-400/80 font-sans">Hedge Vendedor MM</span>
           </div>
 
           <div className="p-3 bg-[#070b14] border border-gray-800 rounded-xl space-y-1">
             <span className="text-[10px] text-gray-400 block font-sans">Net GEX Regime</span>
             <span className={`text-base font-bold block ${netGexTotal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {netGexTotal >= 0 ? '+GEX' : '-GEX'} (${netGexTotal}M)
+              {netGexTotal >= 0 ? '+GEX' : '-GEX'} ($<DataValue variant="inline" value={netGexTotal} format="number" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" />M)
             </span>
             <span className="text-[10px] text-gray-400 font-sans">
               {netGexTotal >= 0 ? 'Vol Suprimida' : 'Vol Acelerada'}
