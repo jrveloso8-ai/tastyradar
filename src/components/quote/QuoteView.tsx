@@ -913,8 +913,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
 
                   <div className="flex items-center gap-2 self-start sm:self-auto">
                     <span className="px-3 py-1 bg-cyan-950 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-bold font-mono">
-                      {/* eslint-disable-next-line local-rules/no-raw-numbers-in-jsx -- prazo em dias uteis da estrategia de opcoes (parametro de contrato, rotulo de UI) */}
-                      {electedStrategy.dte} DTE • {electedStrategy.expirationDate}
+                      <DataValue variant="inline" value={electedStrategy.dte} format="number" provenance="MEDIDO" source="Tastytrade REST (option-recommendation)" /> DTE • {electedStrategy.expirationDate}
                     </span>
                     <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-xl text-xs font-bold font-mono">
                       ✓ {electedStrategy.status}

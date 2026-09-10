@@ -452,8 +452,7 @@ export function UnifiedGexBarreirasView({
                 <span>DASHBOARD DE GAMMA EXPOSURE (GEX POR STRIKE)</span>
               </h4>
               <p className="text-xs text-gray-400 mt-0.5">
-                {/* eslint-disable-next-line local-rules/no-raw-numbers-in-jsx -- prazo em dias corridos ate o vencimento (parametro temporal de contrato, rotulo de UI) */}
-                Exposição gama institucional em $ Milhões por strike para o vencimento de <strong>{currentExp.label}</strong> ({currentExp.dte} DTE).
+                Exposição gama institucional em $ Milhões por strike para o vencimento de <strong>{currentExp.label}</strong> (<DataValue variant="inline" value={currentExp.dte} format="number" provenance="ESTIMADO" source="TASTYTRADE_EXPIRATIONS (catálogo de vencimentos)" /> DTE).
               </p>
             </div>
 

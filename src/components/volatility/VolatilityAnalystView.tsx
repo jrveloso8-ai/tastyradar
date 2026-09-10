@@ -356,6 +356,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                       : 'text-gray-400 hover:text-white'
                   }`}
                 >
+                  {/* eslint-disable-next-line local-rules/no-raw-numbers-in-jsx -- contagem de ativos monitorados no catalogo (contador de UI) */}
                   Todos S&P 500 ({SP500_DATASET.length})
                 </button>
                 <button 
@@ -420,6 +421,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                 {isSearchFocused && searchSuggestions.length > 0 && (
                   <div className="absolute left-0 right-0 top-full mt-1 bg-[#0c1322] border border-purple-500/40 rounded-xl shadow-2xl z-40 max-h-64 overflow-y-auto custom-scrollbar divide-y divide-gray-800/60 font-mono text-xs">
                     <div className="px-3 py-1.5 bg-[#070b14] text-[10px] text-gray-400 font-sans flex justify-between items-center">
+                      {/* eslint-disable-next-line local-rules/no-raw-numbers-in-jsx -- contagem de sugestoes de busca encontradas (contador de UI) */}
                       <span>S&P 500 ({searchSuggestions.length} encontrados)</span>
                       <span>Clique para abrir</span>
                     </div>
@@ -690,7 +692,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                       strokeWidth="1.8" 
                     />
                     <text x="455" y={getYCoord(rec.callWall) + 3} fill="#10b981" fontSize="9" fontFamily="JetBrains Mono" fontWeight="bold">
-                      Call Wall ${Math.round(rec.callWall)}
+                      Call Wall <DataValue variant="inline" as="tspan" value={rec.callWall} format="currency" provenance={liveProv} source={liveSourceDesc} />
                     </text>
 
                     {/* Linha da Put Wall (Maior OI Put) */}
@@ -704,7 +706,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                       strokeWidth="1.8" 
                     />
                     <text x="455" y={getYCoord(rec.putWall) + 3} fill="#f43f5e" fontSize="9" fontFamily="JetBrains Mono" fontWeight="bold">
-                      Put Wall ${Math.round(rec.putWall)}
+                      Put Wall <DataValue variant="inline" as="tspan" value={rec.putWall} format="currency" provenance={liveProv} source={liveSourceDesc} />
                     </text>
 
                     {/* Linha do Zero Gamma Flip */}
@@ -718,7 +720,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                       strokeWidth="1.2" 
                     />
                     <text x="455" y={getYCoord(rec.zeroGammaFlip) + 3} fill="#22d3ee" fontSize="8" fontFamily="JetBrains Mono">
-                      Flip ${Math.round(rec.zeroGammaFlip)}
+                      Flip <DataValue variant="inline" as="tspan" value={rec.zeroGammaFlip} format="currency" provenance={liveProv} source={liveSourceDesc} />
                     </text>
 
                     {/* Linha de Spot Atual */}
@@ -733,7 +735,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                       opacity="0.6"
                     />
                     <text x="455" y={getYCoord(selectedAsset.spot) + 3} fill="#ffffff" fontSize="8" fontFamily="JetBrains Mono" opacity="0.8">
-                      Spot ${Math.round(selectedAsset.spot * 10) / 10}
+                      Spot <DataValue variant="inline" as="tspan" value={selectedAsset.spot} format="currency" provenance="ESTIMADO" source="SP500_DATASET (catálogo estático)" />
                     </text>
 
                     {/* Candles / Barras de Preço da Ação */}
@@ -766,7 +768,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                   </svg>
                 </div>
                 <p className="text-[10px] font-mono text-gray-400">
-                  🛡️ <strong>Regra Institucional:</strong> Os strikes vendidos do trade ficam ancorados fora do túnel entre a Put Wall (${Math.round(rec.putWall * 100) / 100}) e a Call Wall (${Math.round(rec.callWall * 100) / 100}), onde o hedge dos formadores amortece o movimento.
+                  🛡️ <strong>Regra Institucional:</strong> Os strikes vendidos do trade ficam ancorados fora do túnel entre a Put Wall (<DataValue variant="inline" value={rec.putWall} format="currency" provenance={liveProv} source={liveSourceDesc} />) e a Call Wall (<DataValue variant="inline" value={rec.callWall} format="currency" provenance={liveProv} source={liveSourceDesc} />), onde o hedge dos formadores amortece o movimento.
                 </p>
               </div>
             )}
@@ -837,13 +839,13 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                         {/* Linha de 52w Max (100% IV Rank) */}
                         <line x1="0" y1="18" x2="330" y2="18" stroke="#f59e0b" strokeDasharray="4 3" strokeWidth="1.2" opacity="0.8" />
                         <text x="335" y="21" fill="#f59e0b" fontSize="8" fontFamily="JetBrains Mono" fontWeight="bold">
-                          100% IVR ({Math.round(selectedAsset.iv52wMax)}%)
+                          100% IVR (<DataValue variant="inline" as="tspan" value={selectedAsset.iv52wMax} format="percent" provenance="ESTIMADO" source="SP500_DATASET (catálogo estático)" />)
                         </text>
 
                         {/* Linha de 52w Min (0% IV Rank) */}
                         <line x1="0" y1="118" x2="330" y2="118" stroke="#64748b" strokeDasharray="4 3" strokeWidth="1.2" opacity="0.8" />
                         <text x="335" y="121" fill="#94a3b8" fontSize="8" fontFamily="JetBrains Mono">
-                          0% IVR ({Math.round(selectedAsset.iv52wMin)}%)
+                          0% IVR (<DataValue variant="inline" as="tspan" value={selectedAsset.iv52wMin} format="percent" provenance="ESTIMADO" source="SP500_DATASET (catálogo estático)" />)
                         </text>
 
                         {/* Área Sombreada de VRP (Prêmio de Risco de Volatilidade) */}
@@ -936,7 +938,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                           />
                         </div>
                         <p className="text-[9px] text-gray-400 mt-1.5 font-sans">
-                          A IV atual está a <strong>{Math.round(selectedAsset.ivr)}%</strong> do caminho entre a mínima ({Math.round(selectedAsset.iv52wMin)}%) e a máxima ({Math.round(selectedAsset.iv52wMax)}%) do último ano.
+                          A IV atual está a <strong><DataValue variant="inline" value={selectedAsset.ivr} format="percent" provenance={liveProv} source={liveSourceDesc} /></strong> do caminho entre a mínima (<DataValue variant="inline" value={selectedAsset.iv52wMin} format="percent" provenance="ESTIMADO" source="SP500_DATASET (catálogo estático)" />) e a máxima (<DataValue variant="inline" value={selectedAsset.iv52wMax} format="percent" provenance="ESTIMADO" source="SP500_DATASET (catálogo estático)" />) do último ano.
                         </p>
                       </div>
                     </div>
@@ -960,7 +962,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                         />
                       </div>
                       <p className="text-[9px] text-gray-400 font-sans">
-                        Em <strong>{Math.round(selectedAsset.ivp)}%</strong> dos dias do ano, o mercado precificou oscilação menor que hoje.
+                        Em <strong><DataValue variant="inline" value={selectedAsset.ivp} format="percent" provenance={liveProv} source={liveSourceDesc} /></strong> dos dias do ano, o mercado precificou oscilação menor que hoje.
                       </p>
                     </div>
 
@@ -1050,19 +1052,19 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                     {/* Linha Vertical no Spot ATM */}
                     <line x1="260" y1="10" x2="260" y2="125" stroke="#ffffff" strokeDasharray="3 3" strokeWidth="1" opacity="0.5" />
                     <text x="264" y="18" fill="#ffffff" fontSize="8" fontFamily="JetBrains Mono" opacity="0.8">
-                      ATM ${Math.round(selectedAsset.spot)}
+                      ATM <DataValue variant="inline" as="tspan" value={selectedAsset.spot} format="currency" provenance="ESTIMADO" source="SP500_DATASET (catálogo estático)" />
                     </text>
 
                     {/* Linha Vertical na Put Wall */}
                     <line x1="140" y1="10" x2="140" y2="125" stroke="#f43f5e" strokeDasharray="3 3" strokeWidth="1.2" opacity="0.7" />
                     <text x="144" y="28" fill="#f43f5e" fontSize="8" fontFamily="JetBrains Mono">
-                      Put Wall ${Math.round(rec.putWall)}
+                      Put Wall <DataValue variant="inline" as="tspan" value={rec.putWall} format="currency" provenance={liveProv} source={liveSourceDesc} />
                     </text>
 
                     {/* Linha Vertical na Call Wall */}
                     <line x1="410" y1="10" x2="410" y2="125" stroke="#10b981" strokeDasharray="3 3" strokeWidth="1.2" opacity="0.7" />
                     <text x="414" y="28" fill="#10b981" fontSize="8" fontFamily="JetBrains Mono">
-                      Call Wall ${Math.round(rec.callWall)}
+                      Call Wall <DataValue variant="inline" as="tspan" value={rec.callWall} format="currency" provenance={liveProv} source={liveSourceDesc} />
                     </text>
 
                     {/* Área Preenchida abaixo da Curva do Smile */}
@@ -1105,7 +1107,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                           <circle cx={x} cy={clampedY} r={isAtm ? 4.5 : 3} fill={isAtm ? '#ffffff' : '#c084fc'} />
                           {idx % 2 === 0 && (
                             <text x={x} y={clampedY - 7} fill="#94a3b8" fontSize="7" fontFamily="JetBrains Mono" textAnchor="middle">
-                              {Math.round(pt.iv * 10) / 10}%
+                              <DataValue variant="inline" as="tspan" value={pt.iv} format="percent" provenance={liveProv} source={liveSourceDesc} />
                             </text>
                           )}
                         </g>
@@ -1140,7 +1142,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                             fontWeight="bold" 
                             textAnchor="middle"
                           >
-                            {leg.action} ${leg.strike}
+                            {leg.action} <DataValue variant="inline" as="tspan" value={leg.strike} format="currency" provenance={liveProv} source={liveSourceDesc} />
                           </text>
                         </g>
                       );
@@ -1306,7 +1308,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                         {leg.action}
                       </span>
                       <span className={leg.action === 'SELL' ? 'text-white font-bold' : 'text-gray-300'}>
-                        {leg.type} ${leg.strike}
+                        {leg.type} <DataValue variant="inline" value={leg.strike} format="currency" provenance="MEDIDO" source="Tastytrade REST (option-recommendation)" />
                       </span>
                     </div>
                     <span className="text-gray-400 text-[11px]">{leg.description}</span>
@@ -1489,7 +1491,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                         item.action === 'SELL' ? 'bg-rose-500/20 text-rose-300' : 'bg-cyan-500/20 text-cyan-300'
                       }`}>
-                        {item.action} {item.type} ${item.strike}
+                        {item.action} {item.type} <DataValue variant="inline" value={item.strike} format="currency" provenance={liveProv} source={liveSourceDesc} />
                       </span>
                       <span className="text-[11px] text-gray-400 font-semibold">{item.role}</span>
                     </div>
