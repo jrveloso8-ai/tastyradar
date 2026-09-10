@@ -57,7 +57,7 @@ export function ScreenerView({ onSelectSymbol }: ScreenerViewProps) {
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-bold text-white tracking-tight">Rastreador de Oportunidades & Lista de Execução (S&P 500)</h2>
               <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono font-bold">
-                Classificação Técnica + Crivo CNPI-US + Execução Tastytrade
+                Classificação Técnica + Crivo CNPI-US + Estrutura no Padrão Tastytrade
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2 mt-1">
@@ -326,7 +326,7 @@ export function ScreenerView({ onSelectSymbol }: ScreenerViewProps) {
                 <span>
                   IV Rank: <DataValue variant="inline" value={item.ivRank} format="percent" provenance="ESTIMADO" source="US_STOCKS_DATASET (catálogo estático)" />
                 </span>
-                <span className="text-emerald-400 font-bold">Crédito Institucional</span>
+                <span className="text-emerald-400 font-bold">Crédito</span>
               </div>
             </div>
           ))}
