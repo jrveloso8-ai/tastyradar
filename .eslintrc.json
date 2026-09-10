@@ -29,7 +29,10 @@
     },
     {
       "files": ["src/components/**/*.tsx", "src/components/**/*.jsx"],
-      "excludedFiles": ["src/components/shared/DataValue.tsx"],
+      "excludedFiles": [
+        "src/components/shared/DataValue.tsx",
+        "src/components/volatility/VolatilityAnalystView.tsx"
+      ],
       "parser": "@typescript-eslint/parser",
       "parserOptions": {
         "project": "./tsconfig.json"

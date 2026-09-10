@@ -390,7 +390,7 @@ export function UnifiedGexBarreirasView({
           </div>
 
           <div className="text-[11px] font-mono text-cyan-400 pt-1">
-            Série Ativa: <strong>{currentExp.dateStr}</strong> • Base IV: <strong>{currentExp.baseIv}%</strong> • Tipo: <strong>{currentExp.type}</strong>
+            Série Ativa: <strong>{currentExp.dateStr}</strong> • Base IV: <strong><DataValue variant="inline" value={currentExp.baseIv} format="percent" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" /></strong> • Tipo: <strong>{currentExp.type}</strong>
           </div>
         </div>
 
@@ -452,6 +452,7 @@ export function UnifiedGexBarreirasView({
                 <span>DASHBOARD DE GAMMA EXPOSURE (GEX POR STRIKE)</span>
               </h4>
               <p className="text-xs text-gray-400 mt-0.5">
+                {/* eslint-disable-next-line local-rules/no-raw-numbers-in-jsx -- prazo em dias corridos ate o vencimento (parametro temporal de contrato, rotulo de UI) */}
                 Exposição gama institucional em $ Milhões por strike para o vencimento de <strong>{currentExp.label}</strong> ({currentExp.dte} DTE).
               </p>
             </div>
@@ -574,7 +575,7 @@ export function UnifiedGexBarreirasView({
                         fontSize="7.5"
                         fontFamily="monospace"
                       >
-                        {s.strike}
+                        <DataValue variant="inline" as="tspan" value={s.strike} format="number" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" />
                       </text>
                     </g>
                   );
@@ -601,7 +602,7 @@ export function UnifiedGexBarreirasView({
                         fontSize="7.5"
                         fontFamily="monospace"
                       >
-                        {s.strike}
+                        <DataValue variant="inline" as="tspan" value={s.strike} format="number" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" />
                       </text>
                     </g>
                   );
@@ -628,7 +629,7 @@ export function UnifiedGexBarreirasView({
                         fontSize="7.5"
                         fontFamily="monospace"
                       >
-                        {s.strike}
+                        <DataValue variant="inline" as="tspan" value={s.strike} format="number" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" />
                       </text>
                     </g>
                   );
@@ -729,6 +730,7 @@ export function UnifiedGexBarreirasView({
                 {topCallWalls.map((w, idx) => (
                   <div key={w.strike} className="flex justify-between items-center text-gray-300 bg-[#0c1322] p-2 rounded-lg">
                     <div className="flex items-center gap-2">
+                      {/* eslint-disable-next-line local-rules/no-raw-numbers-in-jsx -- indice de posicao ordinal no ranking Top 5 das barreiras (rotulo de UI) */}
                       <span className="text-emerald-400 font-bold">#{idx + 1}</span>
                       <span><DataValue variant="inline" value={w.strike} format="currency" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" /></span>
                       <span className="text-[10px] text-gray-400">{w.callSymbol}</span>
@@ -756,6 +758,7 @@ export function UnifiedGexBarreirasView({
                 {topPutWalls.map((w, idx) => (
                   <div key={w.strike} className="flex justify-between items-center text-gray-300 bg-[#0c1322] p-2 rounded-lg">
                     <div className="flex items-center gap-2">
+                      {/* eslint-disable-next-line local-rules/no-raw-numbers-in-jsx -- indice de posicao ordinal no ranking Top 5 das barreiras (rotulo de UI) */}
                       <span className="text-rose-400 font-bold">#{idx + 1}</span>
                       <span><DataValue variant="inline" value={w.strike} format="currency" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" /></span>
                       <span className="text-[10px] text-gray-400">{w.putSymbol}</span>
@@ -791,7 +794,7 @@ export function UnifiedGexBarreirasView({
               </p>
             </div>
             <div className="text-xs font-mono text-purple-300">
-              ATM IV: <strong>{currentExp.baseIv}%</strong>
+              ATM IV: <strong><DataValue variant="inline" value={currentExp.baseIv} format="percent" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" /></strong>
             </div>
           </div>
 

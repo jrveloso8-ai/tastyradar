@@ -113,6 +113,7 @@ export function ScreenerView({ onSelectSymbol }: ScreenerViewProps) {
                 onChange={(e) => setSelectedSector(e.target.value)}
                 className="bg-[#070b14] border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-gray-200 focus:outline-none focus:border-cyan-500"
               >
+                {/* eslint-disable-next-line local-rules/no-raw-numbers-in-jsx -- contagem total de ativos monitorados no catalogo (contador de UI) */}
                 <option value="ALL">Todos os Setores ({US_STOCKS_DATASET.length} Ações)</option>
                 {sectors.map(sec => (
                   <option key={sec} value={sec}>{sec}</option>
@@ -122,7 +123,14 @@ export function ScreenerView({ onSelectSymbol }: ScreenerViewProps) {
           </div>
 
           <span className="text-xs font-mono text-gray-400">
-            Total de Ativos Analisados no Crivo: <strong className="text-white font-bold">{filteredList.length}</strong> de {US_STOCKS_DATASET.length} ações
+            Total de Ativos Analisados no Crivo:{' '}
+            <strong className="text-white font-bold">
+              {/* eslint-disable-next-line local-rules/no-raw-numbers-in-jsx -- contagem de ativos filtrados no crivo do screener (contador de UI) */}
+              {filteredList.length}
+            </strong>{' '}
+            de{' '}
+            {/* eslint-disable-next-line local-rules/no-raw-numbers-in-jsx -- contagem total de ativos monitorados no catalogo (contador de UI) */}
+            {US_STOCKS_DATASET.length} ações
           </span>
         </div>
       </div>
@@ -134,6 +142,7 @@ export function ScreenerView({ onSelectSymbol }: ScreenerViewProps) {
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
             <h3 className="text-sm font-bold font-mono text-emerald-400">ALTA — Oportunidades de Compra</h3>
             <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-mono font-bold">
+              {/* eslint-disable-next-line local-rules/no-raw-numbers-in-jsx -- quantidade de ativos classificados no regime de alta (contador de lista de UI) */}
               {altaList.length} ativos
             </span>
           </div>
@@ -208,6 +217,7 @@ export function ScreenerView({ onSelectSymbol }: ScreenerViewProps) {
             <span className="w-2.5 h-2.5 rounded-full bg-rose-400"></span>
             <h3 className="text-sm font-bold font-mono text-rose-400">BAIXA — Oportunidades de Venda / Trava Baixa</h3>
             <span className="px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 text-[10px] font-mono font-bold">
+              {/* eslint-disable-next-line local-rules/no-raw-numbers-in-jsx -- quantidade de ativos classificados no regime de baixa (contador de lista de UI) */}
               {baixaList.length} ativos
             </span>
           </div>
@@ -267,6 +277,7 @@ export function ScreenerView({ onSelectSymbol }: ScreenerViewProps) {
             <span className="w-2.5 h-2.5 rounded-full bg-purple-400"></span>
             <h3 className="text-sm font-bold font-mono text-purple-300">LATERAL — Renda com Opções (Iron Condor / Credit Spreads)</h3>
             <span className="px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 text-[10px] font-mono font-bold">
+              {/* eslint-disable-next-line local-rules/no-raw-numbers-in-jsx -- quantidade de ativos classificados no regime lateral (contador de lista de UI) */}
               {lateralList.length} ativos
             </span>
           </div>
@@ -312,7 +323,9 @@ export function ScreenerView({ onSelectSymbol }: ScreenerViewProps) {
               </div>
               <div className="mt-2 text-[10px] text-cyan-300 font-mono">Iron Condor #20 a Crédito (4 Pernas)</div>
               <div className="mt-1 text-[10px] text-gray-400 font-mono flex justify-between">
-                <span>IV Rank: {item.ivRank}%</span>
+                <span>
+                  IV Rank: <DataValue variant="inline" value={item.ivRank} format="percent" provenance="ESTIMADO" source="US_STOCKS_DATASET (catálogo estático)" />
+                </span>
                 <span className="text-emerald-400 font-bold">Crédito Institucional</span>
               </div>
             </div>

@@ -596,7 +596,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                 )}
               </div>
               <p className="text-xs text-gray-400 mt-0.5">
-                Pesos Oficiais: Rentabilidade (35%) • Solvência (35%) • Valuation (30%) | Limiar de Aprovação ≥ {fundResult.minApprovalScore} pts
+                Pesos Oficiais: Rentabilidade (35%) • Solvência (35%) • Valuation (30%) | Limiar de Aprovação ≥ <DataValue variant="inline" value={fundResult.minApprovalScore} format="number" provenance="MEDIDO" source="fundamentalsEngine (Yahoo Finance / BRAPI)" /> pts
               </p>
             </div>
 
@@ -611,7 +611,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                 ) : (
                   <AlertTriangle className="w-4 h-4 text-rose-400" />
                 )}
-                SCORE: {fundResult.score}/100 • {fundResult.status}
+                SCORE: <DataValue variant="inline" value={fundResult.score} format="number" provenance="MEDIDO" source="fundamentalsEngine (Yahoo Finance / BRAPI)" />/100 • {fundResult.status}
               </span>
             </div>
           </div>
@@ -639,7 +639,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                 <span className={`text-xs font-mono font-bold ${
                   fundResult.pillars.rentabilidade.score >= 60 ? 'text-emerald-400' : fundResult.pillars.rentabilidade.score >= 40 ? 'text-amber-400' : 'text-rose-400'
                 }`}>
-                  {fundResult.pillars.rentabilidade.score}/100 pts
+                  <DataValue variant="inline" value={fundResult.pillars.rentabilidade.score} format="number" provenance="MEDIDO" source="fundamentalsEngine (Yahoo Finance / BRAPI)" />/100 pts
                 </span>
               </div>
               <div className="w-full bg-gray-800 h-1.5 rounded-full mt-2 overflow-hidden">
@@ -656,7 +656,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                 <span className={`text-xs font-mono font-bold ${
                   fundResult.pillars.solvencia.score >= 60 ? 'text-emerald-400' : fundResult.pillars.solvencia.score >= 40 ? 'text-amber-400' : 'text-rose-400'
                 }`}>
-                  {fundResult.pillars.solvencia.score}/100 pts
+                  <DataValue variant="inline" value={fundResult.pillars.solvencia.score} format="number" provenance="MEDIDO" source="fundamentalsEngine (Yahoo Finance / BRAPI)" />/100 pts
                 </span>
               </div>
               <div className="w-full bg-gray-800 h-1.5 rounded-full mt-2 overflow-hidden">
@@ -673,7 +673,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                 <span className={`text-xs font-mono font-bold ${
                   fundResult.pillars.valuation.score >= 60 ? 'text-emerald-400' : fundResult.pillars.valuation.score >= 40 ? 'text-amber-400' : 'text-rose-400'
                 }`}>
-                  {fundResult.pillars.valuation.score}/100 pts
+                  <DataValue variant="inline" value={fundResult.pillars.valuation.score} format="number" provenance="MEDIDO" source="fundamentalsEngine (Yahoo Finance / BRAPI)" />/100 pts
                 </span>
               </div>
               <div className="w-full bg-gray-800 h-1.5 rounded-full mt-2 overflow-hidden">
@@ -777,12 +777,16 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
             <div className="p-4 bg-[#070b14] rounded-xl border border-gray-800">
               <span className="text-gray-400 text-[10px] block font-sans">IV Rank</span>
-              <span className="text-lg font-bold text-purple-400 mt-1 block">{currentStock.ivRank}%</span>
+              <span className="text-lg font-bold text-purple-400 mt-1 block">
+                <DataValue variant="inline" value={currentStock.ivRank} format="percent" provenance="ESTIMADO" source="US_STOCKS_DATASET (catálogo estático)" />
+              </span>
               <span className="text-[10px] text-gray-400">Volatilidade Histórica</span>
             </div>
             <div className="p-4 bg-[#070b14] rounded-xl border border-gray-800">
               <span className="text-gray-400 text-[10px] block font-sans">IV ATM (30 DTE)</span>
-              <span className="text-lg font-bold text-cyan-400 mt-1 block">{currentStock.ivAtm}%</span>
+              <span className="text-lg font-bold text-cyan-400 mt-1 block">
+                <DataValue variant="inline" value={currentStock.ivAtm} format="percent" provenance="ESTIMADO" source="US_STOCKS_DATASET (catálogo estático)" />
+              </span>
               <span className="text-[10px] text-gray-400">Volatilidade Atual</span>
             </div>
             <div className="p-4 bg-[#070b14] rounded-xl border border-gray-800">
@@ -894,6 +898,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="w-7 h-7 rounded-lg bg-cyan-500 text-slate-950 font-black text-xs flex items-center justify-center font-mono shadow-md">
+                        {/* eslint-disable-next-line local-rules/no-raw-numbers-in-jsx -- identificador numerico da estrategia eleita (rotulo de UI) */}
                         #{electedStrategy.id}
                       </span>
                       {/* nao e valor exibido como preco, e rotulo identificador da estrategia montada */}
@@ -908,6 +913,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
 
                   <div className="flex items-center gap-2 self-start sm:self-auto">
                     <span className="px-3 py-1 bg-cyan-950 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-bold font-mono">
+                      {/* eslint-disable-next-line local-rules/no-raw-numbers-in-jsx -- prazo em dias uteis da estrategia de opcoes (parametro de contrato, rotulo de UI) */}
                       {electedStrategy.dte} DTE • {electedStrategy.expirationDate}
                     </span>
                     <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-xl text-xs font-bold font-mono">
@@ -944,7 +950,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                       className="[&_.font-bold]:text-cyan-400"
                     />
                     <span className="text-[10px] text-gray-500 block font-sans mt-1">
-                      Retorno: {electedStrategy.returnOnRiskPct}% da largura
+                      Retorno: <DataValue variant="inline" value={electedStrategy.returnOnRiskPct} format="percent" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" /> da largura
                     </span>
                   </div>
 
@@ -1141,6 +1147,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-800 pb-3">
                     <div>
                       <h4 className="font-bold text-white text-base">
+                        {/* eslint-disable-next-line local-rules/no-raw-numbers-in-jsx -- quantidade de estrategias catalogadas (contador estatico de catalogo) */}
                         Catálogo Oficial: {CME_25_STRATEGIES.length} Estratégias Comprovadas de Opções (CME & OCC)
                       </h4>
                       <p className="text-xs text-gray-400">
@@ -1178,6 +1185,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                         >
                           <div>
                             <div className="flex items-center justify-between text-xs">
+                              {/* eslint-disable-next-line local-rules/no-raw-numbers-in-jsx -- identificador numerico da estrategia no catalogo CME-25 (rotulo de UI) */}
                               <span className="font-mono font-bold text-amber-400">#{strat.id}</span>
                               <span className="px-2 py-0.2 rounded text-[10px] font-bold bg-gray-800 text-gray-300 font-mono">
                                 {strat.category}

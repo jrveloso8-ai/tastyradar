@@ -95,9 +95,10 @@ export function Navbar({
 
           {/* Right Status Badges & Mobile Menu Button */}
           <div className="flex items-center gap-2">
-            {uniqueVisitors && (
+            {Boolean(uniqueVisitors) && (
               <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#0c1322] border border-gray-800 text-[11px] font-mono text-cyan-300">
                 <Users className="w-3 h-3 text-cyan-400" />
+                {/* eslint-disable-next-line local-rules/no-raw-numbers-in-jsx -- contador de acessos unicos ao radar (metrica de infra/trafego web, nao e dado financeiro) */}
                 <span><strong>{uniqueVisitors}</strong> únicos</span>
               </div>
             )}
