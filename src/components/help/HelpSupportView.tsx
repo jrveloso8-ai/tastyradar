@@ -97,7 +97,7 @@ export function HelpSupportView() {
       id: 1,
       title: 'Arquitetura das 4 Camadas de Decisão Quantitativa',
       subtitle: 'Visão Geral do Modelo Determinístico',
-      content: `O sistema combina de forma estrita 4 camadas independentes: 1) Crivo Fundamentalista CNPI-P Normalizado (Rentabilidade 35%, Solvência 35%, Valuation 30%), 2) Análise Técnica CNPI-T (Médias 9/21/200, Stops e Alvos R:R ≥ 2:1), 3) Estrutura de Mercado & Gamma Exposure (GEX) em tempo real via Tastytrade, e 4) Catálogo CME de ${CME_25_STRATEGIES.length} Estratégias de Opções.`,
+      content: `O sistema combina de forma estrita 4 camadas independentes: 1) Crivo Fundamentalista CNPI-P Normalizado (Rentabilidade 35%, Solvência 35%, Valuation 30%), 2) Análise Técnica CNPI-T (Médias 9/21/200, Stops e Alvos R:R ≥ 2:1), 3) Estrutura de Mercado & Gamma Exposure (GEX) via modelo calibrado interno, com IV/gregas reais da Tastytrade quando disponíveis, e 4) Catálogo CME de ${CME_25_STRATEGIES.length} Estratégias de Opções.`,
     },
     {
       id: 2,
