@@ -1092,7 +1092,9 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                         <TrendingUp className="w-3.5 h-3.5" />
                         <span>SAÍDA COM LUCRO:</span>
                       </div>
-                      <p className="text-white font-semibold">{electedStrategy.takeProfitRule.profitGoal}</p>
+                      <p className="text-white font-semibold">
+                        <DataValue variant="inline" value={electedStrategy.takeProfitRule.targetPct} format="percent" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" /> do prêmio (+<DataValue variant="inline" value={electedStrategy.takeProfitRule.targetDollar} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" /> por contrato)
+                      </p>
                       <p className="text-gray-400 text-[11px]">{electedStrategy.takeProfitRule.description}</p>
                     </div>
 
@@ -1101,7 +1103,9 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                         <TrendingDown className="w-3.5 h-3.5" />
                         <span>SAÍDA COM PERDA (STOP):</span>
                       </div>
-                      <p className="text-white font-semibold">{electedStrategy.stopLossRule.lossLimit}</p>
+                      <p className="text-white font-semibold">
+                        Perda máxima travada em −<DataValue variant="inline" value={electedStrategy.stopLossRule.maxLoss} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" /> por contrato
+                      </p>
                       <p className="text-gray-400 text-[11px]">{electedStrategy.stopLossRule.description}</p>
                     </div>
 
@@ -1110,7 +1114,9 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                         <Clock className="w-3.5 h-3.5" />
                         <span>GATILHO DE TEMPO (TIME STOP):</span>
                       </div>
-                      <p className="text-white font-semibold">Desmontar a {electedStrategy.timeStopRule.dteLimit} dias úteis do vencimento</p>
+                      <p className="text-white font-semibold">
+                        Desmontar a <DataValue variant="inline" value={electedStrategy.timeStopRule.dteLimit} format="raw" provenance="SIMULADO" source="Playbook institucional Tastytrade (gerenciamento mecânico aos 21 DTE)" /> dias úteis do vencimento
+                      </p>
                       <p className="text-gray-400 text-[11px]">{electedStrategy.timeStopRule.description}</p>
                     </div>
                   </div>

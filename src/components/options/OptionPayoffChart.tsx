@@ -48,11 +48,12 @@ export interface ElectedStrategyData {
     recommendationRule: string;
   };
   takeProfitRule: {
-    profitGoal: string;
+    targetPct: number;
+    targetDollar: number;
     description: string;
   };
   stopLossRule: {
-    lossLimit: string;
+    maxLoss: number;
     description: string;
   };
   timeStopRule: {
@@ -563,11 +564,12 @@ export function buildElectedStrategyFromRecommendation(
         'Regra institucional Tastytrade: crédito recebido deve cobrir ao menos 1/3 (33%) da largura das asas vendidas.',
     },
     takeProfitRule: {
-      profitGoal: `${rec.lifecycle.profitTargetPct}% do prêmio (+$${Math.round(rec.lifecycle.profitTargetDollar * 100 * 100) / 100} por contrato)`,
+      targetPct: rec.lifecycle.profitTargetPct,
+      targetDollar: Math.round(rec.lifecycle.profitTargetDollar * 100 * 100) / 100,
       description: 'Realizar lucro quando a passagem do tempo consumir a fração-alvo do prêmio das opções.',
     },
     stopLossRule: {
-      lossLimit: `Perda máxima travada em -$${Math.round(rec.maxLoss * 100) / 100} por contrato`,
+      maxLoss: Math.round(rec.maxLoss * 100) / 100,
       description: rec.lifecycle.whatMakesItLose,
     },
     timeStopRule: {
