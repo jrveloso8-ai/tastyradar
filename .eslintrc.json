@@ -26,6 +26,19 @@
           }
         ]
       }
+    },
+    {
+      "files": ["src/components/**/*.tsx", "src/components/**/*.jsx"],
+      "excludedFiles": ["src/components/shared/DataValue.tsx"],
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "JSXExpressionContainer CallExpression[callee.property.name='toFixed']",
+            "message": "REGRA 00: Proibido .toFixed() solto em JSX. Use o componente estrutural <DataValue format=\"...\" /> com proveniencia e fonte obrigatorias."
+          }
+        ]
+      }
     }
   ]
 }
