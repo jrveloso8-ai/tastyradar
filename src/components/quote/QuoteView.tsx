@@ -918,33 +918,46 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                 {/* 4 CARDS DE MÉTRICAS FINANCEIRAS DE MONTAGEM */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono">
                   <div className="p-3.5 bg-[#111827] rounded-xl border border-gray-800">
-                    <span className="text-[10px] text-gray-400 block font-sans">
-                      {electedStrategy.isCredit ? 'CRÉDITO ESTIMADO' : 'CUSTO ESTIMADO'}
-                    </span>
-                    <span className="text-lg font-bold text-emerald-400 mt-1 block">
-                      ${Math.abs(electedStrategy.netCostOrCredit).toFixed(2)} / cota
-                    </span>
-                    <span className="text-[10px] text-gray-500 block font-sans">
+                    <DataValue
+                      label={electedStrategy.isCredit ? 'CRÉDITO ESTIMADO' : 'CUSTO ESTIMADO'}
+                      value={Math.abs(electedStrategy.netCostOrCredit)}
+                      format="currency"
+                      provenance="MEDIDO"
+                      source="Tastytrade REST (option-recommendation)"
+                      size="lg"
+                      className="[&_.font-bold]:text-emerald-400"
+                    />
+                    <span className="text-[10px] text-gray-500 block font-sans mt-1">
                       (${electedStrategy.totalCostOrCreditForLot.toLocaleString('en-US', { minimumFractionDigits: 2 })} por contrato de 100)
                     </span>
                   </div>
 
                   <div className="p-3.5 bg-[#111827] rounded-xl border border-gray-800">
-                    <span className="text-[10px] text-gray-400 block font-sans">LARGURA DO SPREAD</span>
-                    <span className="text-lg font-bold text-cyan-400 mt-1 block">
-                      ${electedStrategy.spreadWidth.toFixed(2)}
-                    </span>
-                    <span className="text-[10px] text-gray-500 block font-sans">
+                    <DataValue
+                      label="LARGURA DO SPREAD"
+                      value={electedStrategy.spreadWidth}
+                      format="currency"
+                      provenance="MEDIDO"
+                      source="Tastytrade REST (option-recommendation)"
+                      size="lg"
+                      className="[&_.font-bold]:text-cyan-400"
+                    />
+                    <span className="text-[10px] text-gray-500 block font-sans mt-1">
                       Retorno: {electedStrategy.returnOnRiskPct}% da largura
                     </span>
                   </div>
 
                   <div className="p-3.5 bg-[#111827] rounded-xl border border-gray-800">
-                    <span className="text-[10px] text-gray-400 block font-sans">PONTO DE EQUILÍBRIO</span>
-                    <span className="text-lg font-bold text-amber-400 mt-1 block">
-                      ${electedStrategy.breakEven.toFixed(2)}
-                    </span>
-                    <span className="text-[10px] text-gray-500 block font-sans">
+                    <DataValue
+                      label="PONTO DE EQUILÍBRIO"
+                      value={electedStrategy.breakEven}
+                      format="currency"
+                      provenance="MEDIDO"
+                      source="Tastytrade REST (option-recommendation)"
+                      size="lg"
+                      className="[&_.font-bold]:text-amber-400"
+                    />
+                    <span className="text-[10px] text-gray-500 block font-sans mt-1">
                       Break-even no vencimento
                     </span>
                   </div>
@@ -993,16 +1006,29 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                             </span>
                             <span className="font-bold text-white text-xs">{leg.symbol}</span>
                           </div>
-                          <div className="text-[11px] text-gray-400 mt-1 font-sans">
-                            Strike <strong>${leg.strike.toFixed(2)}</strong> • {leg.type}
+                          <div className="mt-1">
+                            <DataValue
+                              label={`STRIKE (${leg.type})`}
+                              value={leg.strike}
+                              format="currency"
+                              provenance="MEDIDO"
+                              source="Tastytrade REST (option-recommendation)"
+                              size="sm"
+                            />
                           </div>
                         </div>
 
                         <div className="text-right">
-                          <span className="text-xs font-bold text-white">
-                            {leg.action === 'VENDA' ? '+' : '-'}${leg.unitPrice.toFixed(2)} / cota
-                          </span>
-                          <div className="text-[10px] text-gray-400 font-sans">
+                          <DataValue
+                            label={leg.action === 'VENDA' ? 'PRÊMIO RECEBIDO' : 'PRÊMIO PAGO'}
+                            value={leg.unitPrice}
+                            format="currency"
+                            provenance="MEDIDO"
+                            source="Tastytrade REST (option-recommendation)"
+                            size="sm"
+                            className="items-end text-right"
+                          />
+                          <div className="text-[10px] text-gray-400 font-sans mt-0.5">
                             Total: ${leg.totalFinancial.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                           </div>
                           <div className="text-[9px] text-gray-500 font-mono">
@@ -1016,17 +1042,18 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                   {/* RESUMO DO PREÇO TOTAL POR OPERAÇÃO */}
                   <div className="pt-3 border-t border-gray-800 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
                     <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-xl bg-[#0b101b] border border-gray-800">
-                        <span className="text-[10px] text-gray-400 block font-sans uppercase">
-                          {electedStrategy.isCredit ? 'Crédito Líquido Total' : 'Custo Total da Operação (Débito)'}
-                        </span>
-                        <div className="flex items-baseline gap-2 mt-0.5">
-                          <span className={`text-base font-bold ${electedStrategy.isCredit ? 'text-emerald-400' : 'text-cyan-400'}`}>
-                            {electedStrategy.isCredit ? '+' : '−'}${Math.abs(electedStrategy.netCostOrCredit).toFixed(2)} <span className="text-xs text-gray-400 font-normal">/ cota</span>
-                          </span>
-                          <span className="text-xs font-bold text-gray-300 font-sans">
-                            • ${Math.abs(electedStrategy.totalCostOrCreditForLot).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-[10px] text-gray-500 font-normal">no contrato de 100</span>
-                          </span>
+                      <div className="p-2.5 rounded-xl bg-[#0b101b] border border-gray-800 flex items-center gap-3">
+                        <DataValue
+                          label={electedStrategy.isCredit ? 'Crédito Líquido Total' : 'Custo Total da Operação (Débito)'}
+                          value={Math.abs(electedStrategy.netCostOrCredit)}
+                          format="currency"
+                          provenance="MEDIDO"
+                          source="Tastytrade REST (option-recommendation)"
+                          size="md"
+                          className={electedStrategy.isCredit ? '[&_.font-bold]:text-emerald-400' : '[&_.font-bold]:text-cyan-400'}
+                        />
+                        <div className="text-xs font-bold text-gray-300 font-sans self-end pb-0.5">
+                          • ${Math.abs(electedStrategy.totalCostOrCreditForLot).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-[10px] text-gray-500 font-normal">no contrato de 100</span>
                         </div>
                       </div>
                     </div>
