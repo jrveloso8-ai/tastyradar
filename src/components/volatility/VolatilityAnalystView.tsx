@@ -318,29 +318,6 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
               </p>
             </div>
           </div>
-
-          <div className="flex flex-wrap items-center gap-2.5 font-mono text-xs">
-            <div className="bg-[#070b14] px-3 py-1.5 rounded-xl border border-gray-800 flex items-center gap-2">
-              <span className="text-gray-400">VIX Spot:</span>
-              <strong className="text-emerald-400">15.42</strong>
-              <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-300 font-bold">CONTANGO</span>
-            </div>
-            <div className="bg-[#070b14] px-3 py-1.5 rounded-xl border border-gray-800 flex items-center gap-2">
-              <span className="text-gray-400">VIX9D/VIX3M:</span>
-              <strong className="text-cyan-300">0.86</strong>
-              <span className="text-[9px] text-gray-400">(Calmo &lt; 1.0)</span>
-            </div>
-            <div className="bg-[#070b14] px-3 py-1.5 rounded-xl border border-gray-800 flex items-center gap-2">
-              <span className="text-gray-400">CBOE SKEW:</span>
-              <strong className="text-amber-400">138.2</strong>
-              <span className="text-[9px] text-amber-300/80 font-bold">Tail Risk</span>
-            </div>
-            <div className="bg-[#070b14] px-3 py-1.5 rounded-xl border border-emerald-500/30 flex items-center gap-2 shadow-sm">
-              <span className="text-gray-400">SPX Net GEX:</span>
-              <strong className="text-emerald-400">+$3.82 B</strong>
-              <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-bold">+GEX AMORTECIDO</span>
-            </div>
-          </div>
         </div>
       </div>
 
