@@ -498,7 +498,7 @@ export function UnifiedGexBarreirasView({
                 <span>DASHBOARD DE GAMMA EXPOSURE (GEX POR STRIKE)</span>
               </h4>
               <p className="text-xs text-gray-400 mt-0.5">
-                Exposição gama institucional em $ Milhões por strike para o vencimento de <strong>{currentExp.label}</strong> (<DataValue variant="inline" value={currentExp.dte} format="number" provenance="ESTIMADO" source="TASTYTRADE_EXPIRATIONS (catálogo de vencimentos)" /> DTE).
+                Exposição gama estimada em $ Milhões por strike para o vencimento de <strong>{currentExp.label}</strong> (<DataValue variant="inline" value={currentExp.dte} format="number" provenance="ESTIMADO" source="TASTYTRADE_EXPIRATIONS (catálogo de vencimentos)" /> DTE).
               </p>
             </div>
 
@@ -768,7 +768,7 @@ export function UnifiedGexBarreirasView({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs font-mono">
             <div className="bg-[#070b14] border border-emerald-500/20 rounded-xl p-3.5 space-y-2">
               <div className="flex justify-between items-center text-emerald-400 font-bold border-b border-gray-800 pb-1.5">
-                <span>Top 5 Call Walls (Resistência Institucional)</span>
+                <span>Top 5 Call Walls (Resistência Estimada)</span>
                 <span className="text-[10px] text-gray-400">Total OI</span>
               </div>
               <div className="space-y-1.5">
@@ -796,7 +796,7 @@ export function UnifiedGexBarreirasView({
 
             <div className="bg-[#070b14] border border-rose-500/20 rounded-xl p-3.5 space-y-2">
               <div className="flex justify-between items-center text-rose-400 font-bold border-b border-gray-800 pb-1.5">
-                <span>Top 5 Put Walls (Suporte Institucional)</span>
+                <span>Top 5 Put Walls (Suporte Estimado)</span>
                 <span className="text-[10px] text-gray-400">Total OI</span>
               </div>
               <div className="space-y-1.5">
@@ -887,7 +887,7 @@ export function UnifiedGexBarreirasView({
             <Target className="w-5 h-5 text-cyan-400" />
             <div>
               <h4 className="text-sm font-bold text-white font-mono uppercase tracking-tight">
-                Diretrizes Operacionais de Execução Institucional (GEX Engine)
+                Diretrizes Operacionais do Modelo de GEX (GEX Engine)
               </h4>
               <p className="text-xs text-gray-400 mt-0.5 font-sans">
                 O GEX não é análise técnica subjetiva — é a derivada de 2ª ordem que obriga os Market Makers ao Delta Hedging.

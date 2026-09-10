@@ -1017,7 +1017,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                       size="sm"
                     />
                     <span className="text-emerald-400 font-bold text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30">
-                      PUT SKEW INSTITUCIONAL (Proteção de Cauda)
+                      PUT SKEW MODELADO (Proteção de Cauda)
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
