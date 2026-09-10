@@ -44,7 +44,7 @@ export class FundamentalsEngine {
       (fco !== null && fco > 0 && netInc !== null && (netInc <= 0 || (fco / netInc > 2.5 && fco > 1000000000)))
     ) {
       isIncomeNormalized = true;
-      const impairmentValue = raw.nonRecurringImpairment || 0;
+      const impairmentValue = typeof raw.nonRecurringImpairment === 'number' ? raw.nonRecurringImpairment : 0;
       const impairmentDesc = impairmentValue > 0
         ? `Baixa contábil não-caixa de R$ ${(impairmentValue / 1e9).toFixed(1)} bi expurgada com base em FCO de R$ ${fco ? (fco / 1e9).toFixed(1) : 'N/A'} bi`
         : 'Lucro contábil deprimido por baixas não-caixa enquanto a geração operacional de caixa (FCO) se mantém robusta';

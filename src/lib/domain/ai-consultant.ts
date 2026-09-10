@@ -44,7 +44,7 @@ export class AIConsultantEngine {
       name: `${symbol} Stock`,
       sector: 'Geral',
       category: 'ALTA' as const,
-      spot: context.spotPrice || 150.0,
+      spot: typeof context.spotPrice === 'number' ? context.spotPrice : 0,
       change: 1.2,
       peRatio: 25.0,
       evEbitda: 15.0,

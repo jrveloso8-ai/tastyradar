@@ -112,7 +112,9 @@ export class BrapiService {
       const longDebt = balanceHistory?.longTermLoansAndFinancing ?? balanceHistory?.longTermDebt ?? null;
       let financialDebt: number | null = null;
       if (shortDebt !== null || longDebt !== null) {
-        financialDebt = (shortDebt || 0) + (longDebt || 0);
+        const sDebt = shortDebt !== null ? shortDebt : 0;
+        const lDebt = longDebt !== null ? longDebt : 0;
+        financialDebt = sDebt + lDebt;
       }
 
       let financialDebtToEbitda: number | null = null;
