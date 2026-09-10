@@ -158,7 +158,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
       iv30: live.iv30 ?? asset.iv30,
       liquidityRating: live.liquidityRating ?? asset.liquidityRating,
       daysToEarnings: live.daysToEarnings !== undefined ? live.daysToEarnings : asset.daysToEarnings,
-      dividendAmount: live.dividendYield ? Number((asset.spot * (live.dividendYield / 100)).toFixed(2)) : asset.dividendAmount,
+      dividendAmount: live.dividendYield ? Math.round((asset.spot * (live.dividendYield / 100)) * 100) / 100 : asset.dividendAmount,
       hvHistory: (live.hv90 !== undefined && live.hv60 !== undefined && live.hv30 !== undefined)
         ? [live.hv90, live.hv60, live.hv30]
         : asset.hvHistory,
@@ -440,10 +440,15 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                           </div>
                           <div className="text-[9px] text-gray-500 font-sans">{item.sector}</div>
                         </div>
-                        <div className="text-right">
-                          <div className={`font-bold ${item.spot <= 150 ? 'text-emerald-400' : 'text-gray-300'}`}>
-                            ${item.spot.toFixed(2)}
-                          </div>
+                        <div className="text-right flex flex-col items-end">
+                          <DataValue
+                            label="Spot"
+                            value={item.spot}
+                            provenance="ESTIMADO"
+                            source="SP500_DATASET (catálogo estático)"
+                            format="currency"
+                            size="sm"
+                          />
                           <div className="text-[9px] text-purple-300">
                             {'★'.repeat(item.liquidityRating)}
                           </div>
@@ -473,10 +478,9 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                   {filteredAssets.map(item => {
                     const isSelected = item.symbol === selectedSymbol;
                     const r = item.evaluation;
-
-                    let ivrClass = 'text-gray-300';
-                    if (item.ivr >= 65) ivrClass = 'text-rose-400 font-bold bg-rose-500/10 px-1.5 py-0.5 rounded';
-                    else if (item.ivr <= 30) ivrClass = 'text-cyan-400 font-bold bg-cyan-500/10 px-1.5 py-0.5 rounded';
+                    const isItemLive = liveMetricsMap[item.symbol.toUpperCase()]?.source === 'tastytrade-live';
+                    const itemProv = isItemLive ? 'MEDIDO' : 'ESTIMADO';
+                    const itemSource = isItemLive ? 'Tastytrade REST (option-recommendation)' : 'Modelo calibrado interno';
 
                     return (
                       <tr
@@ -497,21 +501,60 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                           <div className="text-[9px] text-gray-500 font-sans truncate w-24">{item.name}</div>
                         </td>
                         <td className="py-2.5 px-2 text-right">
-                          <div className="text-gray-200">${item.spot.toFixed(2)}</div>
-                          <div className={`text-[10px] ${item.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {item.change >= 0 ? '+' : ''}{item.change.toFixed(2)}%
+                          <div className="flex flex-col items-end gap-0.5">
+                            <DataValue
+                              label="Spot"
+                              value={item.spot}
+                              provenance="ESTIMADO"
+                              source="SP500_DATASET (catálogo estático)"
+                              format="currency"
+                              size="sm"
+                            />
+                            <DataValue
+                              label="Var"
+                              value={item.change}
+                              provenance="ESTIMADO"
+                              source="SP500_DATASET (catálogo estático)"
+                              format="percent"
+                              size="sm"
+                            />
                           </div>
                         </td>
                         <td className="py-2.5 px-2 text-center">
-                          <span className={ivrClass}>{item.ivr.toFixed(1)}%</span>
+                          <div className="flex justify-center">
+                            <DataValue
+                              label="IVR"
+                              value={item.ivr}
+                              provenance={itemProv}
+                              source={itemSource}
+                              format="percent"
+                              size="sm"
+                            />
+                          </div>
                         </td>
-                        <td className="py-2.5 px-2 text-center text-gray-400">
-                          {item.ivp.toFixed(0)}%
+                        <td className="py-2.5 px-2 text-center">
+                          <div className="flex justify-center">
+                            <DataValue
+                              label="IVP"
+                              value={item.ivp}
+                              provenance={itemProv}
+                              source={itemSource}
+                              format="percent"
+                              size="sm"
+                            />
+                          </div>
                         </td>
-                        <td className="py-2.5 px-2 text-center font-semibold">
-                          <span className={r.vrp >= 4 ? 'text-emerald-400' : r.vrp < 0 ? 'text-rose-400' : 'text-gray-300'}>
-                            {r.vrp >= 0 ? '+' : ''}{r.vrp.toFixed(1)}
-                          </span>
+                        <td className="py-2.5 px-2 text-center">
+                          <div className="flex justify-center">
+                            <DataValue
+                              label="VRP"
+                              value={r.vrp}
+                              provenance="DERIVADO"
+                              source="Cálculo VRP: IV 30d - HV 20d (YZ)"
+                              format="number"
+                              size="sm"
+                            />
+                          </div>
                         </td>
                         <td className="py-2.5 px-2 text-center text-[10px]">
                           <span className={r.gexRegime === '+GEX' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
