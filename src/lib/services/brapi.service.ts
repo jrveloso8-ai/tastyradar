@@ -75,7 +75,13 @@ export class BrapiService {
 
     try {
       const data = await this.fetchWithTimeout<any>(url, cacheKey, this.defaultCacheTtl);
-      const item = data?.results?.[0] || {};
+      const item = data?.results?.[0];
+      if (!item) {
+        return {
+          symbol: cleanSymbol,
+          fetchFailed: true,
+        };
+      }
       const fin = item?.financialData || {};
       const stats = item?.defaultKeyStatistics || {};
 
@@ -150,6 +156,7 @@ export class BrapiService {
       console.warn(`[BrapiService] Falha ao consultar fundamentos de ${cleanSymbol}:`, err.message);
       return {
         symbol: cleanSymbol,
+        fetchFailed: true,
       };
     }
   }

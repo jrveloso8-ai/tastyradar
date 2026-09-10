@@ -71,5 +71,7 @@ export interface RawFundamentalData {
   /** Dividend Yield. Fração decimal estrita (ex: 0.07 para 7.0%). */
   dividendYield?: number | null;
   nonRecurringImpairment?: number | null;
+  /** Sinalizador de falha de consulta na fonte (rede, timeout, ticker inexistente na API). */
+  fetchFailed?: boolean;
 }
 
