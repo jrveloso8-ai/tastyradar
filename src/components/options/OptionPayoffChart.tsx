@@ -13,7 +13,10 @@ export interface OptionLegData {
   unitPrice: number;
   totalFinancial: number;
   openInterest: number;
-  roleDescription?: string;
+  description: string;
+  delta: number | null;
+  iv: number | null;
+  oiIsProxy: boolean;
 }
 
 export interface ElectedStrategyData {
@@ -229,15 +232,26 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
                   <span className="font-bold">
                     {i === 0 ? '①' : i === 1 ? '②' : i === 2 ? '③' : '④'} {leg.action}
                   </span>
+                  {/* nao e valor exibido como preco, e identificador de opcao (formato OCC-like) */}
                   <span className="font-bold text-white">{leg.symbol}</span>
                   <span className="text-gray-400">
                     {leg.type} strike <DataValue variant="inline" value={leg.strike} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" />
                   </span>
-                  {leg.roleDescription && (
-                    <span className="text-[11px] text-gray-300 font-sans">
-                      ({leg.roleDescription})
-                    </span>
-                  )}
+                  <span className="text-[11px] text-gray-300 font-sans">
+                    ({leg.description} · Δ{' '}
+                    {leg.delta != null ? (
+                      <DataValue variant="inline" value={leg.delta} format="number" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" />
+                    ) : (
+                      'indisponível'
+                    )}{' '}
+                    · IV{' '}
+                    {leg.iv != null ? (
+                      <DataValue variant="inline" value={leg.iv} format="percent" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" />
+                    ) : (
+                      'indisponível'
+                    )}
+                    {leg.oiIsProxy && ' · OI: proxy de liquidez (não é OI real)'})
+                  </span>
                 </div>
                 <div className="text-right text-gray-300 font-bold">
                   {leg.action === 'VENDA' ? '+' : '−'}<DataValue variant="inline" value={leg.unitPrice} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" /> / cota
@@ -500,6 +514,7 @@ export function buildElectedStrategyFromRecommendation(
 
   const status = rec.meetsCreditRule ? 'AUTORIZADA' : 'CONDICIONAL (fora da regra de 1/3)';
 
+  // nao e valor exibido como preco, e rotulo do card com o intervalo de strikes montados
   const strikeRange = strikes.length
     ? `$${Math.round(Math.min(...strikes) * 100) / 100} a $${Math.round(Math.max(...strikes) * 100) / 100}`
     : '';
@@ -532,9 +547,12 @@ export function buildElectedStrategyFromRecommendation(
       totalFinancial: Math.round(l.midPrice * 100 * 100) / 100,
       // OI real via streaming DXLink quando disponível; se não vier na janela de
       // coleta, cai para o proxy de liquidez documentado (avgOptionVolume * 0.15) —
-      // nunca apresentado como "real" nesse caso (ver roleDescription abaixo).
+      // nunca apresentado como "real" nesse caso.
       openInterest: l.openInterest ?? Math.round(avgOptionVolume * 0.15),
-      roleDescription: `${l.description} · Δ ${l.delta != null ? Math.round(l.delta * 100) / 100 : 'indisponível'} · IV ${l.iv != null ? (Math.round(l.iv * 10) / 10) + '%' : 'indisponível'}${l.openInterest == null ? ' · OI: proxy de liquidez (não é OI real)' : ''}`,
+      description: l.description,
+      delta: l.delta != null ? Math.round(l.delta * 100) / 100 : null,
+      iv: l.iv != null ? Math.round(l.iv * 10) / 10 : null,
+      oiIsProxy: l.openInterest == null,
     })),
     tradeCheckGuide: rec.didacticRationale.whyThisStructure,
     pricingViability: {

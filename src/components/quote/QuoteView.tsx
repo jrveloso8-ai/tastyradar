@@ -896,6 +896,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                       <span className="w-7 h-7 rounded-lg bg-cyan-500 text-slate-950 font-black text-xs flex items-center justify-center font-mono shadow-md">
                         #{electedStrategy.id}
                       </span>
+                      {/* nao e valor exibido como preco, e rotulo identificador da estrategia montada */}
                       <h4 className="font-bold text-white text-base sm:text-lg">
                         {electedStrategy.title}
                       </h4>
@@ -1004,6 +1005,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                             >
                               {leg.action}
                             </span>
+                            {/* nao e valor exibido como preco, e identificador de opcao (formato OCC-like) */}
                             <span className="font-bold text-white text-xs">{leg.symbol}</span>
                           </div>
                           <div className="mt-1">
