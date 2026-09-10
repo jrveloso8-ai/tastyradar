@@ -476,6 +476,50 @@ describe('Audit Gate — Ciclo 5', () => {
     ).toBe(false);
   });
 
+  it('FASE2-06: vencimento de TASTYTRADE_EXPIRATIONS nunca aparece expirado e dte e calculado, nao literal', () => {
+    const src = read('src/components/options/UnifiedGexBarreirasView.tsx');
+
+    // Achado original: dte era numero literal gravado no array, nunca recalculado --
+    // vencimentos ja passados continuavam marcados com DTE positivo (ex.: '2026-09-04'
+    // com dte: 3 seis dias depois de vencido), e esse valor alimentava direto a formula
+    // de calculo de GEX (dteFactor, oiScale, pesos de OI, volume), nao so a exibicao.
+    expect(
+      /dte:\s*-?\d+/.test(src),
+      'TASTYTRADE_EXPIRATIONS (ou qualquer objeto de vencimento) voltou a gravar dte como ' +
+        'numero literal no array -- dte precisa ser sempre derivado de calculateExpirationDte ' +
+        'contra a data atual, nunca um valor fixo escrito a mao.'
+    ).toBe(false);
+
+    expect(
+      src.includes('function calculateExpirationDte') || src.includes('const calculateExpirationDte'),
+      'calculateExpirationDte nao existe mais -- essa funcao e a unica fonte de verdade para ' +
+        'o DTE de qualquer vencimento, calculado contra a data de hoje.'
+    ).toBe(true);
+
+    expect(
+      src.includes('function getAvailableExpirations') || src.includes('const getAvailableExpirations'),
+      'getAvailableExpirations nao existe mais -- sem ela, vencimentos ja passados podem ' +
+        'voltar a aparecer como opcao selecionavel na lista.'
+    ).toBe(true);
+
+    // A lista de botoes de vencimento (linha ~420 no momento do fix) precisa iterar sobre
+    // o resultado filtrado (availableExpirations), nunca direto sobre o array estatico cru --
+    // senao o item expirado volta a aparecer como opcao clicavel.
+    expect(
+      /\{TASTYTRADE_EXPIRATIONS\.map/.test(src),
+      'A lista de vencimentos voltou a mapear TASTYTRADE_EXPIRATIONS diretamente (array estatico, ' +
+        'sem filtro de expirado) em vez de availableExpirations (resultado de getAvailableExpirations).'
+    ).toBe(false);
+
+    // selectedExpId nao pode voltar a ter default hardcoded em uma data fixa -- isso e o mesmo
+    // problema de fundo: uma data especifica marcada como "a boa" vai expirar com o tempo.
+    expect(
+      /useState<string>\('2026-\d{2}-\d{2}'\)/.test(src),
+      'selectedExpId voltou a ter um id de vencimento fixo como valor inicial -- o default ' +
+        'precisa vir de getDefaultExpirationId(), calculado contra a data atual.'
+    ).toBe(false);
+  });
+
   it('C5-16: ESLint tem uma regra contra fallback numerico magico em domain/services', () => {
     const eslintrc = read('.eslintrc.json');
     const hasMagicFallbackRule =
