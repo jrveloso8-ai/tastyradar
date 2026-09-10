@@ -34,8 +34,8 @@
         "no-restricted-syntax": [
           "error",
           {
-            "selector": "JSXExpressionContainer CallExpression[callee.property.name='toFixed']",
-            "message": "REGRA 00: Proibido .toFixed() solto em JSX. Use o componente estrutural <DataValue format=\"...\" /> com proveniencia e fonte obrigatorias."
+            "selector": "CallExpression[callee.property.name='toFixed']",
+            "message": "REGRA 00: Proibido .toFixed() em componentes de UI, mesmo fora do JSX (ex: pre-calcular numa variavel e so interpolar a variavel nao escapa a regra). Use o componente estrutural <DataValue format=\"...\" /> com proveniencia e fonte obrigatorias."
           }
         ]
       }
