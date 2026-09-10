@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { 
   Activity, 
-  LayoutGrid, 
   Search, 
   TrendingUp, 
   Target, 
@@ -15,7 +14,7 @@ import {
   Gauge
 } from 'lucide-react';
 
-export type ActiveTab = 'panorama' | 'consulta' | 'rastreador' | 'barreiras' | 'analista-vol' | 'manual';
+export type ActiveTab = 'consulta' | 'rastreador' | 'barreiras' | 'analista-vol' | 'manual';
 
 interface NavbarProps {
   activeTab: ActiveTab;
@@ -44,7 +43,6 @@ export function Navbar({
   };
 
   const navItems: Array<{ id: ActiveTab; label: string; icon: any; isGex?: boolean; isVol?: boolean }> = [
-    { id: 'panorama', label: 'Panorama Geral', icon: LayoutGrid },
     { id: 'consulta', label: 'Consulta & Gráfico 12M', icon: Search },
     { id: 'rastreador', label: 'Rastreador de Tendências', icon: TrendingUp },
     { id: 'barreiras', label: 'Barreiras & Motor GEX', icon: Target, isGex: true },
@@ -147,7 +145,7 @@ export function Navbar({
         <div className="md:hidden bg-[#070b14] border-b border-gray-800/90 px-4 pt-3 pb-5 space-y-2 shadow-2xl animate-in slide-in-from-top-2 duration-200">
           <div className="text-[10px] font-mono uppercase text-gray-400 px-2 pb-1 border-b border-gray-800/60 flex justify-between items-center">
             <span>Navegação do Radar</span>
-            <span className="text-purple-400">6 Módulos</span>
+            <span className="text-purple-400">5 Módulos</span>
           </div>
 
           <div className="grid grid-cols-1 gap-1.5 pt-1">

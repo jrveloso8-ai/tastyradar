@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import { Navbar, ActiveTab } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
-import { PanoramaView } from '@/components/panorama/PanoramaView';
 import { QuoteView } from '@/components/quote/QuoteView';
 import { ScreenerView } from '@/components/screener/ScreenerView';
 import { BarreirasGexView } from '@/components/options/BarreirasGexView';
@@ -13,7 +12,7 @@ import { HelpSupportView } from '@/components/help/HelpSupportView';
 type ApiStatus = { status: 'ONLINE' | 'OFFLINE' | 'CHECANDO'; latencyMs: number | null };
 
 export default function HomePage() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('panorama');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('consulta');
   const [selectedSymbol, setSelectedSymbol] = useState<string>('NVDA');
   const [apiStatus, setApiStatus] = useState<ApiStatus>({ status: 'CHECANDO', latencyMs: null });
 
@@ -69,10 +68,6 @@ export default function HomePage() {
       <Navbar activeTab={activeTab} onTabChange={setActiveTab} apiStatus={apiStatus} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div id="panel-panorama" role="tabpanel" className={activeTab === 'panorama' ? 'block' : 'hidden'}>
-          {activeTab === 'panorama' && <PanoramaView />}
-        </div>
-
         <div id="panel-consulta" role="tabpanel" className={activeTab === 'consulta' ? 'block' : 'hidden'}>
           {activeTab === 'consulta' && (
             <QuoteView 
