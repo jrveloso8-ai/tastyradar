@@ -357,6 +357,34 @@ describe('Audit Gate — Ciclo 5', () => {
     ).toBe(true);
   });
 
+  it('FASE2-02: ScreenerView migrou para <DataValue> e expoe dataAsOf do catalogo', () => {
+    const src = read('src/components/screener/ScreenerView.tsx');
+
+    expect(
+      src.includes("import { DataValue } from '@/components/shared/DataValue'"),
+      'ScreenerView.tsx nao importa mais o componente estrutural DataValue -- a migracao ' +
+        'da Fase 2 (commit 473f0ed) foi revertida.'
+    ).toBe(true);
+
+    expect(
+      /\.toFixed\(/.test(src),
+      'ScreenerView.tsx voltou a ter .toFixed() solto no componente -- reintroduz numero ' +
+        'formatado sem badge de proveniencia.'
+    ).toBe(false);
+
+    expect(
+      src.includes('US_STOCKS_DATASET (catálogo estático)'),
+      'ScreenerView.tsx nao declara mais US_STOCKS_DATASET como fonte de Spot/Var/Stop/Alvo -- ' +
+        'confirme que os campos continuam marcados como ESTIMADO com a fonte real do catalogo.'
+    ).toBe(true);
+
+    expect(
+      src.includes('US_DATA_AS_OF'),
+      'ScreenerView.tsx nao expoe mais a marca-dagua de data do catalogo (US_DATA_AS_OF, ' +
+        'achado C5-01) -- essa tela era a unica das 7 que nunca mostrava isso.'
+    ).toBe(true);
+  });
+
   it('C5-16: ESLint tem uma regra contra fallback numerico magico em domain/services', () => {
     const eslintrc = read('.eslintrc.json');
     const hasMagicFallbackRule =
