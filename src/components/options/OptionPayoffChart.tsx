@@ -258,7 +258,9 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
             {pricingViability && (
               <div className="flex items-center gap-1.5 text-[11px] text-gray-300 font-sans">
                 <Shield className={`w-3.5 h-3.5 ${pricingViability.isAdequate ? 'text-emerald-400' : 'text-amber-400'}`} />
-                <span>{pricingViability.statusLabel} ({pricingViability.ratioToWidthPct}% da asa)</span>
+                <span>
+                  {pricingViability.statusLabel} (<DataValue variant="inline" value={pricingViability.ratioToWidthPct} format="percent" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" /> da asa)
+                </span>
               </div>
             )}
           </div>

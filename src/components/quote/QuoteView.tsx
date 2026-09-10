@@ -1065,7 +1065,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                           <div className="font-bold flex items-center gap-1.5">
                             <span>{electedStrategy.pricingViability.statusLabel}</span>
                             <span className="text-[10px] px-1.5 py-0.2 rounded bg-gray-900 border border-gray-700 font-mono">
-                              {electedStrategy.pricingViability.ratioToWidthPct}% da largura
+                              <DataValue variant="inline" value={electedStrategy.pricingViability.ratioToWidthPct} format="percent" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" /> da largura
                             </span>
                           </div>
                           <div className="text-[11px] text-gray-400">
