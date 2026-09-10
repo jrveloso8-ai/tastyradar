@@ -10,7 +10,7 @@ export function HelpSupportView() {
   const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; text: string }>>([
     {
       role: 'assistant',
-      text: `Olá! Sou o Consultor Quantitativo IA do RADAR. Posso esclarecer qualquer dúvida sobre o manual operacional, Gamma Exposure (GEX), o crivo fundamentalista CNPI-P normalizado, as ${CME_25_STRATEGIES.length} estratégias de opções CME ou regras de gestão de risco. O que deseja saber?`,
+      text: `Olá! Sou o Consultor Quantitativo IA do RADAR. Posso esclarecer qualquer dúvida sobre o manual operacional, Gamma Exposure (GEX), as ${CME_25_STRATEGIES.length} estratégias de opções CME ou regras de gestão de risco. O que deseja saber?`,
     },
   ]);
   const [inputMessage, setInputMessage] = useState('');
@@ -95,9 +95,9 @@ export function HelpSupportView() {
   const topics = [
     {
       id: 1,
-      title: 'Arquitetura das 4 Camadas de Decisão Quantitativa',
+      title: 'Arquitetura das Camadas de Decisão Quantitativa',
       subtitle: 'Visão Geral do Modelo Determinístico',
-      content: `O sistema combina de forma estrita 4 camadas independentes: 1) Crivo Fundamentalista CNPI-P Normalizado (Rentabilidade 35%, Solvência 35%, Valuation 30%), 2) Análise Técnica CNPI-T (Médias 9/21/200, Stops e Alvos R:R ≥ 2:1), 3) Estrutura de Mercado & Gamma Exposure (GEX) via modelo calibrado interno, com IV/gregas reais da Tastytrade quando disponíveis, e 4) Catálogo CME de ${CME_25_STRATEGIES.length} Estratégias de Opções.`,
+      content: `O sistema combina de forma estrita camadas quantitativas independentes: 1) Análise Técnica CNPI-T (Médias 9/21/200, Stops e Alvos R:R ≥ 2:1), 2) Estrutura de Mercado & Gamma Exposure (GEX) via modelo calibrado interno, com IV/gregas reais da Tastytrade quando disponíveis, e 3) Catálogo CME de ${CME_25_STRATEGIES.length} Estratégias de Opções. Métricas contábeis/fundamentalistas foram descontinuadas por ausência de vendor de dados ao vivo para ações americanas no ecossistema da corretora.`,
     },
     {
       id: 2,
@@ -107,9 +107,9 @@ export function HelpSupportView() {
     },
     {
       id: 3,
-      title: 'Normalização Contábil por FCO e Dívida Financeira Real',
-      subtitle: 'Auditoria e Sanidade Fundamentalista',
-      content: 'Diferente de sistemas convencionais, o RADAR cruza DRE com DFC. Se uma empresa (ex: VALE3) sofre uma baixa não-caixa (impairment de R$ 25,1 bi) mas mantém geração de caixa operacional forte (FCO R$ 50,6 bi), o lucro é normalizado para pontuação. Além disso, a Dívida Líquida isola passivos IFRS-16 e provisões socioambientais para refletir a alavancagem financeira real (0,8x vs 3,09x bruto).',
+      title: 'Descontinuação de Métricas Contábeis / Fundamentalistas',
+      subtitle: 'Integridade de Dados & Foco em Derivativos US',
+      content: 'O RADAR opera como terminal quantitativo focado em volatilidade, gregas e opções do mercado americano via Tastytrade. Como a Tastytrade não provê dados contábeis/fundamentalistas ao vivo para ações dos EUA, qualquer crivo contábil dependeria de catálogos estáticos desatualizados. Em conformidade com a Regra 00 de Integridade de Dados, métricas contábeis foram completamente removidas para evitar falsa sensação de precisão.',
     },
     {
       id: 4,
@@ -128,9 +128,7 @@ export function HelpSupportView() {
 
     try {
       const response = await aiConsultantEngine.consult(textToSend, {
-        symbol: 'SPX',
-        spotPrice: 6000,
-        category: 'LATERAL',
+        symbol: 'SPY',
       });
 
       setChatMessages((prev) => [
@@ -145,7 +143,7 @@ export function HelpSupportView() {
         ...prev,
         {
           role: 'assistant',
-          text: `Erro ao consultar a IA: ${err?.message || 'Tente novamente em instantes.'}`,
+          text: `Erro ao consultar base de conhecimento: ${err.message || 'Tente novamente.'}`,
         },
       ]);
     } finally {
@@ -164,7 +162,7 @@ export function HelpSupportView() {
               Manual de Operações & Metodologia Quantitativa (Radar + GEX)
             </h3>
             <p className="text-xs text-gray-400 mt-1">
-              Guia detalhado de como o sistema analisa tendências, valida fundamentos, calcula o Gamma Exposure e estrutura posições com a Tastytrade.
+              Guia detalhado de como o sistema analisa tendências, calcula o Gamma Exposure e estrutura posições com a Tastytrade.
             </p>
           </div>
 
