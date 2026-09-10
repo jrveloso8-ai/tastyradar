@@ -48,6 +48,7 @@ function ProvenanceTag({ badge }: { badge: ProvenanceBadge }) {
     DERIVADO: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
     ESTIMADO: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
     SIMULADO: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+    INDISPONIVEL: 'bg-gray-500/20 text-gray-400 border-gray-500/40',
   };
   return (
     <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold font-mono border ${colorMap[badge]}`}>
