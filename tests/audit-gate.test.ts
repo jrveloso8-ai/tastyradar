@@ -208,6 +208,105 @@ describe('Audit Gate — Ciclo 5', () => {
   // (Math.random e catch vazio). Nao ha barreira mecanica contra o padrao
   // `|| <numero>` / `spot * 1.0x` que causou C5-01, C5-02/03 e C5-06.
   // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // FASE 1 (10/09) — inventario completo das 7 telas encontrou fabricacao/
+  // rotulo falso fora do escopo do Ciclo 5. Decisao do usuario: remover por
+  // hora (nao construir dado real ainda). Estes testes travam a remocao.
+  // -------------------------------------------------------------------------
+
+  it('FASE1-01: aba "Panorama Geral" foi removida (tela 100% fabricada, sem nenhuma fonte de dado)', () => {
+    const navbar = read('src/components/layout/Navbar.tsx');
+    const page = read('src/app/page.tsx');
+
+    expect(
+      /['"]panorama['"]/.test(navbar) || /Panorama Geral/.test(navbar),
+      'Navbar.tsx ainda referencia a aba "panorama"/"Panorama Geral". Esta aba era ' +
+        '100% fabricada (termometro de sentimento, 5 pilares, VIX/SKEW/macro) sem ' +
+        'nenhuma chamada de API ou catalogo por tras — decisao foi remover, nao corrigir ' +
+        'aos poucos. Remova a entrada de "panorama" de navItems e do tipo ActiveTab.'
+    ).toBe(false);
+
+    expect(
+      /PanoramaView/.test(page),
+      'page.tsx ainda importa ou renderiza PanoramaView. Remova o import e o bloco ' +
+        '<div id="panel-panorama">.'
+    ).toBe(false);
+
+    expect(
+      /useState<ActiveTab>\(['"]panorama['"]\)/.test(page),
+      'O activeTab default de page.tsx ainda comeca em "panorama". Troque para outra ' +
+        'aba (ex.: "consulta", que ja passou pelo Ciclo 5 e tem proveniencia honesta).'
+    ).toBe(false);
+
+    expect(
+      existsSync(path.join(ROOT, 'src/components/panorama/PanoramaView.tsx')),
+      'src/components/panorama/PanoramaView.tsx ainda existe no repositorio. Apague o ' +
+        'arquivo — nao deixe como codigo morto desreferenciado (isso so recria o mesmo ' +
+        'problema que auditorias anteriores ja apontaram: dead code sem explicacao).'
+    ).toBe(false);
+  });
+
+  it('FASE1-02: tarja de VIX/SKEW/SPX Net GEX hardcoded foi removida da Analista de Volatilidade', () => {
+    const src = read('src/components/volatility/VolatilityAnalystView.tsx');
+    const forbidden = ['VIX Spot:', 'VIX9D/VIX3M', 'CBOE SKEW', 'SPX Net GEX'];
+    for (const phrase of forbidden) {
+      expect(
+        src.includes(phrase),
+        `VolatilityAnalystView.tsx ainda contem "${phrase}" — essa tarja inteira (VIX ` +
+          'Spot: 15.42, VIX9D/VIX3M: 0.86, CBOE SKEW: 138.2, SPX Net GEX: +$3.82 B) era ' +
+          'literal fixo no JSX, sem nenhuma variavel ou chamada de API. Remova o bloco ' +
+          'inteiro em vez de deixar parte dele.'
+      ).toBe(false);
+    }
+  });
+
+  it('FASE1-03: badge "Fonte: Tastytrade Live" colado ao Spot foi removido (nao correspondia ao spot)', () => {
+    const src = read('src/components/volatility/VolatilityAnalystView.tsx');
+    expect(
+      src.includes('Fonte: Tastytrade Live'),
+      'VolatilityAnalystView.tsx ainda contem o texto "Fonte: Tastytrade Live". Esse ' +
+        'badge testava liveMetricsMap[...]?.source, um campo de IV/GEX, nao do spot — ' +
+        'mas ficava posicionado visualmente colado ao Spot (que vem do catalogo ' +
+        'estatico, nunca atualizado pelo merge com dado ao vivo). Remova o badge; nao ' +
+        'precisa adicionar um novo badge "ESTIMADO" nesta rodada, so tirar a alegacao falsa.'
+    ).toBe(false);
+  });
+
+  it('FASE1-04: ScreenerView nao alega continuidade/dado real que o catalogo estatico nao sustenta', () => {
+    const src = read('src/components/screener/ScreenerView.tsx');
+    expect(
+      src.includes('Escaneamento contínuo') || src.includes('Escaneamento continuo'),
+      'ScreenerView.tsx ainda diz "Escaneamento contínuo das ações do S&P 500..." — a ' +
+        'lista vem de US_STOCKS_DATASET estatico, sem nenhum merge com dado ao vivo. ' +
+        'Reescreva para algo honesto (ex.: "Lista de ativos do catálogo S&P 500").'
+    ).toBe(false);
+
+    expect(
+      src.includes('IV ATM Real Favorável') || src.includes('IV ATM Real Favoravel'),
+      'ScreenerView.tsx ainda usa "IV ATM Real Favorável" no criterio da categoria ' +
+        'LATERAL — item.ivRank vem do catalogo estatico, nao e "Real". Remova a palavra ' +
+        '"Real" desse rotulo.'
+    ).toBe(false);
+
+    expect(
+      /setTimeout\(\s*\(\)\s*=>\s*setIsRefreshing\(false\)/.test(src),
+      'ScreenerView.tsx ainda tem o botao "Atualizar" ligado a um setTimeout que so gira ' +
+        'o icone por 400ms sem rebuscar nada (teatro de UI). Remova o handleRefresh falso ' +
+        'e o spinner, ou o botao inteiro, ate existir uma rebusca real para conectar a ele.'
+    ).toBe(false);
+  });
+
+  it('FASE1-05: Manual & Ajuda nao alega GEX "em tempo real" quando o motor e modelo calibrado', () => {
+    const src = read('src/components/help/HelpSupportView.tsx');
+    expect(
+      src.includes('Gamma Exposure (GEX) em tempo real via Tastytrade'),
+      'HelpSupportView.tsx ainda descreve o GEX como "em tempo real via Tastytrade" — ' +
+        'contradiz o proprio tooltip honesto do motor em UnifiedGexBarreirasView.tsx ' +
+        '("modelo parametrico interno... nao representa posicionamento real de ' +
+        'mercado"). Reescreva a frase para refletir o que o motor realmente faz.'
+    ).toBe(false);
+  });
+
   it('C5-16: ESLint tem uma regra contra fallback numerico magico em domain/services', () => {
     const eslintrc = read('.eslintrc.json');
     const hasMagicFallbackRule =
