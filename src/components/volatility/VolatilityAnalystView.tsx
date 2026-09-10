@@ -1060,7 +1060,6 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                 <div className="flex items-center gap-2">
                   <h2 className="text-2xl font-black font-mono text-white">{selectedAsset.symbol}</h2>
                   <span className="text-xs text-gray-400 font-sans">{selectedAsset.name}</span>
-                  <span className="px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono">Líquido 5/5</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-3 font-mono text-xs mt-1">
                   <span>Spot: <strong className="text-white">${selectedAsset.spot.toFixed(2)}</strong></span>
