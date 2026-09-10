@@ -68,9 +68,6 @@ export interface MarketAssetQuote {
   low52w: number;
   volume: number;
   avgVolume20: number;
-  peRatio?: number;
-  evEbitda?: number;
-  dividendYield?: number;
   ivRank?: number;
   ivPercentile30d?: number;
   hv21?: number;
@@ -78,5 +75,4 @@ export interface MarketAssetQuote {
   updatedAt: string;
 }
 
-export * from './financial';
 export * from './provenance';
