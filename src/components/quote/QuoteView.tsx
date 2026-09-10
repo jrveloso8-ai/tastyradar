@@ -604,10 +604,14 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
               <span className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 ${
                 fundResult.status === 'APROVADO'
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm shadow-emerald-500/10'
+                  : fundResult.status === 'EM_OBSERVACAO'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm shadow-amber-500/10'
                   : 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm shadow-rose-500/10'
               }`}>
                 {fundResult.status === 'APROVADO' ? (
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                ) : fundResult.status === 'EM_OBSERVACAO' ? (
+                  <Info className="w-4 h-4 text-amber-400" />
                 ) : (
                   <AlertTriangle className="w-4 h-4 text-rose-400" />
                 )}
