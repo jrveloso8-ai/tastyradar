@@ -30,7 +30,13 @@
     {
       "files": ["src/components/**/*.tsx", "src/components/**/*.jsx"],
       "excludedFiles": ["src/components/shared/DataValue.tsx"],
+      "parser": "@typescript-eslint/parser",
+      "parserOptions": {
+        "project": "./tsconfig.json"
+      },
+      "plugins": ["local-rules"],
       "rules": {
+        "local-rules/no-raw-numbers-in-jsx": "error",
         "no-restricted-syntax": [
           "error",
           {
