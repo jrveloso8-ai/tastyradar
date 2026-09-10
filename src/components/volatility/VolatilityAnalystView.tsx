@@ -1067,8 +1067,6 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                   <span className={`font-semibold ${selectedAsset.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {selectedAsset.change >= 0 ? '+' : ''}{selectedAsset.change.toFixed(2)}%
                   </span>
-                  <span className="text-gray-500">|</span>
-                  <span className="text-gray-400">SOFR: <strong className="text-gray-200">5.32%</strong></span>
                 </div>
               </div>
 
