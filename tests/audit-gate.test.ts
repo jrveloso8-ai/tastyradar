@@ -596,6 +596,73 @@ describe('Audit Gate — Ciclo 5', () => {
     ).toBe(true);
   });
 
+  it('FASE3-01: crivo fundamentalista foi removido por completo (nenhum resquicio de score/veredito contabil)', () => {
+    const fs = require('fs');
+
+    // Achado: nao existia fonte real de fundamentos para acoes americanas no ecossistema
+    // Tastytrade (corretora, nao vendor de dados contabeis), e BRAPI (a unica alternativa
+    // cotada) so cobre B3. Um "crivo" com veredito de aprovacao sobre catalogo estatico
+    // e a mesma classe de falso-confianca corrigida no resto do sistema -- decisao foi
+    // remover a analise fundamentalista por completo, nao so consertar o rotulo.
+
+    // 1. Os arquivos do motor e do servico de dado nao existem mais.
+    const deletedPaths = [
+      'src/lib/domain/fundamentals-engine.ts',
+      'src/lib/domain/fundamentals-engine.test.ts',
+      'src/lib/services/brapi.service.ts',
+      'src/app/api/market/fundamentals/route.ts',
+      'src/lib/types/financial.ts',
+    ];
+    for (const p of deletedPaths) {
+      expect(
+        fs.existsSync(path.join(ROOT, p)),
+        `${p} foi reintroduzido -- o crivo fundamentalista foi removido por decisao explicita ` +
+          '(sem fonte real de dado contabil para o mercado americano no ecossistema Tastytrade).'
+      ).toBe(false);
+    }
+
+    // 2. Nenhum arquivo fonte de src referencia mais o motor, o servico ou os campos do
+    // veredito -- nem um resquicio isolado que reintroduza o conceito por um caminho novo.
+    const walk = (dir: string): string[] => {
+      const entries = fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true });
+      let files: string[] = [];
+      for (const entry of entries) {
+        const rel = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) files = files.concat(walk(rel));
+        else if (/\.(ts|tsx)$/.test(entry.name)) files.push(rel);
+      }
+      return files;
+    };
+    const forbiddenPattern = /fundamentalsEngine|fundResult|fundStatus|fundScore|brapiService|BrapiService|RawFundamentalData|FundamentalAnalysisResult/;
+    const offenders: string[] = [];
+    for (const rel of walk('src')) {
+      const content = read(rel);
+      if (forbiddenPattern.test(content)) offenders.push(rel);
+    }
+    expect(
+      offenders,
+      `Referencia residual ao crivo fundamentalista removido encontrada em: ${offenders.join(', ')}`
+    ).toEqual([]);
+
+    // 3. QuoteView.tsx nao tem mais aba/estado 'fundamentos'.
+    const quoteViewSrc = read('src/components/quote/QuoteView.tsx');
+    expect(
+      quoteViewSrc.includes("'fundamentos'"),
+      'QuoteView.tsx ainda declara o estado/aba "fundamentos" -- a aba Fundamentos (CNPI-F) ' +
+        'deveria ter sido removida junto com o motor.'
+    ).toBe(false);
+
+    // 4. ai-consultant.ts responde de forma honesta se alguem perguntar sobre fundamentos --
+    // nao pode simplesmente sumir sem explicar o motivo tecnico da descontinuacao.
+    const aiConsultantSrc = read('src/lib/domain/ai-consultant.ts');
+    expect(
+      /descontinuad/i.test(aiConsultantSrc),
+      'ai-consultant.ts nao explica mais a descontinuacao da analise fundamentalista -- se o ' +
+        'usuario perguntar sobre fundamentos no chat, a resposta precisa dizer que foi removido ' +
+        'e por que (sem fonte real de dado contabil), nao silenciar ou inventar novo dado.'
+    ).toBe(true);
+  });
+
   it('C5-16: ESLint tem uma regra contra fallback numerico magico em domain/services', () => {
     const eslintrc = read('.eslintrc.json');
     const hasMagicFallbackRule =
