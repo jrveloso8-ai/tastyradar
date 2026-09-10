@@ -3,6 +3,7 @@
 import React from 'react';
 import { AlertTriangle, Info, Shield } from 'lucide-react';
 import { VolatilityRecommendation } from '@/lib/domain/volatility-engine';
+import { DataValue } from '@/components/shared/DataValue';
 
 export interface OptionLegData {
   action: 'COMPRA' | 'VENDA';
@@ -104,8 +105,8 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
   const maxK = Math.max(...(allStrikes.length ? allStrikes : [spot]), spot);
   const paddingX = Math.max((maxK - minK) * 0.45, spot * 0.10);
 
-  const minX = Math.max(0.5, Number((minK - paddingX).toFixed(2)));
-  const maxX = Number((maxK + paddingX).toFixed(2));
+  const minX = Math.max(0.5, Math.round((minK - paddingX) * 100) / 100);
+  const maxX = Math.round((maxK + paddingX) * 100) / 100;
 
   const steps = 70;
   const stepSize = (maxX - minX) / steps;
@@ -194,16 +195,16 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
             </span>
           </div>
           <p className="text-xs text-gray-400 mt-1 font-mono">
-            Estrutura Ilustrativa (Modelo Interno) · ativo a ${spot.toFixed(2)} naquele fechamento · Perfil de Lucro e Prejuízo no Vencimento (Contrato 100 cotas)
+            Estrutura Ilustrativa (Modelo Interno) · ativo a <DataValue variant="inline" value={spot} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" /> naquele fechamento · Perfil de Lucro e Prejuízo no Vencimento (Contrato 100 cotas)
           </p>
         </div>
 
         <div className="flex items-center gap-2 font-mono text-xs shrink-0">
           <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">
-            Lucro Máx: +${maxProfitLot.toFixed(2)}
+            Lucro Máx: +<DataValue variant="inline" value={maxProfitLot} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" />
           </span>
           <span className="px-2.5 py-1 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 font-bold">
-            Perda Máx: -${maxLossLot.toFixed(2)}
+            Perda Máx: -<DataValue variant="inline" value={maxLossLot} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" />
           </span>
         </div>
       </div>
@@ -230,7 +231,7 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
                   </span>
                   <span className="font-bold text-white">{leg.symbol}</span>
                   <span className="text-gray-400">
-                    {leg.type} strike ${leg.strike.toFixed(2)}
+                    {leg.type} strike <DataValue variant="inline" value={leg.strike} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" />
                   </span>
                   {leg.roleDescription && (
                     <span className="text-[11px] text-gray-300 font-sans">
@@ -239,7 +240,7 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
                   )}
                 </div>
                 <div className="text-right text-gray-300 font-bold">
-                  {leg.action === 'VENDA' ? '+' : '−'}${leg.unitPrice.toFixed(2)} / cota
+                  {leg.action === 'VENDA' ? '+' : '−'}<DataValue variant="inline" value={leg.unitPrice} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" /> / cota
                 </div>
               </div>
             ))}
@@ -248,7 +249,7 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
           <div className="pt-2.5 border-t border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-2">
               <span className={`font-bold ${isCredit ? 'text-emerald-400' : 'text-cyan-400'}`}>
-                {isCredit ? 'Crédito Líquido:' : 'Custo Líquido (Débito):'} {isCredit ? '+' : '−'}${Math.abs(netCostOrCredit).toFixed(2)} / cota
+                {isCredit ? 'Crédito Líquido:' : 'Custo Líquido (Débito):'} {isCredit ? '+' : '−'}<DataValue variant="inline" value={Math.abs(netCostOrCredit)} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" /> / cota
               </span>
               <span className="text-gray-400 font-sans">
                 (Total: ${(Math.abs(netCostOrCredit) * 100).toLocaleString('en-US', { minimumFractionDigits: 2 })} por contrato de 100)
@@ -299,7 +300,19 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
                   fontSize="9"
                   fontFamily="monospace"
                 >
-                  {isZero ? '$0' : `${ratio > 0 ? '+' : ''}$${val.toFixed(0)}`}
+                  {isZero ? '$0' : (
+                    <>
+                      {ratio > 0 ? '+' : ''}
+                      <DataValue
+                        variant="inline"
+                        as="tspan"
+                        value={Math.round(val)}
+                        format="currency"
+                        provenance="SIMULADO"
+                        source="Modelo interno de precificação (sem consulta a book de opções real)"
+                      />
+                    </>
+                  )}
                 </text>
               </g>
             );
@@ -325,7 +338,7 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
             fontWeight="bold"
             fontFamily="monospace"
           >
-            Spot Atual (${spot.toFixed(2)})
+            Spot Atual (<DataValue variant="inline" as="tspan" value={spot} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" />)
           </text>
 
           {/* Linha Vertical do Break-Even */}
@@ -350,7 +363,7 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
                 fontWeight="bold"
                 fontFamily="monospace"
               >
-                Break-Even {breakEvenUpperX !== null ? 'Inferior ' : ''}(${breakEven.toFixed(2)})
+                Break-Even {breakEvenUpperX !== null ? 'Inferior ' : ''}(<DataValue variant="inline" as="tspan" value={breakEven} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" />)
               </text>
             </g>
           )}
@@ -377,7 +390,7 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
                 fontWeight="bold"
                 fontFamily="monospace"
               >
-                Break-Even Superior (${breakEvenUpper!.toFixed(2)})
+                Break-Even Superior (<DataValue variant="inline" as="tspan" value={breakEvenUpper!} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" />)
               </text>
             </g>
           )}
@@ -405,11 +418,13 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
             🟢 ZONA DE LUCRO
           </span>
           <p className="text-white font-semibold">
-            {bias === 'ALTA'
-              ? `Acima de $${breakEven.toFixed(2)} (Lucro máx: +$${maxProfitLot.toFixed(2)})`
-              : bias === 'BAIXA'
-              ? `Abaixo de $${breakEven.toFixed(2)} (Lucro máx: +$${maxProfitLot.toFixed(2)})`
-              : `Entre os strikes de equilíbrio`}
+            {bias === 'ALTA' ? (
+              <>Acima de <DataValue variant="inline" value={breakEven} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" /> (Lucro máx: +<DataValue variant="inline" value={maxProfitLot} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" />)</>
+            ) : bias === 'BAIXA' ? (
+              <>Abaixo de <DataValue variant="inline" value={breakEven} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" /> (Lucro máx: +<DataValue variant="inline" value={maxProfitLot} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" />)</>
+            ) : (
+              `Entre os strikes de equilíbrio`
+            )}
           </p>
           <span className="text-[10px] text-gray-400 block font-sans">
             Garante a retenção do prêmio recebido na montagem da opção.
@@ -421,7 +436,10 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
             ⚖️ PONTO DE EQUILÍBRIO (ZERO A ZERO)
           </span>
           <p className="text-amber-300 font-bold">
-            ${breakEven.toFixed(2)}{breakEvenUpper !== undefined ? ` e $${breakEvenUpper.toFixed(2)}` : ''}
+            <DataValue variant="inline" value={breakEven} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" />
+            {breakEvenUpper !== undefined && (
+              <> e <DataValue variant="inline" value={breakEvenUpper} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" /></>
+            )}
           </p>
           <span className="text-[10px] text-gray-400 block font-sans">
             Preço exato onde o ganho da opção anula o custo de montagem.
@@ -433,7 +451,7 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
             🔴 ZONA DE PREJUÍZO CONTROLADO
           </span>
           <p className="text-red-300 font-semibold">
-            Perda máx travada em -${maxLossLot.toFixed(2)}
+            Perda máx travada em -<DataValue variant="inline" value={maxLossLot} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" />
           </p>
           <span className="text-[10px] text-gray-400 block font-sans">
             Risco 100% blindado pelas travas de proteção Tastytrade.
@@ -464,13 +482,13 @@ export function buildElectedStrategyFromRecommendation(
 ): ElectedStrategyData {
   const strikes = rec.legs.map((l) => l.strike);
   const spreadWidth = strikes.length
-    ? Number((Math.max(...strikes) - Math.min(...strikes)).toFixed(2))
+    ? Math.round((Math.max(...strikes) - Math.min(...strikes)) * 100) / 100
     : 0;
 
   const bias: 'ALTA' | 'BAIXA' | 'LATERAL' =
     rec.strategy.bias === 'ALTA' || rec.strategy.bias === 'BAIXA' ? rec.strategy.bias : 'LATERAL';
 
-  const returnOnRiskPct = rec.maxLoss > 0 ? Number(((rec.maxProfit / rec.maxLoss) * 100).toFixed(1)) : 0;
+  const returnOnRiskPct = rec.maxLoss > 0 ? Math.round(((rec.maxProfit / rec.maxLoss) * 100) * 10) / 10 : 0;
 
   // rec.expirationDate já é a data REAL do vencimento escolhido na cadeia da Tastytrade
   // (antes esta função somava `hoje + targetDte dias`, o que dava uma data aproximada
@@ -481,7 +499,7 @@ export function buildElectedStrategyFromRecommendation(
   const status = rec.meetsCreditRule ? 'AUTORIZADA' : 'CONDICIONAL (fora da regra de 1/3)';
 
   const strikeRange = strikes.length
-    ? `$${Math.min(...strikes).toFixed(2)} a $${Math.max(...strikes).toFixed(2)}`
+    ? `$${Math.round(Math.min(...strikes) * 100) / 100} a $${Math.round(Math.max(...strikes) * 100) / 100}`
     : '';
 
   return {
@@ -496,7 +514,7 @@ export function buildElectedStrategyFromRecommendation(
     status,
     isCredit: rec.isCredit,
     netCostOrCredit: rec.netCredit,
-    totalCostOrCreditForLot: Number((rec.netCredit * 100).toFixed(2)),
+    totalCostOrCreditForLot: Math.round(rec.netCredit * 100 * 100) / 100,
     spreadWidth,
     returnOnRiskPct,
     breakEven: rec.lowerBreakeven,
@@ -505,31 +523,31 @@ export function buildElectedStrategyFromRecommendation(
     maxLossLot: rec.maxLoss,
     legs: rec.legs.map((l) => ({
       action: l.action === 'BUY' ? 'COMPRA' : 'VENDA',
-      symbol: `${underlyingSymbol} ${l.type}${l.strike.toFixed(0)}`,
+      symbol: `${underlyingSymbol} ${l.type}${Math.round(l.strike)}`,
       type: l.type,
       strike: l.strike,
       unitPrice: l.midPrice,
-      totalFinancial: Number((l.midPrice * 100).toFixed(2)),
+      totalFinancial: Math.round(l.midPrice * 100 * 100) / 100,
       // OI real via streaming DXLink quando disponível; se não vier na janela de
       // coleta, cai para o proxy de liquidez documentado (avgOptionVolume * 0.15) —
       // nunca apresentado como "real" nesse caso (ver roleDescription abaixo).
       openInterest: l.openInterest ?? Math.round(avgOptionVolume * 0.15),
-      roleDescription: `${l.description} · Δ ${l.delta != null ? l.delta.toFixed(2) : 'indisponível'} · IV ${l.iv != null ? l.iv.toFixed(1) + '%' : 'indisponível'}${l.openInterest == null ? ' · OI: proxy de liquidez (não é OI real)' : ''}`,
+      roleDescription: `${l.description} · Δ ${l.delta != null ? Math.round(l.delta * 100) / 100 : 'indisponível'} · IV ${l.iv != null ? (Math.round(l.iv * 10) / 10) + '%' : 'indisponível'}${l.openInterest == null ? ' · OI: proxy de liquidez (não é OI real)' : ''}`,
     })),
     tradeCheckGuide: rec.didacticRationale.whyThisStructure,
     pricingViability: {
       isAdequate: rec.meetsCreditRule,
       statusLabel: rec.meetsCreditRule ? '✓ Crédito/Débito Adequado' : '⚠ Fora da Regra de 1/3',
-      ratioToWidthPct: Number((rec.creditWidthRatio * 100).toFixed(1)),
+      ratioToWidthPct: Math.round((rec.creditWidthRatio * 100) * 10) / 10,
       recommendationRule:
         'Regra institucional Tastytrade: crédito recebido deve cobrir ao menos 1/3 (33%) da largura das asas vendidas.',
     },
     takeProfitRule: {
-      profitGoal: `${rec.lifecycle.profitTargetPct}% do prêmio (+$${(rec.lifecycle.profitTargetDollar * 100).toFixed(2)} por contrato)`,
+      profitGoal: `${rec.lifecycle.profitTargetPct}% do prêmio (+$${Math.round(rec.lifecycle.profitTargetDollar * 100 * 100) / 100} por contrato)`,
       description: 'Realizar lucro quando a passagem do tempo consumir a fração-alvo do prêmio das opções.',
     },
     stopLossRule: {
-      lossLimit: `Perda máxima travada em -$${rec.maxLoss.toFixed(2)} por contrato`,
+      lossLimit: `Perda máxima travada em -$${Math.round(rec.maxLoss * 100) / 100} por contrato`,
       description: rec.lifecycle.whatMakesItLose,
     },
     timeStopRule: {
