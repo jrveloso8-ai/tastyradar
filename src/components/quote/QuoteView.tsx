@@ -40,22 +40,7 @@ import { CME_25_STRATEGIES, StrategySpec } from '@/lib/domain/cme-catalog';
 import { fundamentalsEngine } from '@/lib/domain/fundamentals-engine';
 import { RawFundamentalData } from '@/lib/types/financial';
 import { aiConsultantEngine } from '@/lib/domain/ai-consultant';
-import { ProvenanceBadge, combineProvenance } from '@/lib/types/provenance';
-
-function ProvenanceTag({ badge }: { badge: ProvenanceBadge }) {
-  const colorMap: Record<ProvenanceBadge, string> = {
-    MEDIDO: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
-    DERIVADO: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
-    ESTIMADO: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-    SIMULADO: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
-    INDISPONIVEL: 'bg-gray-500/20 text-gray-400 border-gray-500/40',
-  };
-  return (
-    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold font-mono border ${colorMap[badge]}`}>
-      {badge}
-    </span>
-  );
-}
+import { DataValue } from '@/components/shared/DataValue';
 
 interface QuoteViewProps {
   initialSymbol?: string;
@@ -398,28 +383,35 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
         </div>
 
         <div className="flex items-center gap-6 bg-[#070b14] px-5 py-3 rounded-xl border border-gray-800 text-right">
-          <div>
-            <div className="text-[10px] font-mono text-gray-400 flex items-center gap-1.5 justify-end">
-              <span>SPOT</span>
-              <ProvenanceTag badge="ESTIMADO" />
-            </div>
-            <div className="text-xl font-bold font-mono text-white">${currentStock.spot.toFixed(2)}</div>
-          </div>
-          <div>
-            <div className="text-[10px] font-mono text-gray-400 flex items-center gap-1.5 justify-end">
-              <span>VARIAÇÃO</span>
-              <ProvenanceTag badge="ESTIMADO" />
-            </div>
-            <div className={`text-sm font-bold font-mono ${currentStock.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {currentStock.change >= 0 ? '+' : ''}{currentStock.change.toFixed(2)}%
-            </div>
-          </div>
+          <DataValue
+            label="SPOT"
+            value={currentStock.spot}
+            format="currency"
+            provenance="ESTIMADO"
+            source="US_STOCKS_DATASET (catálogo estático)"
+            size="lg"
+            className="items-end text-right"
+          />
+          <DataValue
+            label="VARIAÇÃO"
+            value={currentStock.change}
+            format="percent"
+            provenance="ESTIMADO"
+            source="US_STOCKS_DATASET (catálogo estático)"
+            size="sm"
+            className={`items-end text-right ${currentStock.change >= 0 ? '[&_.font-bold]:text-emerald-400' : '[&_.font-bold]:text-rose-400'}`}
+          />
           <div className="border-l border-gray-800 pl-4">
-            <div className="text-[10px] font-mono text-gray-400 flex items-center gap-1.5 justify-end">
-              <span>OPÇÕES</span>
-              <ProvenanceTag badge={combineProvenance(['ESTIMADO', volRecStatus === 'ready' && volRecommendation ? 'MEDIDO' : 'ESTIMADO'])} />
-            </div>
-            <div className="text-xs font-bold font-mono text-cyan-300">2026-09-18 (12 DTE)</div>
+            <DataValue
+              label="OPÇÕES"
+              value={volRecStatus === 'ready' && electedStrategy ? `${electedStrategy.expirationDate} (${electedStrategy.dte} DTE)` : null}
+              format="raw"
+              provenance={volRecStatus === 'ready' && electedStrategy ? 'MEDIDO' : 'INDISPONIVEL'}
+              source="Tastytrade REST (option-recommendation)"
+              unavailableLabel="N/D"
+              size="sm"
+              className="items-end text-right [&_.font-bold]:text-cyan-300"
+            />
           </div>
         </div>
       </div>
@@ -538,21 +530,49 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                 </span>
               </div>
               <div className="space-y-2 text-xs">
-                <div className="flex justify-between p-2 rounded-lg bg-[#070b14] border border-gray-800">
-                  <span className="text-gray-400">Preço de Entrada (Spot):</span>
-                  <span className="text-white font-bold">${currentStock.spot.toFixed(2)}</span>
+                <div className="p-2 rounded-lg bg-[#070b14] border border-gray-800">
+                  <DataValue
+                    label="Preço de Entrada (Spot)"
+                    value={currentStock.spot}
+                    format="currency"
+                    provenance="ESTIMADO"
+                    source="US_STOCKS_DATASET (catálogo estático)"
+                    size="sm"
+                    className="flex flex-row items-center justify-between w-full"
+                  />
                 </div>
-                <div className="flex justify-between p-2 rounded-lg bg-[#070b14] border border-gray-800">
-                  <span className="text-gray-400">Stop Loss Técnico:</span>
-                  <span className="text-rose-400 font-bold">${currentStock.stop.toFixed(2)}</span>
+                <div className="p-2 rounded-lg bg-[#070b14] border border-gray-800">
+                  <DataValue
+                    label="Stop Loss Técnico"
+                    value={currentStock.stop}
+                    format="currency"
+                    provenance="ESTIMADO"
+                    source="US_STOCKS_DATASET (catálogo estático)"
+                    size="sm"
+                    className="flex flex-row items-center justify-between w-full [&_.font-bold]:text-rose-400"
+                  />
                 </div>
-                <div className="flex justify-between p-2 rounded-lg bg-[#070b14] border border-gray-800">
-                  <span className="text-gray-400">Alvo Parcial (1ª Resistência):</span>
-                  <span className="text-emerald-400 font-bold">${currentStock.alvo1.toFixed(2)}</span>
+                <div className="p-2 rounded-lg bg-[#070b14] border border-gray-800">
+                  <DataValue
+                    label="Alvo Parcial (1ª Resistência)"
+                    value={currentStock.alvo1}
+                    format="currency"
+                    provenance="ESTIMADO"
+                    source="US_STOCKS_DATASET (catálogo estático)"
+                    size="sm"
+                    className="flex flex-row items-center justify-between w-full [&_.font-bold]:text-emerald-400"
+                  />
                 </div>
-                <div className="flex justify-between p-2 rounded-lg bg-[#070b14] border border-gray-800">
-                  <span className="text-gray-400">Alvo Final (2ª Resistência):</span>
-                  <span className="text-emerald-400 font-bold">${currentStock.alvo2.toFixed(2)}</span>
+                <div className="p-2 rounded-lg bg-[#070b14] border border-gray-800">
+                  <DataValue
+                    label="Alvo Final (2ª Resistência)"
+                    value={currentStock.alvo2}
+                    format="currency"
+                    provenance="ESTIMADO"
+                    source="US_STOCKS_DATASET (catálogo estático)"
+                    size="sm"
+                    className="flex flex-row items-center justify-between w-full [&_.font-bold]:text-emerald-400"
+                  />
                 </div>
               </div>
             </div>
@@ -1163,21 +1183,49 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                 <div className="p-4 bg-[#070b14] rounded-xl border border-gray-800 space-y-3 font-mono">
                   <h5 className="font-bold text-xs text-emerald-400 font-sans uppercase">Parâmetros Operacionais de Entrada e Saída:</h5>
                   <div className="space-y-2 text-xs">
-                    <div className="flex justify-between p-2 rounded-lg bg-[#111827]">
-                      <span className="text-gray-400">Preço de Entrada (Spot):</span>
-                      <span className="text-white font-bold">${currentStock.spot.toFixed(2)}</span>
+                    <div className="p-2 rounded-lg bg-[#111827]">
+                      <DataValue
+                        label="Preço de Entrada (Spot)"
+                        value={currentStock.spot}
+                        format="currency"
+                        provenance="ESTIMADO"
+                        source="US_STOCKS_DATASET (catálogo estático)"
+                        size="sm"
+                        className="flex flex-row items-center justify-between w-full"
+                      />
                     </div>
-                    <div className="flex justify-between p-2 rounded-lg bg-[#111827]">
-                      <span className="text-gray-400">Stop Loss Técnico:</span>
-                      <span className="text-rose-400 font-bold">${currentStock.stop.toFixed(2)}</span>
+                    <div className="p-2 rounded-lg bg-[#111827]">
+                      <DataValue
+                        label="Stop Loss Técnico"
+                        value={currentStock.stop}
+                        format="currency"
+                        provenance="ESTIMADO"
+                        source="US_STOCKS_DATASET (catálogo estático)"
+                        size="sm"
+                        className="flex flex-row items-center justify-between w-full [&_.font-bold]:text-rose-400"
+                      />
                     </div>
-                    <div className="flex justify-between p-2 rounded-lg bg-[#111827]">
-                      <span className="text-gray-400">Alvo Parcial (1ª Resistência):</span>
-                      <span className="text-emerald-400 font-bold">${currentStock.alvo1.toFixed(2)}</span>
+                    <div className="p-2 rounded-lg bg-[#111827]">
+                      <DataValue
+                        label="Alvo Parcial (1ª Resistência)"
+                        value={currentStock.alvo1}
+                        format="currency"
+                        provenance="ESTIMADO"
+                        source="US_STOCKS_DATASET (catálogo estático)"
+                        size="sm"
+                        className="flex flex-row items-center justify-between w-full [&_.font-bold]:text-emerald-400"
+                      />
                     </div>
-                    <div className="flex justify-between p-2 rounded-lg bg-[#111827]">
-                      <span className="text-gray-400">Alvo Final (2ª Resistência):</span>
-                      <span className="text-emerald-400 font-bold">${currentStock.alvo2.toFixed(2)}</span>
+                    <div className="p-2 rounded-lg bg-[#111827]">
+                      <DataValue
+                        label="Alvo Final (2ª Resistência)"
+                        value={currentStock.alvo2}
+                        format="currency"
+                        provenance="ESTIMADO"
+                        source="US_STOCKS_DATASET (catálogo estático)"
+                        size="sm"
+                        className="flex flex-row items-center justify-between w-full [&_.font-bold]:text-emerald-400"
+                      />
                     </div>
                   </div>
                 </div>
