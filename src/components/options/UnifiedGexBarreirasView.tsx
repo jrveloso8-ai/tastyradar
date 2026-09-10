@@ -13,6 +13,7 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { calculateGex, RawOptionData } from '@/lib/domain/gex-engine';
+import { DataValue } from '@/components/shared/DataValue';
 
 export interface ExpirationOptionItem {
   id: string;
@@ -107,7 +108,7 @@ export function UnifiedGexBarreirasView({
     const occDate = currentExp.dateOCC;
 
     for (let i = 0; i < numStrikes; i++) {
-      const strike = Number((minK + i * step).toFixed(2));
+      const strike = Math.round((minK + i * step) * 100) / 100;
       const dist = (strike - spotPrice) / spotPrice;
 
       const callOiWeight = Math.exp(-Math.pow(dist - (0.03 * (currentExp.dte / 17)), 2) / 0.008);
@@ -122,11 +123,11 @@ export function UnifiedGexBarreirasView({
       const gamma = (Math.exp(-Math.pow(dist, 2) / (0.003 / dteFactor)) / (spotPrice * 0.15)) * dteFactor;
 
       const baseIv = currentExp.baseIv + Math.pow(dist * 8, 2) * 1.8;
-      const callIv = Number((baseIv - dist * 6).toFixed(1));
-      const putIv = Number((baseIv - dist * 12).toFixed(1));
+      const callIv = Math.round((baseIv - dist * 6) * 10) / 10;
+      const putIv = Math.round((baseIv - dist * 12) * 10) / 10;
 
-      const callDelta = Number((Math.max(0.01, Math.min(0.99, 0.5 + (spotPrice - strike) / (spotPrice * 0.18)))).toFixed(2));
-      const putDelta = Number((callDelta - 1).toFixed(2));
+      const callDelta = Math.round((Math.max(0.01, Math.min(0.99, 0.5 + (spotPrice - strike) / (spotPrice * 0.18)))) * 100) / 100;
+      const putDelta = Math.round((callDelta - 1) * 100) / 100;
 
       const symClean = symbol.toUpperCase().trim();
       const strikeStr = String(Math.round(strike * 1000)).padStart(8, '0');
@@ -169,8 +170,8 @@ export function UnifiedGexBarreirasView({
     const gexByStrike = new Map(gexResult.strikes.map(s => [s.strike, s]));
     return syntheticStrikes.map(s => {
       const g = gexByStrike.get(s.strike);
-      const callGex = Number((g?.callGex ?? 0).toFixed(2));
-      const putGex = Number((g?.putGex ?? 0).toFixed(2));
+      const callGex = Math.round((g?.callGex ?? 0) * 100) / 100;
+      const putGex = Math.round((g?.putGex ?? 0) * 100) / 100;
       return {
         strike: s.strike,
         callSymbol: s.callSymbol,
@@ -181,7 +182,7 @@ export function UnifiedGexBarreirasView({
         putVol: s.putVol,
         callGex,
         putGex,
-        netGex: Number((callGex + putGex).toFixed(2)),
+        netGex: Math.round((callGex + putGex) * 100) / 100,
         callIv: s.callIv,
         putIv: s.putIv,
         callDelta: s.callDelta,
@@ -192,11 +193,11 @@ export function UnifiedGexBarreirasView({
 
   // Totais, strike de maior GEX e zero gamma flip agora vêm direto do calculateGex(),
   // não de uma reconta local — única fonte de verdade por campo (REGRA 00).
-  const totalCallGex = useMemo(() => Number(gexResult.totalCallGex.toFixed(2)), [gexResult]);
+  const totalCallGex = useMemo(() => Math.round(gexResult.totalCallGex * 100) / 100, [gexResult]);
   // totalPutGex no motor é armazenado negativo (convenção de "GEX vendido pelo MM");
   // a UI aqui sempre exibiu a magnitude positiva, então aplicamos Math.abs().
-  const totalPutGex = useMemo(() => Number(Math.abs(gexResult.totalPutGex).toFixed(2)), [gexResult]);
-  const netGexTotal = useMemo(() => Number(gexResult.totalNetGex.toFixed(2)), [gexResult]);
+  const totalPutGex = useMemo(() => Math.round(Math.abs(gexResult.totalPutGex) * 100) / 100, [gexResult]);
+  const netGexTotal = useMemo(() => Math.round(gexResult.totalNetGex * 100) / 100, [gexResult]);
 
   // Nota: maxGexMagnetStrike do motor ranqueia por magnitude BRUTA (|call|+|put|),
   // enquanto a versão local anterior ranqueava por magnitude do GEX LÍQUIDO por strike.
@@ -204,7 +205,7 @@ export function UnifiedGexBarreirasView({
   // por ser a fonte única e documentada (ver gex-engine.ts).
   const maxGexStrike = useMemo(() => gexResult.maxGexMagnetStrike, [gexResult]);
 
-  const zeroGammaFlip = useMemo(() => Number(gexResult.zeroGammaFlip.toFixed(2)), [gexResult]);
+  const zeroGammaFlip = useMemo(() => Math.round(gexResult.zeroGammaFlip * 100) / 100, [gexResult]);
 
   const maxPain = useMemo(() => {
     let minLoss = Infinity;
@@ -293,7 +294,7 @@ export function UnifiedGexBarreirasView({
           </div>
 
           <div className="text-xs font-mono text-gray-400">
-            Ativo em Análise: <strong className="text-white">{symbol}</strong> • Spot: <strong className="text-cyan-400">${spotPrice.toFixed(2)}</strong>
+            Ativo em Análise: <strong className="text-white">{symbol}</strong> • Spot: <strong className="text-cyan-400"><DataValue variant="inline" value={spotPrice} format="currency" provenance="ESTIMADO" source="US_STOCKS_DATASET (catálogo estático)" /></strong>
           </div>
         </div>
       )}
@@ -396,27 +397,27 @@ export function UnifiedGexBarreirasView({
         {/* 6 Cartões Métricos */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs font-mono">
           <div className="p-3 bg-[#070b14] border border-gray-800 rounded-xl space-y-1">
-            <span className="text-[10px] text-gray-400 block font-sans">Spot Atual</span>
-            <span className="text-base font-bold text-white block">${spotPrice.toFixed(2)}</span>
+            <span className="text-[10px] text-gray-400 block font-sans">Preço Spot ({symbol})</span>
+            <DataValue variant="inline" value={spotPrice} format="currency" provenance="ESTIMADO" source="US_STOCKS_DATASET (catálogo estático)" className="text-base font-bold text-white block" />
             <span className="text-[10px] text-cyan-400 font-bold">{symbol}</span>
           </div>
 
           <div className="p-3 bg-[#070b14] border border-gray-800 rounded-xl space-y-1">
             <span className="text-[10px] text-gray-400 block font-sans">Total Call GEX</span>
-            <span className="text-base font-bold text-emerald-400 block">+$${totalCallGex}M</span>
+            <span className="text-base font-bold text-emerald-400 block">+${totalCallGex}M</span>
             <span className="text-[10px] text-emerald-400/80 font-sans">Força Compradora MM</span>
           </div>
 
           <div className="p-3 bg-[#070b14] border border-gray-800 rounded-xl space-y-1">
             <span className="text-[10px] text-gray-400 block font-sans">Total Put GEX</span>
-            <span className="text-base font-bold text-rose-400 block">-$${totalPutGex}M</span>
+            <span className="text-base font-bold text-rose-400 block">-${totalPutGex}M</span>
             <span className="text-[10px] text-rose-400/80 font-sans">Hedge Vendedor MM</span>
           </div>
 
           <div className="p-3 bg-[#070b14] border border-gray-800 rounded-xl space-y-1">
             <span className="text-[10px] text-gray-400 block font-sans">Net GEX Regime</span>
             <span className={`text-base font-bold block ${netGexTotal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {netGexTotal >= 0 ? '+GEX' : '-GEX'} ($${netGexTotal}M)
+              {netGexTotal >= 0 ? '+GEX' : '-GEX'} (${netGexTotal}M)
             </span>
             <span className="text-[10px] text-gray-400 font-sans">
               {netGexTotal >= 0 ? 'Vol Suprimida' : 'Vol Acelerada'}
@@ -425,13 +426,13 @@ export function UnifiedGexBarreirasView({
 
           <div className="p-3 bg-[#070b14] border border-gray-800 rounded-xl space-y-1">
             <span className="text-[10px] text-gray-400 block font-sans">Zero Gamma Flip</span>
-            <span className="text-base font-bold text-purple-400 block">\$${zeroGammaFlip.toFixed(2)}</span>
+            <DataValue variant="inline" value={zeroGammaFlip} format="currency" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" className="text-base font-bold text-purple-400 block" />
             <span className="text-[10px] text-purple-400/80 font-sans">Ponto de Transição</span>
           </div>
 
           <div className="p-3 bg-[#070b14] border border-gray-800 rounded-xl space-y-1">
             <span className="text-[10px] text-gray-400 block font-sans">Max GEX Magnet</span>
-            <span className="text-base font-bold text-cyan-400 block">\$${maxGexStrike.toFixed(2)}</span>
+            <DataValue variant="inline" value={maxGexStrike} format="currency" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" className="text-base font-bold text-cyan-400 block" />
             <span className="text-[10px] text-cyan-400/80 font-sans">Ímã de Pinning</span>
           </div>
         </div>
@@ -496,14 +497,14 @@ export function UnifiedGexBarreirasView({
               />
               <text
                 x={spotX}
-                y={padT - 6}
+                y={padT - 4}
                 textAnchor="middle"
                 fill="#22d3ee"
                 fontSize="9"
                 fontWeight="bold"
                 fontFamily="monospace"
               >
-                Spot $${spotPrice.toFixed(2)}
+                Spot <DataValue variant="inline" as="tspan" value={spotPrice} format="currency" provenance="ESTIMADO" source="US_STOCKS_DATASET (catálogo estático)" />
               </text>
 
               <line
@@ -524,7 +525,7 @@ export function UnifiedGexBarreirasView({
                 fontWeight="bold"
                 fontFamily="monospace"
               >
-                Flip $${zeroGammaFlip.toFixed(2)}
+                Flip <DataValue variant="inline" as="tspan" value={zeroGammaFlip} format="currency" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" />
               </text>
 
               {strikesData.map((s) => {
@@ -652,12 +653,11 @@ export function UnifiedGexBarreirasView({
                 <span>DISTRIBUIÇÃO DE VOLUME & OPEN INTEREST POR STRIKE</span>
               </h4>
               <p className="text-xs text-gray-400 mt-0.5">
-                Paredes de contratos institucionais abertos para {currentExp.dateStr} (Puts em Rosa, Calls em Ciano).
+                Paredes de contratos institucionais abertos para {currentExp.dateStr}.
               </p>
             </div>
-
             <div className="text-xs font-mono text-cyan-300 bg-[#070b14] px-3 py-1 rounded-lg border border-gray-800">
-              Max Pain: <strong>$${maxPain.toFixed(2)}</strong>
+              Max Pain: <strong><DataValue variant="inline" value={maxPain} format="currency" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" /></strong>
             </div>
           </div>
 
@@ -696,7 +696,7 @@ export function UnifiedGexBarreirasView({
                         ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                         : 'text-gray-300'
                     }`}>
-                      $${s.strike.toFixed(1)}
+                      <DataValue variant="inline" value={s.strike} format="currency" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" />
                     </span>
                   </div>
 
@@ -726,13 +726,15 @@ export function UnifiedGexBarreirasView({
                   <div key={w.strike} className="flex justify-between items-center text-gray-300 bg-[#0c1322] p-2 rounded-lg">
                     <div className="flex items-center gap-2">
                       <span className="text-emerald-400 font-bold">#{idx + 1}</span>
-                      <span>$${w.strike.toFixed(2)}</span>
+                      <span><DataValue variant="inline" value={w.strike} format="currency" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" /></span>
                       <span className="text-[10px] text-gray-400">{w.callSymbol}</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-emerald-400 font-bold">{w.callOi.toLocaleString()} OI</span>
                       <span className="text-[10px] text-gray-400">IV: {w.callIv}%</span>
-                      <span className="text-[10px] text-cyan-400">+{(((w.strike - spotPrice) / spotPrice) * 100).toFixed(1)}%</span>
+                      <span className="text-[10px] text-cyan-400">
+                        <DataValue variant="inline" value={((w.strike - spotPrice) / spotPrice) * 100} format="percent" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" />
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -749,13 +751,15 @@ export function UnifiedGexBarreirasView({
                   <div key={w.strike} className="flex justify-between items-center text-gray-300 bg-[#0c1322] p-2 rounded-lg">
                     <div className="flex items-center gap-2">
                       <span className="text-rose-400 font-bold">#{idx + 1}</span>
-                      <span>$${w.strike.toFixed(2)}</span>
+                      <span><DataValue variant="inline" value={w.strike} format="currency" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" /></span>
                       <span className="text-[10px] text-gray-400">{w.putSymbol}</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-rose-400 font-bold">{w.putOi.toLocaleString()} OI</span>
                       <span className="text-[10px] text-gray-400">IV: {w.putIv}%</span>
-                      <span className="text-[10px] text-rose-400">{(((w.strike - spotPrice) / spotPrice) * 100).toFixed(1)}%</span>
+                      <span className="text-[10px] text-rose-400">
+                        <DataValue variant="inline" value={((w.strike - spotPrice) / spotPrice) * 100} format="percent" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" />
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -787,7 +791,7 @@ export function UnifiedGexBarreirasView({
             <svg viewBox="0 0 850 180" className="w-full h-auto">
               <line x1={spotX} y1={20} x2={spotX} y2={145} stroke="#06b6d4" strokeWidth="1.5" strokeDasharray="4 4" />
               <text x={spotX} y={15} textAnchor="middle" fill="#22d3ee" fontSize="9" fontWeight="bold" fontFamily="monospace">
-                Spot $${spotPrice.toFixed(2)}
+                Spot <DataValue variant="inline" as="tspan" value={spotPrice} format="currency" provenance="ESTIMADO" source="US_STOCKS_DATASET (catálogo estático)" />
               </text>
 
               {strikesData.map((s, idx) => {
@@ -842,25 +846,25 @@ export function UnifiedGexBarreirasView({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
           <div className="p-3.5 bg-[#070b14] border border-emerald-500/30 rounded-xl space-y-1">
             <span className="text-[10px] text-emerald-400 font-bold block font-sans">1. RESISTÊNCIA (CALL WALL)</span>
-            <span className="text-base font-bold text-white block">\$${topCallWalls[0]?.strike.toFixed(2) || '—'}</span>
+            <DataValue variant="inline" value={topCallWalls[0]?.strike ?? null} format="currency" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" className="text-base font-bold text-white block" unavailableLabel="—" />
             <span className="text-[10px] text-gray-400 block font-sans">Ímã de alta & trava de balanceamento dos MMs.</span>
           </div>
 
           <div className="p-3.5 bg-[#070b14] border border-rose-500/30 rounded-xl space-y-1">
             <span className="text-[10px] text-rose-400 font-bold block font-sans">2. SUPORTE (PUT WALL)</span>
-            <span className="text-base font-bold text-white block">\$${topPutWalls[0]?.strike.toFixed(2) || '—'}</span>
+            <DataValue variant="inline" value={topPutWalls[0]?.strike ?? null} format="currency" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" className="text-base font-bold text-white block" unavailableLabel="—" />
             <span className="text-[10px] text-gray-400 block font-sans">Ímã de baixa & barreira matemática dos MMs.</span>
           </div>
 
           <div className="p-3.5 bg-[#070b14] border border-amber-500/30 rounded-xl space-y-1">
             <span className="text-[10px] text-amber-400 font-bold block font-sans">3. PIN CANDIDATE (ESCAPE OI)</span>
-            <span className="text-base font-bold text-amber-300 block">\$${maxPain.toFixed(2)}</span>
+            <DataValue variant="inline" value={maxPain} format="currency" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" className="text-base font-bold text-amber-300 block" />
             <span className="text-[10px] text-gray-400 block font-sans">Ponto de fuga secundário quando as Walls falham.</span>
           </div>
 
           <div className="p-3.5 bg-[#070b14] border border-purple-500/30 rounded-xl space-y-1">
             <span className="text-[10px] text-purple-400 font-bold block font-sans">4. ZERO GAMMA FLIP</span>
-            <span className="text-base font-bold text-purple-300 block">\$${zeroGammaFlip.toFixed(2)}</span>
+            <DataValue variant="inline" value={zeroGammaFlip} format="currency" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" className="text-base font-bold text-purple-300 block" />
             <span className="text-[10px] text-gray-400 block font-sans">Gatilho de transição entre Supressão e Squeeze.</span>
           </div>
         </div>
