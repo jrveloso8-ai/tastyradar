@@ -424,7 +424,6 @@ export function buildRecommendation(
   const strikeValues = pricedLegs.map((l) => l.strike);
   let width: number;
   if (strategy.id === 28 || strategy.id === 14) {
-    width = Math.max(1, Math.abs(pricedLegs[0].midPrice - pricedLegs[1].midPrice) > 0 ? pricedLegs[1].strike - pricedLegs[0].strike || 1 : 1);
     // Calendário: mesmo strike nas duas pernas — não há "largura" de asa real. Mantido
     // como referência mínima de $1 só para não dividir por zero nas fórmulas de
     // maxProfit/maxLoss abaixo, que já eram uma simplificação no arquivo original
@@ -444,8 +443,8 @@ export function buildRecommendation(
     ? Math.max(0, Number(((width - netCredit) * 100).toFixed(2)))
     : Number((Math.abs(netCredit) * 100).toFixed(2));
 
-  const divAmount = input.dividendAmount || 0;
-  const callExtrinsic = input.callExtrinsic || (netCredit > 0 ? netCredit * 0.5 : 1.0);
+  const divAmount = typeof input.dividendAmount === 'number' ? input.dividendAmount : 0;
+  const callExtrinsic = typeof input.callExtrinsic === 'number' ? input.callExtrinsic : (netCredit > 0 ? netCredit * 0.5 : 1.0);
   const hasDividendRisk = divAmount > 0 && divAmount > callExtrinsic;
   const dividendRiskReason = hasDividendRisk
     ? `ALERTA DE ATRIBUIÇÃO: Dividendo de $${divAmount.toFixed(2)} supera o extrínseco de $${callExtrinsic.toFixed(2)}. Risco iminente de exercício antecipado da Call curta!`
@@ -487,11 +486,13 @@ export function buildRecommendation(
   let dynamicPop: number | null = null;
   if (allSoldHaveDelta) {
     if (strategy.id === 20) {
-      const pDelta = Math.abs(soldLegs.find((l) => l.type === 'PUT')?.delta || 0);
-      const cDelta = Math.abs(soldLegs.find((l) => l.type === 'CALL')?.delta || 0);
+      const putLeg = soldLegs.find((l) => l.type === 'PUT');
+      const callLeg = soldLegs.find((l) => l.type === 'CALL');
+      const pDelta = putLeg?.delta != null ? Math.abs(putLeg.delta) : 0;
+      const cDelta = callLeg?.delta != null ? Math.abs(callLeg.delta) : 0;
       dynamicPop = Math.min(95, Math.max(5, Math.round((1 - pDelta - cDelta) * 100)));
     } else if (isCredit) {
-      const sDelta = Math.abs(soldLegs[0].delta || 0);
+      const sDelta = soldLegs[0]?.delta != null ? Math.abs(soldLegs[0].delta) : 0;
       dynamicPop = Math.min(95, Math.max(5, Math.round((1 - sDelta) * 100)));
     } else {
       const boughtLeg = pricedLegs.find((l) => l.action === 'BUY');
