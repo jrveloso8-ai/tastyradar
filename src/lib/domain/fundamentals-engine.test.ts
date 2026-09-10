@@ -75,8 +75,10 @@ describe('FundamentalsEngine (CNPI-P Audit & Normalization)', () => {
 
     const result = fundamentalsEngine.evaluate(rawEmpty);
 
-    expect(result.status).toBe('REPROVADO');
+    expect(result.status).toBe('EM_OBSERVACAO');
     expect(result.score).toBe(0);
+    expect(result.summary).toContain('EM OBSERVAÇÃO');
+    expect(result.analystVerdict).toContain('Dados fundamentalistas insuficientes');
 
     // Todas as métricas sem dados devem ter status 'N/D' e formatado 'N/D'
     result.metrics.forEach((metric) => {
@@ -84,6 +86,21 @@ describe('FundamentalsEngine (CNPI-P Audit & Normalization)', () => {
       expect(metric.formatted).toBe('N/D');
       expect(metric.value).toBeNull();
     });
+  });
+
+  it('deve atribuir status EM_OBSERVACAO quando fetchFailed for true', () => {
+    const rawFailed: RawFundamentalData = {
+      symbol: 'TICKER_FALHOU',
+      fetchFailed: true,
+      returnOnEquity: 0.18, // mesmo com algum dado residual
+      netMargin: 0.15,
+    };
+
+    const result = fundamentalsEngine.evaluate(rawFailed);
+
+    expect(result.status).toBe('EM_OBSERVACAO');
+    expect(result.summary).toContain('EM OBSERVAÇÃO');
+    expect(result.analystVerdict).toContain('Dados fundamentalistas insuficientes');
   });
 
   it('deve reprovar empresa com fundamentos deteriorados e alta alavancagem', () => {

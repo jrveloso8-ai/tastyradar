@@ -481,8 +481,15 @@ export class FundamentalsEngine {
     ];
 
     const topNegativeDrivers = allMetrics.filter((m) => m.status === 'RUIM');
+    const metricsWithRealValue = allMetrics.filter((m) => m.value !== null);
+    const hasInsufficientData = raw.fetchFailed === true || metricsWithRealValue.length < 3;
 
-    const status = finalScore >= this.minApprovalScore ? 'APROVADO' : 'REPROVADO';
+    let status: 'APROVADO' | 'REPROVADO' | 'EM_OBSERVACAO';
+    if (hasInsufficientData) {
+      status = 'EM_OBSERVACAO';
+    } else {
+      status = finalScore >= this.minApprovalScore ? 'APROVADO' : 'REPROVADO';
+    }
 
     // =========================================================================
     // 5. PARECER ANALÍTICO E SUMÁRIO DINÂMICO
@@ -499,9 +506,12 @@ export class FundamentalsEngine {
       }${solvPillar.score >= 60 ? ', solvência' : ''}${valPillar.score >= 60 ? ' e valuation atrativo' : ''}.`;
 
       analystVerdict = `${symbol} apresenta balanço financeiro consistente, alavancagem sob controle e rentabilidade comprovada. Aprovado para montagens estruturadas de swing trade e opções.`;
+    } else if (status === 'EM_OBSERVACAO') {
+      summary = `A empresa ${symbol} está EM OBSERVAÇÃO no crivo fundamentalista (Score preliminar ${finalScore}/100). Dados fundamentalistas insuficientes na fonte para emissão de parecer conclusivo (${metricsWithRealValue.length} de ${allMetrics.length} métricas disponíveis).`;
+      analystVerdict = `Dados fundamentalistas insuficientes para avaliação contábil de ${symbol}. Não há métricas auditáveis suficientes para atestar solvência ou rentabilidade. Recomenda-se cautela antes de assumir risco direcional.`;
     } else {
       const reasons = topNegativeDrivers.map((d) => d.name).join(', ');
-      summary = `A empresa ${symbol} foi REPROVADA no crivo fundamentalista (Score ${finalScore}/100, mínimo 45). Indicadores mais penalizados: ${reasons || 'dados insuficientes ou múltiplos fora dos limites'}.`;
+      summary = `A empresa ${symbol} foi REPROVADA no crivo fundamentalista (Score ${finalScore}/100, mínimo 45). Indicadores mais penalizados: ${reasons || 'múltiplos fora dos limites de segurança'}.`;
       analystVerdict = `Cuidado: ${symbol} não atinge os critérios mínimos de segurança contábil e múltiplos de valuation. Recomenda-se cautela em operações compradas direcionais.`;
     }
 
