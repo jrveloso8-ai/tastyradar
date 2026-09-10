@@ -2,7 +2,7 @@ import React from 'react';
 import { ProvenanceBadge } from '@/lib/types/provenance';
 
 export interface DataValueProps {
-  label: string;
+  label?: string;
   value: number | string | null | undefined;
   provenance: ProvenanceBadge;
   source: string;
@@ -12,6 +12,8 @@ export interface DataValueProps {
   unavailableLabel?: string;
   className?: string;
   size?: 'sm' | 'md' | 'lg';
+  variant?: 'badge' | 'inline';
+  as?: 'span' | 'tspan';
 }
 
 const PROVENANCE_COLORS: Record<ProvenanceBadge, string> = {
@@ -70,9 +72,11 @@ function formatValue(
  * <DataValue /> — Componente estrutural obrigatório para exibição de métricas numéricas.
  * 
  * Regra 00:
- * 1. Label + valor formatado + badge de proveniência sempre juntos.
+ * 1. Label + valor formatado + badge de proveniência sempre juntos (no modo default).
  * 2. Ausência de dado (null/undefined) exibe "N/D" em estilo neutro, nunca esconde nem mascara.
- * 3. Declaração obrigatória de provenance e source.
+ * 3. Declaração obrigatória de provenance e source em todos os modos.
+ * 4. variant="inline": renderiza somente o texto formatado (ou N/D), preservando a exigência
+ *    estrutural de tipagem sem poluir gráficos com dezenas de badges repetidos.
  */
 export function DataValue({
   label,
@@ -85,9 +89,20 @@ export function DataValue({
   unavailableLabel = 'N/D',
   className = '',
   size = 'md',
+  variant = 'badge',
+  as = 'span',
 }: DataValueProps) {
   const isAvailable = value !== null && value !== undefined && value !== '' && !Number.isNaN(value);
   const activeProvenance: ProvenanceBadge = isAvailable ? provenance : 'INDISPONIVEL';
+
+  if (variant === 'inline') {
+    const Component = as as any;
+    return (
+      <Component className={className}>
+        {isAvailable ? formatValue(value as number | string, format) : unavailableLabel}
+      </Component>
+    );
+  }
 
   const labelSize = size === 'sm' ? 'text-[9px]' : size === 'lg' ? 'text-xs' : 'text-[10px]';
   const valSize = size === 'sm' ? 'text-xs' : size === 'lg' ? 'text-xl' : 'text-sm';
@@ -95,9 +110,11 @@ export function DataValue({
   return (
     <div className={`inline-flex flex-col gap-0.5 font-mono ${className}`}>
       <div className="flex items-center gap-1.5">
-        <span className={`${labelSize} uppercase text-gray-400 font-semibold tracking-wider`}>
-          {label}
-        </span>
+        {label && (
+          <span className={`${labelSize} uppercase text-gray-400 font-semibold tracking-wider`}>
+            {label}
+          </span>
+        )}
         <ProvenanceTag
           badge={activeProvenance}
           source={source}

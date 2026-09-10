@@ -34,3 +34,48 @@ describe('Proveniência de Dados — Regra estrita de contágio', () => {
     expect(combineProvenance([])).toBe('MEDIDO');
   });
 });
+
+describe('DataValue — Componente Estrutural e Variante Inline', () => {
+  it('renderiza variant inline como span por padrao com format currency', async () => {
+    const { DataValue } = await import('@/components/shared/DataValue');
+    const elem = DataValue({
+      value: 125.4,
+      provenance: 'SIMULADO',
+      source: 'Modelo interno',
+      format: 'currency',
+      variant: 'inline',
+    });
+
+    expect(elem.type).toBe('span');
+    expect(elem.props.children).toBe('$125.40');
+  });
+
+  it('renderiza variant inline com tag customizada as="tspan"', async () => {
+    const { DataValue } = await import('@/components/shared/DataValue');
+    const elem = DataValue({
+      value: 50.5,
+      provenance: 'ESTIMADO',
+      source: 'Modelo GEX',
+      format: 'currency',
+      variant: 'inline',
+      as: 'tspan',
+    });
+
+    expect(elem.type).toBe('tspan');
+    expect(elem.props.children).toBe('$50.50');
+  });
+
+  it('renderiza N/D quando value e nulo em variant inline', async () => {
+    const { DataValue } = await import('@/components/shared/DataValue');
+    const elem = DataValue({
+      value: null,
+      provenance: 'MEDIDO',
+      source: 'Tastytrade REST',
+      format: 'currency',
+      variant: 'inline',
+    });
+
+    expect(elem.props.children).toBe('N/D');
+  });
+});
+
