@@ -102,7 +102,8 @@ export class TastytradeAuthService {
 
     const body = await res.json();
     const accessToken = body.access_token;
-    const expiresIn = body.expires_in || 900;
+    const DEFAULT_TOKEN_TTL_SECONDS = 900;
+    const expiresIn = typeof body.expires_in === 'number' ? body.expires_in : DEFAULT_TOKEN_TTL_SECONDS;
 
     const cache: TokenCache = {
       access_token: accessToken,

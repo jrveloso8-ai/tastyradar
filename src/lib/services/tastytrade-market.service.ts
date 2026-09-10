@@ -2,18 +2,18 @@ import { tastyAuthService } from './tastytrade-auth.service';
 
 export interface TastyLiveMetrics {
   symbol: string;
-  ivRank: number;
-  ivPercentile: number;
-  iv30: number;
-  tosIvIndex?: number;
+  ivRank: number | null;
+  ivPercentile: number | null;
+  iv30: number | null;
+  tosIvIndex?: number | null;
   liquidityRating: number;
-  beta: number;
-  dividendYield: number;
+  beta: number | null;
+  dividendYield: number | null;
   earningsDate?: string;
   daysToEarnings?: number;
-  hv30?: number;
-  hv60?: number;
-  hv90?: number;
+  hv30?: number | null;
+  hv60?: number | null;
+  hv90?: number | null;
   updatedAt: string;
   source: 'tastytrade-live' | 'preset-fallback';
 }
@@ -51,10 +51,10 @@ export interface OptionChainResult {
   fetchedAt: string;
 }
 
-function parsePct(val: any, fallback = 0): number {
-  if (val === undefined || val === null || val === '') return fallback;
+function parsePct(val: any): number | null {
+  if (val === undefined || val === null || val === '') return null;
   const num = typeof val === 'number' ? val : parseFloat(val);
-  if (isNaN(num)) return fallback;
+  if (isNaN(num)) return null;
   if (num > 0 && num <= 1.0) {
     return Number((num * 100).toFixed(1));
   }
@@ -140,9 +140,9 @@ export class TastytradeMarketService {
           if (!sym) continue;
 
           // IV Rank oficial Tastytrade: tw-implied-volatility-index-rank ou implied-volatility-index-rank
-          const rawIvr = item['implied-volatility-index-rank'] ?? item['tw-implied-volatility-index-rank'] ?? 0;
-          const rawIvp = item['implied-volatility-percentile'] ?? item['tw-implied-volatility-percentile'] ?? 0;
-          const rawIv30 = item['implied-volatility-30-day'] ?? item['implied-volatility-index'] ?? 0;
+          const rawIvr = item['implied-volatility-index-rank'] ?? item['tw-implied-volatility-index-rank'];
+          const rawIvp = item['implied-volatility-percentile'] ?? item['tw-implied-volatility-percentile'];
+          const rawIv30 = item['implied-volatility-30-day'] ?? item['implied-volatility-index'];
           const rawTosIv = item['tos-implied-volatility-index-rank'];
 
           const earningsDate = item.earnings?.['expected-report-date'] || undefined;
@@ -152,6 +152,9 @@ export class TastytradeMarketService {
             daysToEarnings = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
           }
 
+          const rawBeta = item.beta !== undefined && item.beta !== null && item.beta !== '' ? parseFloat(item.beta) : null;
+          const beta = rawBeta !== null && !isNaN(rawBeta) ? Number(rawBeta.toFixed(2)) : null;
+
           const metrics: TastyLiveMetrics = {
             symbol: sym,
             ivRank: parsePct(rawIvr),
@@ -159,8 +162,8 @@ export class TastytradeMarketService {
             iv30: parsePct(rawIv30),
             tosIvIndex: rawTosIv !== undefined ? parsePct(rawTosIv) : undefined,
             liquidityRating: typeof item['liquidity-rating'] === 'number' ? item['liquidity-rating'] : 4,
-            beta: parseFloat(item.beta || '1.0') || 1.0,
-            dividendYield: parsePct(item['dividend-yield'] || 0),
+            beta,
+            dividendYield: parsePct(item['dividend-yield']),
             earningsDate,
             daysToEarnings,
             hv30: parsePct(item['historical-volatility-30-day']),
@@ -238,7 +241,20 @@ export class TastytradeMarketService {
       const expirations: OptionChainExpiration[] = underlying.expirations
         .map((exp: any) => ({
           expirationDate: exp['expiration-date'],
-          daysToExpiration: Number(exp['days-to-expiration']) || 0,
+          daysToExpiration: (() => {
+            const rawDte = exp['days-to-expiration'];
+            if (typeof rawDte === 'number') return rawDte;
+            const parsed = parseInt(String(rawDte), 10);
+            if (!isNaN(parsed)) return parsed;
+            if (exp['expiration-date']) {
+              const [y, m, d] = String(exp['expiration-date']).split('-').map(Number);
+              const target = new Date(y, m - 1, d);
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              return Math.max(0, Math.ceil((target.getTime() - today.getTime()) / 86400000));
+            }
+            return 0;
+          })(),
           expirationType: exp['expiration-type'] || 'Regular',
           settlementType: exp['settlement-type'] || 'PM',
           strikes: (exp.strikes || [])
