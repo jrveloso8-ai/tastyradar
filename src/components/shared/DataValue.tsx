@@ -1,0 +1,124 @@
+import React from 'react';
+import { ProvenanceBadge } from '@/lib/types/provenance';
+
+export interface DataValueProps {
+  label: string;
+  value: number | string | null | undefined;
+  provenance: ProvenanceBadge;
+  source: string;
+  format?: 'currency' | 'percent' | 'number' | 'raw';
+  timestamp?: string;
+  formula?: string;
+  unavailableLabel?: string;
+  className?: string;
+  size?: 'sm' | 'md' | 'lg';
+}
+
+const PROVENANCE_COLORS: Record<ProvenanceBadge, string> = {
+  MEDIDO: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+  DERIVADO: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
+  ESTIMADO: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+  SIMULADO: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+  INDISPONIVEL: 'bg-gray-500/20 text-gray-400 border-gray-500/40',
+};
+
+export function ProvenanceTag({ badge, source, formula, timestamp }: {
+  badge: ProvenanceBadge;
+  source?: string;
+  formula?: string;
+  timestamp?: string;
+}) {
+  const tooltip = [
+    `Proveniência: ${badge}`,
+    source ? `Fonte: ${source}` : null,
+    timestamp ? `Timestamp: ${timestamp}` : null,
+    formula ? `Fórmula: ${formula}` : null,
+  ].filter(Boolean).join(' | ');
+
+  return (
+    <span
+      title={tooltip}
+      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold font-mono border cursor-help select-none ${PROVENANCE_COLORS[badge]}`}
+    >
+      {badge}
+    </span>
+  );
+}
+
+function formatValue(
+  val: number | string,
+  format: 'currency' | 'percent' | 'number' | 'raw'
+): string {
+  if (format === 'raw') return String(val);
+
+  const num = typeof val === 'number' ? val : parseFloat(String(val));
+  if (Number.isNaN(num)) return String(val);
+
+  switch (format) {
+    case 'currency':
+      return `$${num.toFixed(2)}`;
+    case 'percent':
+      return `${num >= 0 ? '' : ''}${num.toFixed(2)}%`;
+    case 'number':
+      return num.toFixed(2);
+    default:
+      return String(val);
+  }
+}
+
+/**
+ * <DataValue /> — Componente estrutural obrigatório para exibição de métricas numéricas.
+ * 
+ * Regra 00:
+ * 1. Label + valor formatado + badge de proveniência sempre juntos.
+ * 2. Ausência de dado (null/undefined) exibe "N/D" em estilo neutro, nunca esconde nem mascara.
+ * 3. Declaração obrigatória de provenance e source.
+ */
+export function DataValue({
+  label,
+  value,
+  provenance,
+  source,
+  format = 'raw',
+  timestamp,
+  formula,
+  unavailableLabel = 'N/D',
+  className = '',
+  size = 'md',
+}: DataValueProps) {
+  const isAvailable = value !== null && value !== undefined && value !== '' && !Number.isNaN(value);
+  const activeProvenance: ProvenanceBadge = isAvailable ? provenance : 'INDISPONIVEL';
+
+  const labelSize = size === 'sm' ? 'text-[9px]' : size === 'lg' ? 'text-xs' : 'text-[10px]';
+  const valSize = size === 'sm' ? 'text-xs' : size === 'lg' ? 'text-xl' : 'text-sm';
+
+  return (
+    <div className={`inline-flex flex-col gap-0.5 font-mono ${className}`}>
+      <div className="flex items-center gap-1.5">
+        <span className={`${labelSize} uppercase text-gray-400 font-semibold tracking-wider`}>
+          {label}
+        </span>
+        <ProvenanceTag
+          badge={activeProvenance}
+          source={source}
+          formula={formula}
+          timestamp={timestamp}
+        />
+      </div>
+
+      <div className="flex items-baseline gap-1">
+        {isAvailable ? (
+          <span className={`${valSize} font-bold text-gray-100`}>
+            {formatValue(value as number | string, format)}
+          </span>
+        ) : (
+          <span className={`${valSize} font-semibold text-gray-400 italic`}>
+            {unavailableLabel}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default DataValue;
