@@ -385,6 +385,36 @@ describe('Audit Gate — Ciclo 5', () => {
     ).toBe(true);
   });
 
+  it('FASE2-03: QuoteView migrou ProvenanceTag local para <DataValue> e nao alega vencimento fixo', () => {
+    const src = read('src/components/quote/QuoteView.tsx');
+
+    expect(
+      src.includes("import { DataValue } from '@/components/shared/DataValue'"),
+      'QuoteView.tsx nao importa mais o componente estrutural DataValue -- a migracao ' +
+        'da Fase 2 (commits d4c3304, 9e63429) foi revertida.'
+    ).toBe(true);
+
+    expect(
+      /function ProvenanceTag/.test(src),
+      'QuoteView.tsx voltou a definir um ProvenanceTag local -- a tela deve usar o ' +
+        'DataValue estrutural compartilhado, nao reimplementar o badge por conta propria.'
+    ).toBe(false);
+
+    expect(
+      /\.toFixed\(/.test(src),
+      'QuoteView.tsx voltou a ter .toFixed() solto no componente.'
+    ).toBe(false);
+
+    // Achado especifico desta rodada: a badge OPCOES mostrava uma data de vencimento
+    // fixa (2026-09-18) independente do ticker ou do status do fetch real.
+    expect(
+      src.includes('2026-09-18'),
+      'QuoteView.tsx voltou a ter a data de vencimento fixa "2026-09-18" na badge ' +
+        'OPCOES -- deve usar electedStrategy.expirationDate/.dte quando disponivel, ou ' +
+        'INDISPONIVEL/N-D quando nao houver recomendacao pronta.'
+    ).toBe(false);
+  });
+
   it('C5-16: ESLint tem uma regra contra fallback numerico magico em domain/services', () => {
     const eslintrc = read('.eslintrc.json');
     const hasMagicFallbackRule =
