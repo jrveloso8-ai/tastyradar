@@ -735,7 +735,9 @@ export function UnifiedGexBarreirasView({
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-emerald-400 font-bold">{w.callOi.toLocaleString()} OI</span>
-                      <span className="text-[10px] text-gray-400">IV: {w.callIv}%</span>
+                      <span className="text-[10px] text-gray-400">
+                        IV: <DataValue variant="inline" value={w.callIv} format="percent" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" />
+                      </span>
                       <span className="text-[10px] text-cyan-400">
                         <DataValue variant="inline" value={((w.strike - spotPrice) / spotPrice) * 100} format="percent" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" />
                       </span>
@@ -760,7 +762,9 @@ export function UnifiedGexBarreirasView({
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-rose-400 font-bold">{w.putOi.toLocaleString()} OI</span>
-                      <span className="text-[10px] text-gray-400">IV: {w.putIv}%</span>
+                      <span className="text-[10px] text-gray-400">
+                        IV: <DataValue variant="inline" value={w.putIv} format="percent" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" />
+                      </span>
                       <span className="text-[10px] text-rose-400">
                         <DataValue variant="inline" value={((w.strike - spotPrice) / spotPrice) * 100} format="percent" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" />
                       </span>
