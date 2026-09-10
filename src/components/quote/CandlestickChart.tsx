@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { CandleDataPoint } from '@/lib/domain/us-market-data';
+import { DataValue } from '@/components/shared/DataValue';
 
 interface CandlestickChartProps {
   candles: CandleDataPoint[];
@@ -47,16 +48,16 @@ export function CandlestickChart({ candles, spotPrice }: CandlestickChartProps) 
       <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-400 border-b border-gray-800/80 pb-2 mb-2">
         <div className="flex items-center gap-3">
           <span className="text-white font-bold">{activeCandle.date}</span>
-          <span>O: <strong className="text-white">${activeCandle.open.toFixed(2)}</strong></span>
-          <span>H: <strong className="text-emerald-400">${activeCandle.high.toFixed(2)}</strong></span>
-          <span>L: <strong className="text-rose-400">${activeCandle.low.toFixed(2)}</strong></span>
-          <span>C: <strong className={activeCandle.close >= activeCandle.open ? 'text-emerald-400' : 'text-rose-400'}>${activeCandle.close.toFixed(2)}</strong></span>
-          <span>Vol: <strong className="text-cyan-300">{(activeCandle.volume / 1e6).toFixed(1)}M</strong></span>
+          <span>O: <strong className="text-white"><DataValue variant="inline" value={activeCandle.open} format="currency" provenance="SIMULADO" source="Série OHLCV modelada parametricamente (semente determinística)" /></strong></span>
+          <span>H: <strong className="text-emerald-400"><DataValue variant="inline" value={activeCandle.high} format="currency" provenance="SIMULADO" source="Série OHLCV modelada parametricamente (semente determinística)" /></strong></span>
+          <span>L: <strong className="text-rose-400"><DataValue variant="inline" value={activeCandle.low} format="currency" provenance="SIMULADO" source="Série OHLCV modelada parametricamente (semente determinística)" /></strong></span>
+          <span>C: <strong className={activeCandle.close >= activeCandle.open ? 'text-emerald-400' : 'text-rose-400'}><DataValue variant="inline" value={activeCandle.close} format="currency" provenance="SIMULADO" source="Série OHLCV modelada parametricamente (semente determinística)" /></strong></span>
+          <span>Vol: <strong className="text-cyan-300"><DataValue variant="inline" value={activeCandle.volume / 1e6} format="number" provenance="SIMULADO" source="Série OHLCV modelada parametricamente (semente determinística)" />M</strong></span>
         </div>
         <div className="flex items-center gap-3 text-[10px]">
-          <span className="text-amber-400">MA20: ${activeCandle.ma20.toFixed(2)}</span>
-          <span className="text-cyan-400">MA50: ${activeCandle.ma50.toFixed(2)}</span>
-          <span className="text-purple-400">MA200: ${activeCandle.ma200.toFixed(2)}</span>
+          <span className="text-amber-400">MA20: <DataValue variant="inline" value={activeCandle.ma20} format="currency" provenance="SIMULADO" source="Série OHLCV modelada parametricamente (semente determinística)" /></span>
+          <span className="text-cyan-400">MA50: <DataValue variant="inline" value={activeCandle.ma50} format="currency" provenance="SIMULADO" source="Série OHLCV modelada parametricamente (semente determinística)" /></span>
+          <span className="text-purple-400">MA200: <DataValue variant="inline" value={activeCandle.ma200} format="currency" provenance="SIMULADO" source="Série OHLCV modelada parametricamente (semente determinística)" /></span>
           <span className="text-emerald-400">RSI(14): {activeCandle.rsi}</span>
           <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-mono" title="Série OHLCV histórica calculada parametricamente por semente determinística">
             SÉRIE HISTÓRICA MODELADA
@@ -73,7 +74,7 @@ export function CandlestickChart({ candles, spotPrice }: CandlestickChartProps) 
             <g key={i}>
               <line x1="0" y1={y} x2={width - 80} y2={y} stroke="#1f293d" strokeDasharray="3 3" strokeWidth="0.8" />
               <text x={width - 70} y={y + 3} fill="#64748b" fontSize="10">
-                ${p.toFixed(2)}
+                <DataValue variant="inline" as="tspan" value={p} format="currency" provenance="SIMULADO" source="Série OHLCV modelada parametricamente (semente determinística)" />
               </text>
             </g>
           );
@@ -82,12 +83,12 @@ export function CandlestickChart({ candles, spotPrice }: CandlestickChartProps) 
         {/* Linhas de Amplitude (+5% / -4%) */}
         <line x1="0" y1={getY(bandaAlta)} x2={width - 80} y2={getY(bandaAlta)} stroke="#f43f5e" strokeDasharray="4 4" strokeWidth="1.2" />
         <text x={width - 75} y={getY(bandaAlta) + 3} fill="#f43f5e" fontSize="9" fontWeight="bold">
-          BANDA +5% ${bandaAlta.toFixed(2)}
+          BANDA +5% <DataValue variant="inline" as="tspan" value={bandaAlta} format="currency" provenance="ESTIMADO" source="Spot x percentual de amplitude (+5%)" />
         </text>
 
         <line x1="0" y1={getY(bandaBaixa)} x2={width - 80} y2={getY(bandaBaixa)} stroke="#10b981" strokeDasharray="4 4" strokeWidth="1.2" />
         <text x={width - 75} y={getY(bandaBaixa) + 3} fill="#10b981" fontSize="9" fontWeight="bold">
-          BANDA -4% ${bandaBaixa.toFixed(2)}
+          BANDA -4% <DataValue variant="inline" as="tspan" value={bandaBaixa} format="currency" provenance="ESTIMADO" source="Spot x percentual de amplitude (-4%)" />
         </text>
 
         {/* MA20, MA50, MA200 Lines */}
