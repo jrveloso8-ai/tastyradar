@@ -307,6 +307,30 @@ describe('Audit Gate — Ciclo 5', () => {
     ).toBe(false);
   });
 
+  it('FASE1-06: VolatilityAnalystView nao reintroduz SOFR hardcoded ao lado do Spot', () => {
+    const src = read('src/components/volatility/VolatilityAnalystView.tsx');
+    expect(
+      /SOFR:\s*<strong[^>]*>5\.32%/.test(src),
+      'VolatilityAnalystView.tsx ainda mostra "SOFR: 5.32%" como literal fixo, colado ao ' +
+        'Spot (mesmo bloco de onde removemos VIX/SKEW/GEX hardcoded no FASE1-02, e o ' +
+        'badge falso no FASE1-03). Nao ha variavel nem chamada de API por tras — e o ' +
+        'mesmo padrao de fabricacao, so que escapou do inventario original. Remova o ' +
+        'valor (ou o campo inteiro) ate existir uma fonte real de SOFR conectada.'
+    ).toBe(false);
+  });
+
+  it('FASE1-07: VolatilityAnalystView nao reintroduz selo de liquidez fixo "Liquido 5/5"', () => {
+    const src = read('src/components/volatility/VolatilityAnalystView.tsx');
+    expect(
+      src.includes('Líquido 5/5') || src.includes('Liquido 5/5'),
+      'VolatilityAnalystView.tsx ainda mostra o selo "Líquido 5/5" colado ao simbolo do ' +
+        'ativo — literal fixo, sem variavel, sem calculo de liquidez por tras. E exatamente ' +
+        'o tipo de linguagem de confianca absoluta sobre dado inexistente que a auditoria ' +
+        'ja sinalizou como problema de tom (nao so de dado). Remova o selo ate existir uma ' +
+        'metrica real de liquidez conectada a ele.'
+    ).toBe(false);
+  });
+
   it('C5-16: ESLint tem uma regra contra fallback numerico magico em domain/services', () => {
     const eslintrc = read('.eslintrc.json');
     const hasMagicFallbackRule =
