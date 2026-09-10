@@ -18,24 +18,63 @@ import { DataValue } from '@/components/shared/DataValue';
 export interface ExpirationOptionItem {
   id: string;
   label: string;
-  dateStr: string;
+  datePrefix: string;
+  classification: string;
   dateOCC: string;
-  dte: number;
   type: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY';
   isLiquid: boolean;
   baseIv: number;
 }
 
+export interface ActiveExpirationOptionItem extends ExpirationOptionItem {
+  dte: number;
+  dateStr: string;
+}
+
 export const TASTYTRADE_EXPIRATIONS: ExpirationOptionItem[] = [
-  { id: '2026-09-04', label: 'Sep 4, 2026', dateStr: '04 Set (3 DTE - Semanal W)', dateOCC: '260904', dte: 3, type: 'WEEKLY', isLiquid: false, baseIv: 38.5 },
-  { id: '2026-09-11', label: 'Sep 11, 2026', dateStr: '11 Set (10 DTE - Semanal W)', dateOCC: '260911', dte: 10, type: 'WEEKLY', isLiquid: false, baseIv: 36.2 },
-  { id: '2026-09-18', label: 'Sep 18, 2026', dateStr: '18 Set (17 DTE - Mais Líquida)', dateOCC: '260918', dte: 17, type: 'MONTHLY', isLiquid: true, baseIv: 34.0 },
-  { id: '2026-09-25', label: 'Sep 25, 2026', dateStr: '25 Set (24 DTE - Semanal W)', dateOCC: '260925', dte: 24, type: 'WEEKLY', isLiquid: false, baseIv: 33.5 },
-  { id: '2026-10-02', label: 'Oct 2, 2026', dateStr: '02 Out (31 DTE - Semanal W)', dateOCC: '261002', dte: 31, type: 'WEEKLY', isLiquid: false, baseIv: 33.0 },
-  { id: '2026-10-16', label: 'Oct 16, 2026', dateStr: '16 Out (45 DTE - Mensal Standard)', dateOCC: '261016', dte: 45, type: 'MONTHLY', isLiquid: true, baseIv: 32.5 },
-  { id: '2026-11-20', label: 'Nov 20, 2026', dateStr: '20 Nov (80 DTE - Mensal)', dateOCC: '261120', dte: 80, type: 'MONTHLY', isLiquid: false, baseIv: 31.8 },
-  { id: '2026-12-18', label: 'Dec 18, 2026', dateStr: '18 Dez (108 DTE - Trimestral)', dateOCC: '261218', dte: 108, type: 'QUARTERLY', isLiquid: false, baseIv: 31.0 },
+  { id: '2026-09-04', label: 'Sep 4, 2026', datePrefix: '04 Set', classification: 'Semanal W', dateOCC: '260904', type: 'WEEKLY', isLiquid: false, baseIv: 38.5 },
+  { id: '2026-09-11', label: 'Sep 11, 2026', datePrefix: '11 Set', classification: 'Semanal W', dateOCC: '260911', type: 'WEEKLY', isLiquid: false, baseIv: 36.2 },
+  { id: '2026-09-18', label: 'Sep 18, 2026', datePrefix: '18 Set', classification: 'Mais Líquida', dateOCC: '260918', type: 'MONTHLY', isLiquid: true, baseIv: 34.0 },
+  { id: '2026-09-25', label: 'Sep 25, 2026', datePrefix: '25 Set', classification: 'Semanal W', dateOCC: '260925', type: 'WEEKLY', isLiquid: false, baseIv: 33.5 },
+  { id: '2026-10-02', label: 'Oct 2, 2026', datePrefix: '02 Out', classification: 'Semanal W', dateOCC: '261002', type: 'WEEKLY', isLiquid: false, baseIv: 33.0 },
+  { id: '2026-10-16', label: 'Oct 16, 2026', datePrefix: '16 Out', classification: 'Mensal Standard', dateOCC: '261016', type: 'MONTHLY', isLiquid: true, baseIv: 32.5 },
+  { id: '2026-11-20', label: 'Nov 20, 2026', datePrefix: '20 Nov', classification: 'Mensal', dateOCC: '261120', type: 'MONTHLY', isLiquid: false, baseIv: 31.8 },
+  { id: '2026-12-18', label: 'Dec 18, 2026', datePrefix: '18 Dez', classification: 'Trimestral', dateOCC: '261218', type: 'QUARTERLY', isLiquid: false, baseIv: 31.0 },
 ];
+
+export function calculateExpirationDte(id: string, now: Date = new Date()): number {
+  const [y, m, d] = id.split('-').map(Number);
+  const targetMidnight = new Date(y, m - 1, d);
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffMs = targetMidnight.getTime() - todayMidnight.getTime();
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+}
+
+export function buildActiveExpiration(
+  raw: ExpirationOptionItem,
+  now: Date = new Date()
+): ActiveExpirationOptionItem {
+  const dte = calculateExpirationDte(raw.id, now);
+  const dateStr = `${raw.datePrefix} (${dte} DTE - ${raw.classification})`;
+  return {
+    ...raw,
+    dte,
+    dateStr,
+  };
+}
+
+export function getAvailableExpirations(now: Date = new Date()): ActiveExpirationOptionItem[] {
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return TASTYTRADE_EXPIRATIONS
+    .filter(exp => exp.id >= todayStr)
+    .map(exp => buildActiveExpiration(exp, now));
+}
+
+export function getDefaultExpirationId(now: Date = new Date()): string {
+  const available = getAvailableExpirations(now);
+  const liquid = available.find(e => e.isLiquid);
+  return liquid ? liquid.id : (available[0]?.id ?? TASTYTRADE_EXPIRATIONS[0]?.id ?? '');
+}
 
 export interface StrikeDerivativesData {
   strike: number;
@@ -69,13 +108,20 @@ export function UnifiedGexBarreirasView({
   onBackToQuote,
   onBackToScreener
 }: UnifiedGexBarreirasProps) {
-  const [selectedExpId, setSelectedExpId] = useState<string>('2026-09-18');
+  const availableExpirations = useMemo(() => {
+    return getAvailableExpirations();
+  }, []);
+
+  const [selectedExpId, setSelectedExpId] = useState<string>(() => getDefaultExpirationId());
   const [gexSubView, setGexSubView] = useState<'calls_vs_puts' | 'net_gex' | 'abs_gex'>('calls_vs_puts');
   const [displayMode, setDisplayMode] = useState<'UNIFIED' | 'GEX_ONLY' | 'WALLS_ONLY' | 'SKEW_ONLY'>('UNIFIED');
 
   const currentExp = useMemo(() => {
-    return TASTYTRADE_EXPIRATIONS.find(e => e.id === selectedExpId) || TASTYTRADE_EXPIRATIONS[2];
-  }, [selectedExpId]);
+    return availableExpirations.find(e => e.id === selectedExpId)
+      || availableExpirations.find(e => e.isLiquid)
+      || availableExpirations[0]
+      || buildActiveExpiration(TASTYTRADE_EXPIRATIONS[0]);
+  }, [availableExpirations, selectedExpId]);
 
   // Camada sintética "MODELO CALIBRADO": OI, volume, IV, delta e gamma por strike.
   // Isso NÃO é dado de mercado real (ver badge no header) — é a mesma geração
@@ -371,7 +417,7 @@ export function UnifiedGexBarreirasView({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {TASTYTRADE_EXPIRATIONS.map((exp) => (
+            {availableExpirations.map((exp) => (
               <button
                 key={exp.id}
                 onClick={() => setSelectedExpId(exp.id)}
