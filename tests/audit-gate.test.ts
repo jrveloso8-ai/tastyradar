@@ -415,6 +415,67 @@ describe('Audit Gate — Ciclo 5', () => {
     ).toBe(false);
   });
 
+  it('FASE2-04: nenhum arquivo de src/components tem excecao de arquivo inteiro na REGRA 00 (exceto DataValue.tsx)', () => {
+    const eslintrc = read('.eslintrc.json');
+    const config = JSON.parse(eslintrc);
+    const componentsOverride = config.overrides.find(
+      (o: any) => Array.isArray(o.files) && o.files.includes('src/components/**/*.tsx')
+    );
+
+    expect(
+      componentsOverride,
+      '.eslintrc.json nao tem mais o override para src/components/**/*.tsx -- ' +
+        'a REGRA 00 (toFixed + numero cru em JSX) deixou de valer para todo o diretorio.'
+    ).toBeTruthy();
+
+    const excluded: string[] = componentsOverride.excludedFiles || [];
+    const excecoesIndevidas = excluded.filter((f: string) => !f.includes('DataValue.tsx'));
+
+    expect(
+      excecoesIndevidas.length,
+      'Um arquivo de src/components foi excluido inteiro da REGRA 00 alem do proprio ' +
+        'DataValue.tsx: ' + JSON.stringify(excecoesIndevidas) + '. Exececao de arquivo inteiro ' +
+        'esconde violacao real (aconteceu com VolatilityAnalystView.tsx, 19 pontos de dado ' +
+        'financeiro sem proveniencia) -- corrija ponto a ponto com eslint-disable-next-line ' +
+        'justificado, nunca excluindo o arquivo inteiro.'
+    ).toBe(0);
+
+    expect(
+      componentsOverride.rules && componentsOverride.rules['local-rules/no-raw-numbers-in-jsx'],
+      '.eslintrc.json nao registra mais a regra local-rules/no-raw-numbers-in-jsx -- a defesa ' +
+        'contra numero cru em JSX (sem .toFixed(), portanto invisivel para a regra antiga) foi removida.'
+    ).toBeTruthy();
+  });
+
+  it('FASE2-05: VolatilityAnalystView nao volta a fixar provenance/source de leg.strike e leg.midPrice', () => {
+    const src = read('src/components/volatility/VolatilityAnalystView.tsx');
+
+    expect(
+      src.includes('liveProv') && src.includes('liveSourceDesc'),
+      'VolatilityAnalystView.tsx nao declara mais liveProv/liveSourceDesc -- essas variaveis ' +
+        'alternam entre MEDIDO/Tastytrade REST e ESTIMADO/Modelo calibrado interno conforme ' +
+        'isSelectedLive, e sao a fonte de verdade para tudo que vem de rec.*.'
+    ).toBe(true);
+
+    // Achado desta rodada: leg.strike e leg.midPrice, no bloco "Lista de Pernas com
+    // Justificativa Resumida", estavam com provenance="MEDIDO" e source fixos em vez de
+    // usar liveProv/liveSourceDesc como o resto do arquivo -- badge que nao acompanha o
+    // fallback real (mesma classe do achado original FASE1-03).
+    expect(
+      /value=\{leg\.strike\}[^>]*provenance="MEDIDO"/.test(src) ||
+        /value=\{leg\.strike\}[^>]*source="Tastytrade REST \(option-recommendation\)"/.test(src),
+      'leg.strike voltou a ter provenance/source fixos em vez de liveProv/liveSourceDesc -- ' +
+        'quando rec estiver em modo fallback, essa linha vai continuar afirmando Tastytrade REST ' +
+        'indevidamente.'
+    ).toBe(false);
+
+    expect(
+      /value=\{leg\.midPrice\}[\s\S]{0,120}provenance="MEDIDO"/.test(src),
+      'leg.midPrice voltou a ter provenance fixo em MEDIDO em vez de liveProv -- mesmo risco ' +
+        'de badge nao bater com a fonte real quando rec estiver em modo fallback.'
+    ).toBe(false);
+  });
+
   it('C5-16: ESLint tem uma regra contra fallback numerico magico em domain/services', () => {
     const eslintrc = read('.eslintrc.json');
     const hasMagicFallbackRule =
