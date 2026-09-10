@@ -331,6 +331,32 @@ describe('Audit Gate — Ciclo 5', () => {
     ).toBe(false);
   });
 
+  it('FASE2-01: VolatilityAnalystView migrou para <DataValue> (zero .toFixed solto, proveniencia declarada)', () => {
+    const src = read('src/components/volatility/VolatilityAnalystView.tsx');
+
+    expect(
+      src.includes("import { DataValue } from '@/components/shared/DataValue'"),
+      'VolatilityAnalystView.tsx nao importa mais o componente estrutural DataValue -- ' +
+        'a migracao da Fase 2 (commits 8768a42, 1686930, 7b3738f) foi revertida.'
+    ).toBe(true);
+
+    expect(
+      /\.toFixed\(/.test(src),
+      'VolatilityAnalystView.tsx voltou a ter .toFixed() solto no componente -- isso ' +
+        'reintroduz numero formatado sem badge de proveniencia, o mesmo padrao que ' +
+        'causou FASE1-02, FASE1-03, FASE1-06 e FASE1-07 nesta tela. Todo valor numerico ' +
+        'exibido deve passar por <DataValue format="..." />.'
+    ).toBe(false);
+
+    // Spot/Variacao do catalogo estatico devem declarar a fonte real (nao "Tastytrade"
+    // nem nenhuma alegacao de dado ao vivo -- e exatamente o achado FASE1-03 original).
+    expect(
+      src.includes('source="SP500_DATASET (catálogo estático)"'),
+      'VolatilityAnalystView.tsx nao declara mais SP500_DATASET como fonte do Spot/Variacao -- ' +
+        'confirme que o campo continua marcado como ESTIMADO com a fonte real do catalogo.'
+    ).toBe(true);
+  });
+
   it('C5-16: ESLint tem uma regra contra fallback numerico magico em domain/services', () => {
     const eslintrc = read('.eslintrc.json');
     const hasMagicFallbackRule =
