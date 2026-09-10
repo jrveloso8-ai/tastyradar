@@ -1,12 +1,9 @@
 import { USStockItem, US_STOCKS_DATASET } from '@/lib/domain/us-market-data';
 import { CME_25_STRATEGIES, StrategySpec } from '@/lib/domain/cme-catalog';
-import { fundamentalsEngine } from '@/lib/domain/fundamentals-engine';
-import { RawFundamentalData, FundamentalAnalysisResult } from '@/lib/types/financial';
 
 export interface AIConsultantContext {
   symbol: string;
   stock?: USStockItem;
-  fundamentals?: FundamentalAnalysisResult;
   electedStrategy?: StrategySpec | any;
   spotPrice?: number;
   category?: string;
@@ -18,19 +15,16 @@ export interface AIConsultantResponse {
   contextUsed: {
     symbol: string;
     gexRegime: string;
-    fundScore: number;
-    fundStatus: string;
     electedStrategy: string;
   };
 }
 
 export class AIConsultantEngine {
   /**
-   * Processa a consulta do usuário integrando todas as camadas de conhecimento do RADAR:
-   * 1. Gamma Exposure (GEX) e Estrutura Institucional
-   * 2. Crivo Fundamentalista CNPI-P Normalizado (FCO & Dívida Financeira)
-   * 3. Análise Técnica e Price Action CNPI-T (Stop Loss, Alvos, R:R)
-   * 4. Catálogo CME de 25 Estratégias de Opções e Gestão de Risco
+   * Processa a consulta do usuário integrando as camadas quantitativas do RADAR:
+   * 1. Gamma Exposure (GEX) e Estrutura de Mercado
+   * 2. Análise Técnica e Price Action CNPI-T (Stop Loss, Alvos, R:R)
+   * 3. Catálogo CME de Estratégias de Opções e Gestão de Risco
    */
   public async consult(
     query: string,
@@ -46,48 +40,13 @@ export class AIConsultantEngine {
       category: 'ALTA' as const,
       spot: typeof context.spotPrice === 'number' ? context.spotPrice : 0,
       change: 1.2,
-      peRatio: 25.0,
-      evEbitda: 15.0,
-      dividendYield: 1.5,
-      roe: 20.0,
-      netMargin: 15.0,
-      debtToEbitda: 1.0,
       ivRank: 35.0,
       ivAtm: 22.0,
       stop: 142.5,
       alvo1: 157.5,
       alvo2: 165.0,
       rr: '2.10:1',
-      fundStatus: 'APROVADO' as const,
-      fundScore: 85,
-    };
-
-    // Avalia os fundamentos pelo motor oficial normalizado
-    const rawData: RawFundamentalData = {
-      symbol: stock.symbol,
-      shortName: stock.name,
-      regularMarketPrice: stock.spot,
-      returnOnEquity: stock.roe / 100,
-      netMargin: stock.netMargin / 100,
-      debtToEbitda: stock.debtToEbitda,
-      financialDebtToEbitda: Math.min(stock.debtToEbitda, 1.2),
-      priceEarnings: stock.peRatio,
-      dividendYield: stock.dividendYield / 100,
-      // Mesma correção já aplicada em QuoteView.tsx e fundamentals/route.ts (Nível 3,
-      // Ciclo 4) — achado C5-04 do laudo Ciclo 5: esta era a última cópia restante da
-      // fabricação (1.45 / 0.28 / peRatio÷18 sem base declarada). Sem fonte real de
-      // fundamentos para tickers US no ecossistema Tastytrade (corretora, não vendor de
-      // fundamentos — confirmado contra a doc oficial), estes 3 campos ficam null; o
-      // fundamentals-engine já trata isso como "Dado não disponível na fonte".
-      currentRatio: null,
-      ebitdaMargin: null,
-      priceToBook: null,
-      operatingCashFlow: null,
-      netIncome: null,
-      nonRecurringImpairment: null,
-    };
-
-    const fundResult = context.fundamentals || fundamentalsEngine.evaluate(rawData);
+    } as USStockItem;
 
     // Identifica a estratégia de opções
     let electedStrategyName = 'Trava de Alta com Call (Bull Call Spread)';
@@ -194,11 +153,11 @@ ${stock.category === 'LATERAL'
 
 
     // =========================================================================
-    // ROTA 2: PERGUNTAS SOBRE FUNDAMENTOS / CNPI-P / VALE3 / DÍVIDA / NORMALIZAÇÃO
+    // ROTA 2: PERGUNTAS SOBRE FUNDAMENTOS / DADOS CONTÁBEIS
     // =========================================================================
     else if (
       normalizedQuery.includes('fundamento') ||
-      normalizedQuery.includes('cnpi') ||
+      normalizedQuery.includes('cnpi-p') ||
       normalizedQuery.includes('dre') ||
       normalizedQuery.includes('dfc') ||
       normalizedQuery.includes('fco') ||
@@ -210,30 +169,20 @@ ${stock.category === 'LATERAL'
       normalizedQuery.includes('valuation') ||
       normalizedQuery.includes('p/l') ||
       normalizedQuery.includes('p/vp') ||
-      normalizedQuery.includes('score')
+      normalizedQuery.includes('balanço') ||
+      normalizedQuery.includes('balanco') ||
+      normalizedQuery.includes('lucro') ||
+      normalizedQuery.includes('margem')
     ) {
-      const roeMetric = fundResult.metrics.find((m) => m.name === 'ROE');
-      const debtMetric = fundResult.metrics.find((m) => m.name === 'Dív. Líq. / EBITDA');
-      const plMetric = fundResult.metrics.find((m) => m.name === 'P/L');
+      answer = `### 🏛️ Análise Fundamentalista Descontinuada — ${stock.symbol}
 
-      answer = `### 🏛️ Auditoria Fundamentalista CNPI-P — ${stock.symbol}
-
-• **Score Consolidado:** **${fundResult.score}/100** [Status: **${fundResult.status}**] (Mínimo para aprovação: 45 pts)
-• **Pilar Rentabilidade (35%):** ${fundResult.pillars.rentabilidade.score}/100 pts
-• **Pilar Solvência (35%):** ${fundResult.pillars.solvencia.score}/100 pts
-• **Pilar Valuation (30%):** ${fundResult.pillars.valuation.score}/100 pts
-
-**Métricas Chave Auditadas:**
-• **ROE:** ${roeMetric?.formatted || 'N/D'} [${roeMetric?.status || 'N/D'}] ${roeMetric?.isAdjusted ? `*(Normalizado ex-baixas não-caixa | Bruto contábil: ${roeMetric.rawAccountingFormatted})*` : ''}
-• **Dívida Líq. / EBITDA:** ${debtMetric?.formatted || 'N/D'} [${debtMetric?.status || 'N/D'}] ${debtMetric?.isAdjusted ? `*(Reconciliada para Dívida Financeira Real | Bruto: ${debtMetric.rawAccountingFormatted})*` : ''}
-• **P/L (Preço / Lucro):** ${plMetric?.formatted || 'N/D'} [${plMetric?.status || 'N/D'}]
-• **Margem Líquida:** ${stock.netMargin}% | **Dividend Yield:** ${stock.dividendYield}%
-
-${fundResult.distortionsDetected.length > 0 
-  ? `**Ajustes de Sanidade Contábil Aplicados:**\n${fundResult.distortionsDetected.map((d) => `• ${d}`).join('\n')}\n\n` 
-  : ''}**Parecer do Analista:**
-${fundResult.summary}
-${fundResult.analystVerdict}`;
+• **Status:** O RADAR não realiza mais análise fundamentalista nem cálculo de múltiplos contábeis (P/L, ROE, Dívida/EBITDA, Margem Líquida).
+• **Motivo Técnico:** A plataforma é focada em derivativos e opções do mercado americano operados via Tastytrade. A corretora Tastytrade provê dados de mercado e de opções, não sendo fornecedora de dados contábeis/fundamentalistas para o mercado dos EUA.
+• **Integridade de Dados (Regra 00):** Para evitar a exibição de dados contábeis estáticos desatualizados ou estimativas sem fonte oficial ao vivo, o Crivo Fundamentalista foi integralmente removido do sistema.
+• **Foco Operacional:** A tomada de decisão no RADAR é embasada em:
+  1. **Estrutura de Mercado & Gamma Exposure (GEX):** Posicionamento de market makers e volatilidade real via Tastytrade.
+  2. **Análise Técnica (CNPI-T):** Price action, níveis de suporte/resistência e assimetria risco:retorno.
+  3. **Engenharia de Opções (Catálogo CME):** Estruturas com risco definido e sweet spot de Theta decay.`;
     }
 
     // =========================================================================
@@ -319,29 +268,24 @@ ${stock.category === 'LATERAL'
     else {
       answer = `### 🌐 Análise Consolidada Multi-Camadas — ${stock.symbol}
 
-1. **Camada 1 — Crivo Fundamentalista (CNPI-P):**
-   • Score: **${fundResult.score}/100** [${fundResult.status}]
-   • Rentabilidade: ${fundResult.pillars.rentabilidade.score}/100 | Solvência: ${fundResult.pillars.solvencia.score}/100 | Valuation: ${fundResult.pillars.valuation.score}/100
-   • ${fundResult.summary}
-
-2. **Camada 2 — Price Action & Análise Técnica (CNPI-T):**
+1. **Camada 1 — Price Action & Análise Técnica (CNPI-T):**
    • Viés: **${stock.category}** | Spot: **$${stock.spot.toFixed(2)}**
    • Stop Loss: **$${stock.stop.toFixed(2)}** | Alvo 1: **$${stock.alvo1.toFixed(2)}** | Alvo 2: **$${stock.alvo2.toFixed(2)}** | R:R: **${stock.rr}**
 
-3. **Camada 3 — Gamma Exposure & Volatilidade (Tastytrade GEX):**
+2. **Camada 2 — Gamma Exposure & Volatilidade (Tastytrade GEX):**
    • Regime: **${gexRegime}**
    • IV Rank: **${stock.ivRank}%** | IV Atual: **${stock.ivAtm}%**
 
-4. **Camada 4 — Estratégia de Opções Eleita (CME Catalog):**
+3. **Camada 3 — Estratégia de Opções Eleita (CME Catalog):**
    • Recomendação: **${electedStrategyName}**
    • Gestão: Risco definido e probabilidade estatística favorável.
 
-*Você pode fazer perguntas específicas sobre qualquer uma dessas 4 camadas!*`;
+*Você pode fazer perguntas específicas sobre qualquer uma dessas 3 camadas quantitativas!*`;
     }
 
     const suggestedQuestions = [
       `Qual o regime GEX e barreiras de Gamma em ${stock.symbol}?`,
-      `Como funciona a auditoria de Rentabilidade e Solvência em ${stock.symbol}?`,
+      `Qual a volatilidade implícita e IV Rank de ${stock.symbol}?`,
       `Quais os parâmetros de Stop Loss e Alvos para ${stock.symbol}?`,
       `Como montar a estratégia de opções ${electedStrategyName}?`,
     ];
@@ -349,7 +293,7 @@ ${stock.category === 'LATERAL'
     if (!isKnownTicker) {
       answer =
         `⚠️ **${symbol} está fora da cobertura atual do RADAR** (não consta no dataset de ~66 ativos monitorados).\n\n` +
-        `Os números abaixo (fundamentos, score, stop/alvo, estratégia) são apenas **ilustrativos de como a análise funcionaria**, ` +
+        `Os números abaixo (stop/alvo, estratégia, volatilidade) são apenas **ilustrativos de como a análise funcionaria**, ` +
         `não foram calculados a partir de dado real de ${symbol}, e não devem ser usados para decisão de investimento.\n\n---\n\n` +
         answer;
     }
@@ -360,8 +304,6 @@ ${stock.category === 'LATERAL'
       contextUsed: {
         symbol: stock.symbol,
         gexRegime,
-        fundScore: isKnownTicker ? fundResult.score : 0,
-        fundStatus: isKnownTicker ? fundResult.status : 'SEM_COBERTURA',
         electedStrategy: electedStrategyName,
       },
     };
