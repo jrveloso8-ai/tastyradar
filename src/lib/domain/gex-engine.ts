@@ -140,7 +140,7 @@ export function calculateGex(
     return {
       strike: s.strike,
       symbol: (s as any).callSymbol || '',
-      contracts: s.callOpenInterest ?? s.callOi ?? 0,
+      contracts: s.callOpenInterest,
       delta: s.callDelta,
       iv: s.callIv,
       distancePct: Number((((s.strike - spotPrice) / spotPrice) * 100).toFixed(1)),
@@ -151,7 +151,7 @@ export function calculateGex(
     return {
       strike: s.strike,
       symbol: (s as any).putSymbol || '',
-      contracts: s.putOpenInterest ?? s.putOi ?? 0,
+      contracts: s.putOpenInterest,
       delta: s.putDelta,
       iv: s.putIv,
       distancePct: Number((((s.strike - spotPrice) / spotPrice) * 100).toFixed(1)),
