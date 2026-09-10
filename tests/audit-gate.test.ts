@@ -567,6 +567,35 @@ describe('Audit Gate — Ciclo 5', () => {
     ).toBe(false);
   });
 
+  it('FASE2-08: gate de ESLint roda de fato contra domain/services e a regra cobre || e ??', () => {
+    const batSrc = read('rodar_audit_gate.bat');
+    const eslintrc = read('.eslintrc.json');
+
+    // Achado: a REGRA 00 de domain/services (C5-16) existia no .eslintrc.json mas
+    // nenhum .bat jamais chamava eslint contra src/lib/domain ou src/lib/services --
+    // so contra src/components. Qualquer fallback magico introduzido nesses dois
+    // diretorios era invisivel a QUALQUER resultado de gate, mesmo com a regra escrita.
+    expect(
+      /eslint\s+src\/lib\/domain\s+src\/lib\/services/.test(batSrc) ||
+        (/eslint\s+src\/lib\/domain/.test(batSrc) && /eslint\s+src\/lib\/services/.test(batSrc)),
+      'rodar_audit_gate.bat nao chama mais eslint contra src/lib/domain e src/lib/services -- ' +
+        'a REGRA 00 desses diretorios voltou a existir so no papel, sem nunca ser executada.'
+    ).toBe(true);
+
+    // A regra em si precisa continuar cobrindo os dois operadores de fallback magico,
+    // nao so ||  -- ?? e o mesmo padrao de fabricacao e escapava da regra original.
+    const domainServicesOverrideMatch = eslintrc.match(
+      /"files":\s*\[\s*"src\/lib\/domain\/\*\*\/\*\.ts",\s*"src\/lib\/services\/\*\*\/\*\.ts"\s*\][\s\S]{0,600}/
+    );
+    expect(
+      domainServicesOverrideMatch !== null && /operator=.*\|\|.*\?\?|operator=\/\^\(\\\|\\\|\|\\\?\\\?\)\$\/|matches\(\[operator='\|\|'\],\s*\[operator='\?\?'\]\)/.test(
+        domainServicesOverrideMatch ? domainServicesOverrideMatch[0] : ''
+      ),
+      'O selector da REGRA 00 em domain/services voltou a cobrir so o operador || -- ' +
+        'o mesmo padrao de fallback magico usando ?? (ex.: `valor ?? 0`) precisa continuar coberto.'
+    ).toBe(true);
+  });
+
   it('C5-16: ESLint tem uma regra contra fallback numerico magico em domain/services', () => {
     const eslintrc = read('.eslintrc.json');
     const hasMagicFallbackRule =
