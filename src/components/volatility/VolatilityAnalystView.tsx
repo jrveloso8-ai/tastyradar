@@ -1308,15 +1308,15 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                         {leg.action}
                       </span>
                       <span className={leg.action === 'SELL' ? 'text-white font-bold' : 'text-gray-300'}>
-                        {leg.type} <DataValue variant="inline" value={leg.strike} format="currency" provenance="MEDIDO" source="Tastytrade REST (option-recommendation)" />
+                        {leg.type} <DataValue variant="inline" value={leg.strike} format="currency" provenance={liveProv} source={liveSourceDesc} />
                       </span>
                     </div>
                     <span className="text-gray-400 text-[11px]">{leg.description}</span>
                     <DataValue
                       label={leg.action === 'SELL' ? 'Crédito' : 'Débito'}
                       value={leg.midPrice}
-                      provenance="MEDIDO"
-                      source="Tastytrade REST (option-recommendation)"
+                      provenance={liveProv}
+                      source={liveSourceDesc}
                       format="currency"
                       size="sm"
                     />
