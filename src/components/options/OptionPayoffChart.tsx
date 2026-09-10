@@ -471,7 +471,7 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
             Perda máx travada em -<DataValue variant="inline" value={maxLossLot} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" />
           </p>
           <span className="text-[10px] text-gray-400 block font-sans">
-            Risco 100% blindado pelas travas de proteção Tastytrade.
+            Perda máxima definida pela estrutura da trava (travas de proteção Tastytrade).
           </span>
         </div>
       </div>
