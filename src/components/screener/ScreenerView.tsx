@@ -2,7 +2,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { Search, ArrowUpRight, TrendingDown, Layers, Filter, Building2 } from 'lucide-react';
-import { US_STOCKS_DATASET, USStockItem } from '@/lib/domain/us-market-data';
+import { US_STOCKS_DATASET, USStockItem, US_DATA_AS_OF } from '@/lib/domain/us-market-data';
+import { DataValue } from '@/components/shared/DataValue';
 
 interface ScreenerViewProps {
   onSelectSymbol?: (symbol: string) => void;
@@ -59,9 +60,14 @@ export function ScreenerView({ onSelectSymbol }: ScreenerViewProps) {
                 Classificação Técnica + Crivo CNPI-US + Execução Tastytrade
               </span>
             </div>
-            <p className="text-xs text-gray-400 mt-0.5">
-              Lista de ativos do catálogo S&P 500 filtradas por solvência, alinhamento de médias móveis e liquidez de opções.
-            </p>
+            <div className="flex flex-wrap items-center gap-2 mt-1">
+              <p className="text-xs text-gray-400">
+                Lista de ativos do catálogo S&P 500 filtradas por solvência, alinhamento de médias móveis e liquidez de opções.
+              </p>
+              <span className="text-[10px] text-amber-400/90 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                Catálogo estático (dataAsOf: {US_DATA_AS_OF})
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -152,14 +158,42 @@ export function ScreenerView({ onSelectSymbol }: ScreenerViewProps) {
                   <div className="text-[10px] text-gray-400 font-sans truncate w-28">{item.name}</div>
                   <div className="text-[9px] text-emerald-500/80 font-mono mt-0.5">{item.sector}</div>
                 </div>
-                <div className="text-right font-mono">
-                  <div className="text-sm font-bold text-white">${item.spot.toFixed(2)}</div>
-                  <div className="text-[11px] text-emerald-400 font-semibold">+{item.change.toFixed(2)}%</div>
+                <div className="text-right font-mono flex flex-col items-end gap-0.5">
+                  <DataValue
+                    label="Spot"
+                    value={item.spot}
+                    provenance="ESTIMADO"
+                    source="US_STOCKS_DATASET (catálogo estático)"
+                    format="currency"
+                    size="sm"
+                  />
+                  <DataValue
+                    label="Var"
+                    value={item.change}
+                    provenance="ESTIMADO"
+                    source="US_STOCKS_DATASET (catálogo estático)"
+                    format="percent"
+                    size="sm"
+                  />
                 </div>
               </div>
-              <div className="mt-3 pt-2 border-t border-gray-800/80 flex justify-between text-[10px] font-mono">
-                <span>Stop: <strong className="text-rose-400">${item.stop.toFixed(2)}</strong></span>
-                <span>Alvo 1: <strong className="text-emerald-400">${item.alvo1.toFixed(2)}</strong></span>
+              <div className="mt-3 pt-2 border-t border-gray-800/80 flex justify-between items-center text-[10px] font-mono gap-1">
+                <DataValue
+                  label="Stop"
+                  value={item.stop}
+                  provenance="ESTIMADO"
+                  source="US_STOCKS_DATASET (catálogo estático)"
+                  format="currency"
+                  size="sm"
+                />
+                <DataValue
+                  label="Alvo 1"
+                  value={item.alvo1}
+                  provenance="ESTIMADO"
+                  source="US_STOCKS_DATASET (catálogo estático)"
+                  format="currency"
+                  size="sm"
+                />
                 <span>R:R: <strong className="text-cyan-300">{item.rr}</strong></span>
               </div>
             </div>
@@ -198,9 +232,23 @@ export function ScreenerView({ onSelectSymbol }: ScreenerViewProps) {
                   <div className="text-[10px] text-gray-400 font-sans truncate w-28">{item.name}</div>
                   <div className="text-[9px] text-rose-400/80 font-mono mt-0.5">{item.sector}</div>
                 </div>
-                <div className="text-right font-mono">
-                  <div className="text-sm font-bold text-white">${item.spot.toFixed(2)}</div>
-                  <div className="text-[11px] text-rose-400 font-semibold">{item.change.toFixed(2)}%</div>
+                <div className="text-right font-mono flex flex-col items-end gap-0.5">
+                  <DataValue
+                    label="Spot"
+                    value={item.spot}
+                    provenance="ESTIMADO"
+                    source="US_STOCKS_DATASET (catálogo estático)"
+                    format="currency"
+                    size="sm"
+                  />
+                  <DataValue
+                    label="Var"
+                    value={item.change}
+                    provenance="ESTIMADO"
+                    source="US_STOCKS_DATASET (catálogo estático)"
+                    format="percent"
+                    size="sm"
+                  />
                 </div>
               </div>
               <div className="mt-2 text-[10px] text-gray-400 font-mono truncate">{item.strategy || 'Bear Put Spread'}</div>
@@ -243,9 +291,23 @@ export function ScreenerView({ onSelectSymbol }: ScreenerViewProps) {
                   <div className="text-[10px] text-gray-400 font-sans truncate w-28">{item.name}</div>
                   <div className="text-[9px] text-purple-400/80 font-mono mt-0.5">{item.sector}</div>
                 </div>
-                <div className="text-right font-mono">
-                  <div className="text-sm font-bold text-white">${item.spot.toFixed(2)}</div>
-                  <div className="text-[11px] text-emerald-400 font-semibold">+{item.change.toFixed(2)}%</div>
+                <div className="text-right font-mono flex flex-col items-end gap-0.5">
+                  <DataValue
+                    label="Spot"
+                    value={item.spot}
+                    provenance="ESTIMADO"
+                    source="US_STOCKS_DATASET (catálogo estático)"
+                    format="currency"
+                    size="sm"
+                  />
+                  <DataValue
+                    label="Var"
+                    value={item.change}
+                    provenance="ESTIMADO"
+                    source="US_STOCKS_DATASET (catálogo estático)"
+                    format="percent"
+                    size="sm"
+                  />
                 </div>
               </div>
               <div className="mt-2 text-[10px] text-cyan-300 font-mono">Iron Condor #20 a Crédito (4 Pernas)</div>
