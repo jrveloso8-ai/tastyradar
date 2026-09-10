@@ -36,9 +36,9 @@ export function CandlestickChart({ candles, spotPrice }: CandlestickChartProps) 
 
   const activeCandle = hoverIndex !== null ? candles[hoverIndex] : candles[candles.length - 1];
 
-  // Resistance and Support Levels
-  const res1 = spotPrice * 1.05;
-  const sup1 = spotPrice * 0.96;
+  // Bandas de Amplitude Percentual em torno do Spot (+5% / -4%)
+  const bandaAlta = spotPrice * 1.05;
+  const bandaBaixa = spotPrice * 0.96;
 
   return (
     <div className="w-full bg-[#070b14] p-3 rounded-xl border border-gray-900 overflow-hidden font-mono select-none">
@@ -79,15 +79,15 @@ export function CandlestickChart({ candles, spotPrice }: CandlestickChartProps) 
           );
         })}
 
-        {/* Support & Resistance Lines */}
-        <line x1="0" y1={getY(res1)} x2={width - 80} y2={getY(res1)} stroke="#f43f5e" strokeDasharray="4 4" strokeWidth="1.2" />
-        <text x={width - 75} y={getY(res1) + 3} fill="#f43f5e" fontSize="9" fontWeight="bold">
-          RES ${res1.toFixed(2)}
+        {/* Linhas de Amplitude (+5% / -4%) */}
+        <line x1="0" y1={getY(bandaAlta)} x2={width - 80} y2={getY(bandaAlta)} stroke="#f43f5e" strokeDasharray="4 4" strokeWidth="1.2" />
+        <text x={width - 75} y={getY(bandaAlta) + 3} fill="#f43f5e" fontSize="9" fontWeight="bold">
+          BANDA +5% ${bandaAlta.toFixed(2)}
         </text>
 
-        <line x1="0" y1={getY(sup1)} x2={width - 80} y2={getY(sup1)} stroke="#10b981" strokeDasharray="4 4" strokeWidth="1.2" />
-        <text x={width - 75} y={getY(sup1) + 3} fill="#10b981" fontSize="9" fontWeight="bold">
-          SUP ${sup1.toFixed(2)}
+        <line x1="0" y1={getY(bandaBaixa)} x2={width - 80} y2={getY(bandaBaixa)} stroke="#10b981" strokeDasharray="4 4" strokeWidth="1.2" />
+        <text x={width - 75} y={getY(bandaBaixa) + 3} fill="#10b981" fontSize="9" fontWeight="bold">
+          BANDA -4% ${bandaBaixa.toFixed(2)}
         </text>
 
         {/* MA20, MA50, MA200 Lines */}
