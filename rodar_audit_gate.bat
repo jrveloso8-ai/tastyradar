@@ -30,10 +30,12 @@ set GATE_RESULT=%ERRORLEVEL%
 echo ---------------------------------------------------
 echo.
 
-echo Verificando REGRA 00 (ESLint no-restricted-syntax contra .toFixed() solto em JSX) ...
+echo Verificando REGRA 00 (ESLint: no-raw-numbers/toFixed em components + fallback magico em domain/services) ...
 echo ---------------------------------------------------
 call npx eslint src/components --ext .tsx,.jsx
 set ESLINT_RESULT=%ERRORLEVEL%
+call npx eslint src/lib/domain src/lib/services --ext .ts
+if !ERRORLEVEL! NEQ 0 set ESLINT_RESULT=!ERRORLEVEL!
 echo ---------------------------------------------------
 echo.
 
