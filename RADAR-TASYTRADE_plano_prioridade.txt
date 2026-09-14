@@ -1,0 +1,102 @@
+RADAR-TASYTRADE — Plano de execução por prioridade
+Preparado em 11/09/2026, a partir do estado real do projeto (commit 0f268d1, gate oficial 34/34 verde)
+
+===================================================================
+FASE A — BLOQUEANTE, só você executa (esta semana, antes de qualquer coisa abaixo)
+===================================================================
+
+A1. Teste ponta a ponta com dado real
+    O que: rodar `npm run dev` no seu terminal Windows e abrir as telas de
+    Cotação, Opções e Analista de Volatilidade para um ticker real (ex.: BAC,
+    o caso de referência já usado antes).
+    Por quê primeiro: nenhuma sessão de IA até hoje validou isso — o shell
+    remoto nunca teve saída de rede geral para a Tastytrade. É o único item
+    que decide se o resto do plano (Fase C) é ajuste fino ou se existe
+    problema mais grave escondido atrás do gate.
+    Critério de pronto: números na tela batem com o que você vê na
+    plataforma desktop da Tastytrade para o mesmo ticker/vencimento.
+
+A2. Confirmar o plano de deploy na Vercel (Hobby ou Pro)
+    O que: checar no painel da Vercel qual plano está ativo.
+    Por quê: funções do plano Hobby têm timeout de 10s; o streaming DXLink
+    sozinho (SETUP->AUTH->CHANNEL) já pode levar ~10s antes de qualquer
+    resposta REST. Se for Hobby, a rota pode falhar em produção mesmo
+    funcionando local. 5 minutos, decide se a Fase C precisa de trabalho de
+    infraestrutura além do código.
+
+===================================================================
+FASE B — Barato e mecânico, pode rodar em paralelo com a Fase A
+===================================================================
+
+B1. Versionar a trilha de auditoria
+    O que: commitar AUDITORIA_RADAR_05_VERIFICACAO_CICLO5.md/.pdf,
+    PLANO_MESTRE_REMEDIACAO_RADAR.md/.pdf, INVENTARIO_FASE1_RADAR_TASYTRADE,
+    as mensagens ao programador (09/09 e 10/09), RESUMO_CORRECAO_DADOS_REAIS
+    e PROMPT_PROGRAMADOR_AUDIT_GATE — hoje soltos na pasta, fora do git.
+    Por quê: é o mesmo padrão (C5-13/A-22) que já fez os laudos de Ciclo 1, 2
+    e 4 sumirem do disco sem deixar rastro. Custo zero, risco zero.
+    Quem faz: posso fazer agora se você topar — é só `git add` + commit,
+    sem tocar em código.
+
+===================================================================
+FASE C — Só depois que A1 confirmar dado real (não adianta antes)
+===================================================================
+
+C1. Conectar provenance.ts (badges MEDIDO/DERIVADO/ESTIMADO/SIMULADO) no GEX
+    Onde: UnifiedGexBarreirasView.tsx, hoje rotulado genericamente "modelo
+    calibrado", alimentado por spot do catálogo estático sem indicar isso.
+    Por quê depois do A1: só faz sentido diferenciar visualmente dado real
+    de dado modelo depois que existir dado real de verdade circulando nessas
+    telas — senão é infraestrutura decorativa.
+
+C2. Consolidar US_STOCKS_DATASET / SP500_DATASET
+    O que: decidir campo a campo o que migra para fonte real (via A1) e o
+    que continua estático — e, para o que ficar estático, exibir a data de
+    congelamento explicitamente ("dado de 08/09/2026, não atualizado") em
+    vez de qualquer rótulo que sugira "real".
+    Por quê depois: é a correção de causa-raiz de três ciclos de auditoria
+    (A-03 desde o Ciclo 1) — mas só dá pra decidir com o resultado do A1 na
+    mão.
+
+C3. Resolver o achado do A2 (se for Hobby)
+    Se a Vercel estiver no plano Hobby: mover o streaming DXLink para uma
+    rota separada com timeout maior, ou reestruturar para padrão
+    assíncrono (poll/webhook) antes de liberar a tela de Volatilidade em
+    produção.
+
+===================================================================
+FASE D — Baixa prioridade, não bloqueia nada, agenda quando sobrar ciclo
+===================================================================
+
+D1. Bug das estratégias 7 ("Trava de Baixa com Call a Crédito") e 22
+    ("Jade Lizard") caindo no mesmo template genérico de trava de débito.
+    Não é achado de dado fabricado — é erro de lógica/nomenclatura de
+    estrutura, isolado, sem dependência do resto do plano.
+
+===================================================================
+FASE E — Fecha o ciclo, só depois de A + B + C completos
+===================================================================
+
+E1. Auditoria cega independente
+    Sessão nova, sem o contexto desta sessão, rodando o gate e revisando
+    o código do zero. Só faz sentido depois que A1 confirmar a integração
+    real — senão é "auditoria de fórmula" sem grade real pra comparar,
+    o mesmo erro que os Ciclos 1-4 já cometeram.
+
+-------------------------------------------------------------------
+Opcional / baixo valor agora
+-------------------------------------------------------------------
+- Investigar formalmente os commits "Fatia 1-4" (Plano Mestre, Frente 4):
+  já confirmei que estão em main, mergeados, e o conteúdo (provenance.ts,
+  RSI/MACD corretos) bate com o que o laudo Ciclo 5 validou como resolvido.
+  Não vejo necessidade de gastar os 15-20 min de investigação que o Plano
+  Mestre sugeria, a menos que você tenha dúvida específica sobre autoria.
+
+===================================================================
+MINHA RECOMENDAÇÃO
+===================================================================
+Faça A1 e A2 esta semana, em paralelo — nenhum dos dois depende do outro
+e ambos são só seus (acesso ao seu terminal e ao painel da Vercel). B1 eu
+posso resolver agora mesmo, sem esperar nada, se você topar. Não comece C
+antes de A1 fechar: qualquer trabalho ali hoje é aposta, não engenharia.
+D pode esperar indefinidamente. E é o último passo, não o próximo.
