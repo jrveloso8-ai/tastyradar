@@ -34,12 +34,43 @@ export async function POST(request: NextRequest) {
   } catch {
     return withSessionCookie(NextResponse.json({ available: false, reason: 'Payload inválido.' }, { status: 400 }), guard);
   }
-  if (!body?.symbol || typeof body.spot !== 'number') {
-    return withSessionCookie(NextResponse.json({ available: false, reason: 'Campos "symbol" e "spot" são obrigatórios.' }, { status: 400 }), guard);
+  if (!body?.symbol) {
+    return withSessionCookie(NextResponse.json({ available: false, reason: 'Campo "symbol" é obrigatório.' }, { status: 400 }), guard);
   }
 
+  // Consulta cotação de mercado real (spot) e métricas oficiais de volatilidade (IV Rank, IV30) direto da Tastytrade
+  const [equityQuotes, liveMetrics] = await Promise.all([
+    tastyMarketService.getEquityQuotes([body.symbol]),
+    tastyMarketService.getMarketMetrics([body.symbol]),
+  ]);
+
+  const liveSpot = equityQuotes[body.symbol]?.last ?? (typeof body.spot === 'number' && body.spot > 0 ? body.spot : null);
+
+  if (!liveSpot || liveSpot <= 0) {
+    return withSessionCookie(
+      NextResponse.json({
+        available: false,
+        reason: `Cotação real do ativo (spot) indisponível na Tastytrade para ${body.symbol}. Não fabricamos preço para montar estratégia de opções.`,
+      }),
+      guard
+    );
+  }
+
+  const liveMetric = liveMetrics[body.symbol];
+  const liveIvr = liveMetric?.ivRank ?? body.ivr;
+  const liveIvp = liveMetric?.ivPercentile ?? body.ivp;
+  const liveIv30 = liveMetric?.iv30 ?? body.iv30;
+
+  const assetInput: VolatilityAssetInput = {
+    ...body,
+    spot: liveSpot,
+    ivr: liveIvr,
+    ivp: liveIvp,
+    iv30: liveIv30,
+  };
+
   const chain = await tastyMarketService.getOptionChain(body.symbol);
-  const plan = planStrategy(body, chain);
+  const plan = planStrategy(assetInput, chain);
   if (!plan) {
     return withSessionCookie(
       NextResponse.json({
@@ -59,12 +90,12 @@ export async function POST(request: NextRequest) {
     : [];
   const allStreamerSymbols = Array.from(new Set([...legStreamerSymbols, ...smileStreamerSymbols]));
 
-  const [quotes, greeks] = await Promise.all([
+  const [optionQuotes, greeks] = await Promise.all([
     tastyMarketService.getOptionQuotes(legOccSymbols),
     fetchRealGreeks(allStreamerSymbols, 10000),
   ]);
 
-  const recommendation = buildRecommendation(body, plan, quotes, greeks, body.includeSmile ? greeks : null);
+  const recommendation = buildRecommendation(assetInput, plan, optionQuotes, greeks, body.includeSmile ? greeks : null);
   if (!recommendation) {
     return withSessionCookie(
       NextResponse.json({

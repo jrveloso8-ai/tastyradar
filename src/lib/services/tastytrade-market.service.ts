@@ -61,10 +61,28 @@ function parsePct(val: any): number | null {
   return Number(num.toFixed(1));
 }
 
+export interface TastyEquityQuote {
+  symbol: string;
+  last: number | null;
+  bid: number | null;
+  ask: number | null;
+  mid: number | null;
+  open: number | null;
+  prevClose: number | null;
+  change: number | null;
+  changePct: number | null;
+  dayHigh: number | null;
+  dayLow: number | null;
+  volume: number | null;
+  updatedAt: string;
+  source: 'tastytrade-live';
+}
+
 export class TastytradeMarketService {
   private baseUrl: string;
   private metricsCache = new Map<string, { metrics: TastyLiveMetrics; expiresAt: number }>();
   private chainCache = new Map<string, { chain: OptionChainResult; expiresAt: number }>();
+  private equityQuotesCache = new Map<string, { quote: TastyEquityQuote; expiresAt: number }>();
 
   private setCache(sym: string, metrics: TastyLiveMetrics, expiresAt: number) {
     // Evicção ativa contra memory leak em servidores persistentes (Achado A-19)
@@ -348,13 +366,143 @@ export class TastytradeMarketService {
     return result;
   }
 
-  // getQuote() e getGexAnalysis() foram removidos nesta sessão (Nível 1, Parte 1):
-  // eram código morto (nenhuma rota/componente os chamava — confirmado por grep antes
-  // da remoção), continham um dicionário fixo de 9 tickers com fallback de US$ 100,00
-  // (uma terceira fonte de spot divergente de US_STOCKS_DATASET/SP500_DATASET) e uma
-  // cadeia de opções sintética própria (Achados D-04/D-05 do laudo Ciclo 4). Se um
-  // método de cotação/GEX real for reintroduzido aqui, deve consumir a fonte única
-  // de spot definida no domínio, nunca um preset novo.
+  /**
+   * Consulta cotações de ações/ETFs (spot real) diretamente na Tastytrade Market Data API:
+   * GET /market-data/by-type?equity=SYMBOL1,SYMBOL2,...
+   * Suporta até 100 símbolos por requisição (especificação oficial Tastytrade).
+   * Lotes > 100 são automaticamente particionados em requisições paralelas.
+   * Cache de 15 segundos com evicção ativa.
+   * REGRA 00: Tickers indisponíveis ou em falha simplesmente não constam no Record
+   * de saída — nunca se inventa spot de fallback.
+   */
+  public async getEquityQuotes(symbols: string[], bypassCache = false): Promise<Record<string, TastyEquityQuote>> {
+    const cleanSymbols = Array.from(new Set(symbols.map(s => s.trim().toUpperCase()))).filter(Boolean);
+    if (cleanSymbols.length === 0) return {};
+
+    const result: Record<string, TastyEquityQuote> = {};
+    const missingFromCache: string[] = [];
+    const now = Date.now();
+
+    if (!bypassCache) {
+      for (const sym of cleanSymbols) {
+        const cached = this.equityQuotesCache.get(sym);
+        if (cached && cached.expiresAt > now) {
+          result[sym] = cached.quote;
+        } else {
+          missingFromCache.push(sym);
+        }
+      }
+    } else {
+      missingFromCache.push(...cleanSymbols);
+    }
+
+    if (missingFromCache.length === 0) {
+      return result;
+    }
+
+    // Particiona em lotes de no máximo 100 símbolos
+    const chunkSize = 100;
+    const chunks: string[][] = [];
+    for (let i = 0; i < missingFromCache.length; i += chunkSize) {
+      chunks.push(missingFromCache.slice(i, i + chunkSize));
+    }
+
+    try {
+      const token = await tastyAuthService.getAccessToken();
+
+      await Promise.all(
+        chunks.map(async (chunk) => {
+          const query = encodeURIComponent(chunk.join(','));
+          const url = `${this.baseUrl}/market-data/by-type?equity=${query}`;
+
+          const res = await fetch(url, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json',
+              'User-Agent': 'RadarTastytrade/1.0',
+            },
+          });
+
+          if (!res.ok) {
+            console.warn(`[TastytradeMarketService] Falha ao consultar equity quotes (lote de ${chunk.length}): HTTP ${res.status}`);
+            return;
+          }
+
+          const body = await res.json();
+          const items = Array.isArray(body?.data?.items) ? body.data.items : [];
+
+          for (const item of items) {
+            const sym = (item.symbol || '').toUpperCase().trim();
+            if (!sym) continue;
+
+            const parseNum = (v: any): number | null => {
+              if (v === undefined || v === null || v === '') return null;
+              const n = typeof v === 'number' ? v : parseFloat(v);
+              return isNaN(n) ? null : n;
+            };
+
+            const last = parseNum(item.last ?? item.mark);
+            const bid = parseNum(item.bid);
+            const ask = parseNum(item.ask);
+            const midRaw = parseNum(item.mid);
+            const mid = midRaw !== null
+              ? midRaw
+              : (bid !== null && ask !== null ? Number(((bid + ask) / 2).toFixed(4)) : last);
+
+            const prevClose = parseNum(item['prev-close']);
+            const open = parseNum(item.open);
+            const dayHigh = parseNum(item['day-high-price']);
+            const dayLow = parseNum(item['day-low-price']);
+            const volume = parseNum(item.volume);
+
+            let change: number | null = null;
+            let changePct: number | null = null;
+            if (last !== null && prevClose !== null && prevClose > 0) {
+              change = Number((last - prevClose).toFixed(4));
+              changePct = Number((((last - prevClose) / prevClose) * 100).toFixed(2));
+            }
+
+            const quote: TastyEquityQuote = {
+              symbol: sym,
+              last,
+              bid,
+              ask,
+              mid,
+              open,
+              prevClose,
+              change,
+              changePct,
+              dayHigh,
+              dayLow,
+              volume,
+              updatedAt: item['updated-at'] || new Date().toISOString(),
+              source: 'tastytrade-live',
+            };
+
+            result[sym] = quote;
+
+            // Evicção ativa simples se cache atingir tamanho máximo
+            if (this.equityQuotesCache.size >= 200) {
+              const expireNow = Date.now();
+              for (const [key, entry] of this.equityQuotesCache.entries()) {
+                if (entry.expiresAt <= expireNow) this.equityQuotesCache.delete(key);
+              }
+              if (this.equityQuotesCache.size >= 200) {
+                const oldestKey = this.equityQuotesCache.keys().next().value;
+                if (oldestKey) this.equityQuotesCache.delete(oldestKey);
+              }
+            }
+            this.equityQuotesCache.set(sym, { quote, expiresAt: now + 15_000 }); // 15s cache
+          }
+        })
+      );
+    } catch (err: any) {
+      console.warn(`[TastytradeMarketService] Falha de rede ao consultar equity quotes: ${err.message}`);
+    }
+
+    return result;
+  }
 }
 
 export const tastyMarketService = new TastytradeMarketService();

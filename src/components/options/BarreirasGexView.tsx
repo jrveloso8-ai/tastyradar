@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { UnifiedGexBarreirasView } from './UnifiedGexBarreirasView';
 import { US_STOCKS_DATASET } from '@/lib/domain/us-market-data';
 import { Search, ArrowLeft, TrendingUp } from 'lucide-react';
@@ -20,6 +20,29 @@ export function BarreirasGexView({
 }: BarreirasGexViewProps) {
   const [selectedSymbol, setSelectedSymbol] = useState(initialSymbol || 'NVDA');
   const [searchInput, setSearchInput] = useState('');
+  const [liveEquity, setLiveEquity] = useState<{ last: number | null } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const cleanSym = selectedSymbol.toUpperCase().trim();
+    fetch(`/api/market/equity-quotes?symbol=${encodeURIComponent(cleanSym)}`)
+      .then((r) => r.json())
+      .then((res) => {
+        if (cancelled) return;
+        const q = res?.data?.[cleanSym];
+        if (q && typeof q.last === 'number') {
+          setLiveEquity(q);
+        } else {
+          setLiveEquity(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLiveEquity(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSymbol]);
 
   const currentStock = useMemo(() => {
     const found = US_STOCKS_DATASET.find(s => s.symbol === selectedSymbol.toUpperCase().trim());
@@ -30,6 +53,8 @@ export function BarreirasGexView({
       spot: 150.00,
     };
   }, [selectedSymbol]);
+
+  const activeSpot = liveEquity?.last ?? currentStock.spot;
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,7 +134,7 @@ export function BarreirasGexView({
       {/* Main Unified View Component */}
       <UnifiedGexBarreirasView 
         symbol={currentStock.symbol} 
-        spotPrice={currentStock.spot} 
+        spotPrice={activeSpot} 
         onBackToQuote={onBackToQuote}
         onBackToScreener={onBackToScreener}
       />

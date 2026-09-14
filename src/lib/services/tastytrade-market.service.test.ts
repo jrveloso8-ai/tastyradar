@@ -113,3 +113,96 @@ describe('TastytradeMarketService - Market Metrics', () => {
   // aqui cobria esse metodo removido; a cobertura de calculateGex() em si permanece em
   // gex-engine.test.ts, que e o motor de verdade e nao mudou.
 });
+
+describe('TastytradeMarketService - Equity Quotes (Spot Real)', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  it('deve consultar e fazer parse exato do payload oficial /market-data/by-type?equity=...', async () => {
+    const samplePayload = {
+      data: {
+        items: [
+          {
+            symbol: 'NVDA',
+            last: '212.1',
+            bid: '212.1',
+            ask: '212.11',
+            mid: '212.105',
+            open: '211.24',
+            'prev-close': '218.29',
+            'day-high-price': '212.77',
+            'day-low-price': '208.93',
+            volume: '86606225.238593',
+            'updated-at': '2026-09-14T18:32:08.041Z',
+          },
+          {
+            symbol: 'AAPL',
+            last: '334.32',
+            bid: '334.29',
+            ask: '334.35',
+            mid: '334.32',
+            open: '334.79',
+            'prev-close': '332.27',
+            'day-high-price': '335.5',
+            'day-low-price': '331.34',
+            volume: '23221042.003089',
+            'updated-at': '2026-09-14T18:32:08.043Z',
+          },
+        ],
+      },
+    };
+
+    vi.stubGlobal('fetch', mockFetchOnce({ ok: true, json: () => Promise.resolve(samplePayload) }));
+
+    const quotes = await tastyMarketService.getEquityQuotes(['NVDA', 'AAPL'], true);
+
+    expect(quotes.NVDA).toBeDefined();
+    expect(quotes.AAPL).toBeDefined();
+
+    // Verificacao numerica exata do NVDA (conforme print do usuario)
+    expect(quotes.NVDA.symbol).toBe('NVDA');
+    expect(quotes.NVDA.last).toBe(212.1);
+    expect(quotes.NVDA.bid).toBe(212.1);
+    expect(quotes.NVDA.ask).toBe(212.11);
+    expect(quotes.NVDA.mid).toBe(212.105);
+    expect(quotes.NVDA.prevClose).toBe(218.29);
+    expect(quotes.NVDA.change).toBe(-6.19);
+    expect(quotes.NVDA.changePct).toBe(-2.84);
+    expect(quotes.NVDA.source).toBe('tastytrade-live');
+
+    // Verificacao do AAPL
+    expect(quotes.AAPL.symbol).toBe('AAPL');
+    expect(quotes.AAPL.last).toBe(334.32);
+    expect(quotes.AAPL.change).toBe(2.05);
+    expect(quotes.AAPL.changePct).toBe(0.62);
+  });
+
+  it('deve retornar objeto vazio se nenhum simbolo for fornecido sem disparar requisicao', async () => {
+    const quotes = await tastyMarketService.getEquityQuotes([]);
+    expect(quotes).toEqual({});
+    expect(tastyAuthService.getAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('REGRA 00: quando a fonte falha por rede, nenhum spot e inventado', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
+
+    const quotes = await tastyMarketService.getEquityQuotes(['NVDA'], true);
+    expect(quotes.NVDA).toBeUndefined();
+    expect(quotes).toEqual({});
+  });
+
+  it('REGRA 00: quando a API responde com status nao-2xx, nenhum fallback e injetado', async () => {
+    vi.stubGlobal('fetch', mockFetchOnce({ ok: false, status: 502 }));
+
+    const quotes = await tastyMarketService.getEquityQuotes(['NVDA'], true);
+    expect(quotes.NVDA).toBeUndefined();
+    expect(quotes).toEqual({});
+  });
+});
+

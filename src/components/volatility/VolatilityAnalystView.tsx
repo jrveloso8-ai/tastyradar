@@ -57,6 +57,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
 
   // Estados de conexão Live com a API Oficial da Tastytrade
   const [liveMetricsMap, setLiveMetricsMap] = useState<Record<string, any>>({});
+  const [liveQuotesMap, setLiveQuotesMap] = useState<Record<string, any>>({});
   const [isLiveConnected, setIsLiveConnected] = useState<boolean>(false);
   const [isRefreshingLive, setIsRefreshingLive] = useState<boolean>(false);
 
@@ -82,20 +83,31 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
     async function syncLiveMetrics() {
       try {
         setIsRefreshingLive(true);
-        // Busca métricas para o ativo selecionado + os primeiros da grade visível
+        // Busca métricas e cotações para o ativo selecionado + os primeiros da grade visível
         const symbolsToFetch = Array.from(new Set([
           selectedSymbol.toUpperCase(),
           ...baseList.slice(0, 15).map(s => s.symbol.toUpperCase())
         ])).join(',');
 
-        const res = await fetch(`/api/market/metrics?symbols=${symbolsToFetch}`);
-        if (!res.ok) return;
-        const json = await res.json();
+        const [metricsRes, quotesRes] = await Promise.all([
+          fetch(`/api/market/metrics?symbols=${symbolsToFetch}`),
+          fetch(`/api/market/equity-quotes?symbols=${symbolsToFetch}`),
+        ]);
 
-        if (!isCancelled && json.success && json.data) {
-          setLiveMetricsMap(prev => ({ ...prev, ...json.data }));
-          if (json.live) {
-            setIsLiveConnected(true);
+        if (!isCancelled && metricsRes.ok) {
+          const json = await metricsRes.json();
+          if (json?.success && json?.data) {
+            setLiveMetricsMap(prev => ({ ...prev, ...json.data }));
+            if (json.live) {
+              setIsLiveConnected(true);
+            }
+          }
+        }
+
+        if (!isCancelled && quotesRes.ok) {
+          const qJson = await quotesRes.json();
+          if (qJson?.success && qJson?.data) {
+            setLiveQuotesMap(prev => ({ ...prev, ...qJson.data }));
           }
         }
       } catch (err) {
@@ -127,14 +139,18 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
     }
     return list.slice(0, 50).map(item => {
       const live = liveMetricsMap[item.symbol.toUpperCase()];
-      const enrichedItem: SP500StockData = live ? {
+      const liveQuote = liveQuotesMap[item.symbol.toUpperCase()];
+      const enrichedItem: SP500StockData = {
         ...item,
-        ivr: live.ivRank ?? item.ivr,
-        ivp: live.ivPercentile ?? item.ivp,
-        iv30: live.iv30 ?? item.iv30,
-        liquidityRating: live.liquidityRating ?? item.liquidityRating,
-        daysToEarnings: live.daysToEarnings !== undefined ? live.daysToEarnings : item.daysToEarnings,
-      } : item;
+        ...(liveQuote?.last ? { spot: liveQuote.last } : {}),
+        ...(live ? {
+          ivr: live.ivRank ?? item.ivr,
+          ivp: live.ivPercentile ?? item.ivp,
+          iv30: live.iv30 ?? item.iv30,
+          liquidityRating: live.liquidityRating ?? item.liquidityRating,
+          daysToEarnings: live.daysToEarnings !== undefined ? live.daysToEarnings : item.daysToEarnings,
+        } : {})
+      };
 
       // Só classificação de regime (VRP/GEX/estratégia elegível) — não abre cadeia real
       // nem streaming DXLink por linha da tabela (ver classifyRegime() no motor).
@@ -143,27 +159,31 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
         evaluation: classifyRegime(enrichedItem)
       };
     });
-  }, [baseList, searchTerm, liveMetricsMap]);
+  }, [baseList, searchTerm, liveMetricsMap, liveQuotesMap]);
 
   // Ativo atualmente selecionado enriquecido dinamicamente com a API Live
   const selectedAsset = useMemo(() => {
     const asset = getSP500Asset(selectedSymbol);
     const live = liveMetricsMap[selectedSymbol.toUpperCase()];
-    if (!live) return asset;
+    const liveQuote = liveQuotesMap[selectedSymbol.toUpperCase()];
+    const liveSpot = liveQuote?.last ?? asset.spot;
 
     return {
       ...asset,
-      ivr: live.ivRank ?? asset.ivr,
-      ivp: live.ivPercentile ?? asset.ivp,
-      iv30: live.iv30 ?? asset.iv30,
-      liquidityRating: live.liquidityRating ?? asset.liquidityRating,
-      daysToEarnings: live.daysToEarnings !== undefined ? live.daysToEarnings : asset.daysToEarnings,
-      dividendAmount: live.dividendYield ? Math.round((asset.spot * (live.dividendYield / 100)) * 100) / 100 : asset.dividendAmount,
-      hvHistory: (live.hv90 !== undefined && live.hv60 !== undefined && live.hv30 !== undefined)
-        ? [live.hv90, live.hv60, live.hv30]
-        : asset.hvHistory,
+      spot: liveSpot,
+      ...(live ? {
+        ivr: live.ivRank ?? asset.ivr,
+        ivp: live.ivPercentile ?? asset.ivp,
+        iv30: live.iv30 ?? asset.iv30,
+        liquidityRating: live.liquidityRating ?? asset.liquidityRating,
+        daysToEarnings: live.daysToEarnings !== undefined ? live.daysToEarnings : asset.daysToEarnings,
+        dividendAmount: live.dividendYield ? Math.round((liveSpot * (live.dividendYield / 100)) * 100) / 100 : asset.dividendAmount,
+        hvHistory: (live.hv90 !== undefined && live.hv60 !== undefined && live.hv30 !== undefined)
+          ? [live.hv90, live.hv60, live.hv30]
+          : asset.hvHistory,
+      } : {}),
     };
-  }, [selectedSymbol, liveMetricsMap]);
+  }, [selectedSymbol, liveMetricsMap, liveQuotesMap]);
 
   // Recomendação real e completa do ativo selecionado (strikes/vencimento/preço/
   // gregas reais da Tastytrade — ver /api/market/option-recommendation). Antes era

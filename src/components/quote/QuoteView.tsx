@@ -37,6 +37,7 @@ import { US_STOCKS_DATASET, USStockItem, generateCandlesticks } from '@/lib/doma
 import { CME_25_STRATEGIES, StrategySpec } from '@/lib/domain/cme-catalog';
 import { aiConsultantEngine } from '@/lib/domain/ai-consultant';
 import { DataValue } from '@/components/shared/DataValue';
+import { TastyLiveMetrics } from '@/lib/services/tastytrade-market.service';
 
 interface QuoteViewProps {
   initialSymbol?: string;
@@ -90,11 +91,82 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
     } as USStockItem;
   }, [symbol]);
 
-  // Generate Elected Strategy dynamically for the stock based on its category
-  const candles = useMemo(() => {
+  // Cotação spot em tempo real direta da Tastytrade (elimina discrepâncias de catálogo estático)
+  const [liveEquity, setLiveEquity] = useState<{
+    last: number | null;
+    bid: number | null;
+    ask: number | null;
+    change: number | null;
+    changePct: number | null;
+    volume: number | null;
+    updatedAt: string;
+    source: 'tastytrade-live';
+  } | null>(null);
+  const [liveEquityStatus, setLiveEquityStatus] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
 
-    return generateCandlesticks(currentStock.symbol, currentStock.spot, 90);
-  }, [currentStock.symbol, currentStock.spot]);
+  // Métricas oficiais de volatilidade ao vivo da Tastytrade (IV Rank, IV30)
+  const [liveMetrics, setLiveMetrics] = useState<TastyLiveMetrics | null>(null);
+  const [liveMetricsStatus, setLiveMetricsStatus] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
+
+  useEffect(() => {
+    let cancelled = false;
+    const cleanSym = symbol.toUpperCase().trim();
+    setLiveEquityStatus('loading');
+    setLiveMetricsStatus('loading');
+
+    Promise.all([
+      fetch(`/api/market/equity-quotes?symbol=${encodeURIComponent(cleanSym)}`)
+        .then((r) => r.json())
+        .then((res) => {
+          if (cancelled) return;
+          const q = res?.data?.[cleanSym];
+          if (q && typeof q.last === 'number') {
+            setLiveEquity(q);
+            setLiveEquityStatus('ready');
+          } else {
+            setLiveEquity(null);
+            setLiveEquityStatus('unavailable');
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setLiveEquity(null);
+            setLiveEquityStatus('unavailable');
+          }
+        }),
+
+      fetch(`/api/market/market-metrics?symbols=${encodeURIComponent(cleanSym)}`)
+        .then((r) => r.json())
+        .then((res) => {
+          if (cancelled) return;
+          const m = res?.data?.[cleanSym];
+          if (m && typeof m.ivRank === 'number') {
+            setLiveMetrics(m);
+            setLiveMetricsStatus('ready');
+          } else {
+            setLiveMetrics(null);
+            setLiveMetricsStatus('unavailable');
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setLiveMetrics(null);
+            setLiveMetricsStatus('unavailable');
+          }
+        }),
+    ]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [symbol]);
+
+  const activeSpotPrice = liveEquity?.last ?? currentStock.spot;
+
+  // Generate Candlesticks dinamicamente ancorado no spot real ativo
+  const candles = useMemo(() => {
+    return generateCandlesticks(currentStock.symbol, activeSpotPrice, 90);
+  }, [currentStock.symbol, activeSpotPrice]);
 
   // Cobertura real de opções: só os tickers presentes no SP500_DATASET têm os campos
   // (IV30/RV20/IVR/IVP, GEX, Walls de OI) exigidos pelo volatilityEngine. Fora dessa
@@ -109,10 +181,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
 
   // Recomendação real: motor de volatilidade reescrito (2026-09-08) para exigir
   // strike/vencimento/preço reais da Tastytrade (cadeia real + cotação real por
-  // contrato via REST). Antes esta chamada era síncrona (volatilityEngine.evaluate)
-  // e sempre "resolvia" para algo, mesmo que fabricado; agora é uma consulta real via
-  // API (/api/market/option-recommendation), que pode legitimamente não retornar nada
-  // se a Tastytrade não confirmar dado real no momento — daí os 3 estados abaixo.
+  // contrato via REST).
   const [volRecommendation, setVolRecommendation] = useState<VolatilityRecommendation | null>(null);
   const [volRecStatus, setVolRecStatus] = useState<'idle' | 'loading' | 'unavailable' | 'ready'>('idle');
   const [volRecReason, setVolRecReason] = useState<string>('');
@@ -125,10 +194,23 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
     }
     let cancelled = false;
     setVolRecStatus('loading');
+
+    const liveIvr = liveMetrics?.ivRank ?? sp500Stock.ivr;
+    const liveIvp = liveMetrics?.ivPercentile ?? sp500Stock.ivp;
+    const liveIv30 = liveMetrics?.iv30 ?? sp500Stock.iv30;
+
+    const payload = {
+      ...sp500Stock,
+      spot: liveEquity?.last ?? sp500Stock.spot,
+      ivr: liveIvr,
+      ivp: liveIvp,
+      iv30: liveIv30,
+    };
+
     fetch('/api/market/option-recommendation', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sp500Stock),
+      body: JSON.stringify(payload),
     })
       .then((r) => r.json())
       .then((data) => {
@@ -139,20 +221,20 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
         } else {
           setVolRecommendation(null);
           setVolRecStatus('unavailable');
-          setVolRecReason(data.reason || 'Dado real indisponível no momento.');
+          setVolRecReason(data.reason || 'Cotação real indisponível para montar recomendação no momento.');
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (!cancelled) {
           setVolRecommendation(null);
           setVolRecStatus('unavailable');
-          setVolRecReason('Falha ao consultar a API real da Tastytrade.');
+          setVolRecReason(err.message || 'Falha de rede ao consultar recomendação.');
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [sp500Stock]);
+  }, [sp500Stock, liveEquity?.last, liveMetrics?.ivRank, liveMetrics?.ivPercentile, liveMetrics?.iv30]);
 
   const electedStrategy: ElectedStrategyData | null = useMemo(() => {
     if (!volRecommendation || !sp500Stock) return null;
@@ -328,7 +410,14 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
               real quando disponível, e a taxa de juros não tem fonte no RADAR hoje, então
               deixou de ser exibida como se fosse. */}
           <div className="flex items-center gap-2 text-[11px] font-mono text-gray-400 mt-2">
-            <span>1. SPOT: CATÁLOGO (US_STOCKS_DATASET)</span>
+            <span>
+              1. SPOT:{' '}
+              {liveEquityStatus === 'ready' && liveEquity?.last != null
+                ? 'AO VIVO (Tastytrade REST)'
+                : liveEquityStatus === 'loading'
+                ? 'carregando...'
+                : 'INDISPONÍVEL NA CORRETORA'}
+            </span>
             <span>•</span>
             <span>
               2. OPÇÕES:{' '}
@@ -344,23 +433,36 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
         </div>
 
         <div className="flex items-center gap-6 bg-[#070b14] px-5 py-3 rounded-xl border border-gray-800 text-right">
-          <DataValue
-            label="SPOT"
-            value={currentStock.spot}
-            format="currency"
-            provenance="ESTIMADO"
-            source="US_STOCKS_DATASET (catálogo estático)"
-            size="lg"
-            className="items-end text-right"
-          />
+          <div className="flex flex-col items-end">
+            <DataValue
+              label="SPOT"
+              value={liveEquity?.last ?? (liveEquityStatus === 'unavailable' ? null : currentStock.spot)}
+              format="currency"
+              provenance={liveEquity?.last != null ? 'MEDIDO' : liveEquityStatus === 'unavailable' ? 'INDISPONIVEL' : 'ESTIMADO'}
+              source={liveEquity?.last != null ? 'Tastytrade Live REST (/market-data/by-type)' : 'US_STOCKS_DATASET (catálogo estático)'}
+              size="lg"
+              className="items-end text-right"
+            />
+            {liveEquity?.bid != null && liveEquity?.ask != null && (
+              <div className="text-[10px] font-mono text-gray-400 mt-0.5 flex items-center gap-1.5">
+                <span>
+                  Bid: <DataValue variant="inline" value={liveEquity.bid} format="currency" provenance="MEDIDO" source="Tastytrade Live REST" />
+                </span>
+                <span>•</span>
+                <span>
+                  Ask: <DataValue variant="inline" value={liveEquity.ask} format="currency" provenance="MEDIDO" source="Tastytrade Live REST" />
+                </span>
+              </div>
+            )}
+          </div>
           <DataValue
             label="VARIAÇÃO"
-            value={currentStock.change}
+            value={liveEquity?.changePct ?? (liveEquityStatus === 'unavailable' ? null : currentStock.change)}
             format="percent"
-            provenance="ESTIMADO"
-            source="US_STOCKS_DATASET (catálogo estático)"
+            provenance={liveEquity?.changePct != null ? 'DERIVADO' : liveEquityStatus === 'unavailable' ? 'INDISPONIVEL' : 'ESTIMADO'}
+            source={liveEquity?.changePct != null ? 'Tastytrade (last vs prev-close)' : 'US_STOCKS_DATASET (catálogo estático)'}
             size="sm"
-            className={`items-end text-right ${currentStock.change >= 0 ? '[&_.font-bold]:text-emerald-400' : '[&_.font-bold]:text-rose-400'}`}
+            className={`items-end text-right ${(liveEquity?.changePct ?? currentStock.change) >= 0 ? '[&_.font-bold]:text-emerald-400' : '[&_.font-bold]:text-rose-400'}`}
           />
           <div className="border-l border-gray-800 pl-4">
             <DataValue
@@ -554,14 +656,30 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
             <div className="p-4 bg-[#070b14] rounded-xl border border-gray-800">
               <span className="text-gray-400 text-[10px] block font-sans">IV Rank</span>
               <span className="text-lg font-bold text-purple-400 mt-1 block">
-                <DataValue variant="inline" value={currentStock.ivRank} format="percent" provenance="ESTIMADO" source="US_STOCKS_DATASET (catálogo estático)" />
+                <DataValue
+                  variant="inline"
+                  value={liveMetrics?.ivRank ?? (liveMetricsStatus === 'ready' ? null : currentStock.ivRank)}
+                  format="percent"
+                  provenance={liveMetrics?.ivRank != null ? 'MEDIDO' : liveMetricsStatus === 'ready' ? 'INDISPONIVEL' : 'ESTIMADO'}
+                  source={liveMetrics?.ivRank != null ? 'Tastytrade Live Metrics' : 'US_STOCKS_DATASET (catálogo estático)'}
+                />
               </span>
-              <span className="text-[10px] text-gray-400">Volatilidade Histórica</span>
+              <span className="text-[10px] text-gray-400">Volatilidade Histórica (Tastytrade)</span>
             </div>
             <div className="p-4 bg-[#070b14] rounded-xl border border-gray-800">
               <span className="text-gray-400 text-[10px] block font-sans">IV ATM (30 DTE)</span>
               <span className="text-lg font-bold text-cyan-400 mt-1 block">
-                <DataValue variant="inline" value={currentStock.ivAtm} format="percent" provenance="ESTIMADO" source="US_STOCKS_DATASET (catálogo estático)" />
+                <DataValue
+                  variant="inline"
+                  value={
+                    liveMetrics?.iv30 != null
+                      ? liveMetrics.iv30
+                      : (liveMetricsStatus === 'ready' ? null : currentStock.ivAtm)
+                  }
+                  format="percent"
+                  provenance={liveMetrics?.iv30 != null ? 'MEDIDO' : liveMetricsStatus === 'ready' ? 'INDISPONIVEL' : 'ESTIMADO'}
+                  source={liveMetrics?.iv30 != null ? 'Tastytrade Live Metrics' : 'US_STOCKS_DATASET (catálogo estático)'}
+                />
               </span>
               <span className="text-[10px] text-gray-400">Volatilidade Atual</span>
             </div>
