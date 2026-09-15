@@ -157,11 +157,16 @@ export class TastytradeMarketService {
           const sym = (item.symbol || '').toUpperCase();
           if (!sym) continue;
 
-          // IV Rank oficial Tastytrade: tw-implied-volatility-index-rank ou implied-volatility-index-rank
-          const rawIvr = item['implied-volatility-index-rank'] ?? item['tw-implied-volatility-index-rank'];
-          const rawIvp = item['implied-volatility-percentile'] ?? item['tw-implied-volatility-percentile'];
+          // IV Rank oficial Tastytrade: prioridade máxima para tw-implied-volatility-index-rank
+          // (fórmula proprietária exibida na tela da plataforma Tastyworks/Tastytrade).
+          // Fallback secundário para implied-volatility-index-rank (metodologia TOS).
+          const rawTwIvr = item['tw-implied-volatility-index-rank'];
+          const rawTosIvr = item['tos-implied-volatility-index-rank'] ?? item['implied-volatility-index-rank'];
+          const rawIvr = rawTwIvr ?? rawTosIvr;
+
+          const rawIvp = item['tw-implied-volatility-percentile'] ?? item['implied-volatility-percentile'];
           const rawIv30 = item['implied-volatility-30-day'] ?? item['implied-volatility-index'];
-          const rawTosIv = item['tos-implied-volatility-index-rank'];
+          const rawTosIv = rawTosIvr;
 
           const earningsDate = item.earnings?.['expected-report-date'] || undefined;
           let daysToEarnings: number | undefined = undefined;

@@ -60,6 +60,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
   const [liveQuotesMap, setLiveQuotesMap] = useState<Record<string, any>>({});
   const [isLiveConnected, setIsLiveConnected] = useState<boolean>(false);
   const [isRefreshingLive, setIsRefreshingLive] = useState<boolean>(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
 
   // Lista base pelo filtro selecionado
   const baseList = useMemo(() => {
@@ -76,53 +77,48 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
     return SP500_DATASET;
   }, [activeFilter]);
 
-  // Efeito de sincronização em tempo real com a API da Tastytrade
-  useEffect(() => {
-    let isCancelled = false;
+  // Função de sincronização com a API oficial da Tastytrade (suporta refresh manual e bypass de cache)
+  const syncLiveMetrics = React.useCallback(async (bypassCache = false) => {
+    try {
+      setIsRefreshingLive(true);
+      const symbolsToFetch = Array.from(new Set([
+        selectedSymbol.toUpperCase(),
+        ...baseList.slice(0, 15).map(s => s.symbol.toUpperCase())
+      ])).join(',');
 
-    async function syncLiveMetrics() {
-      try {
-        setIsRefreshingLive(true);
-        // Busca métricas e cotações para o ativo selecionado + os primeiros da grade visível
-        const symbolsToFetch = Array.from(new Set([
-          selectedSymbol.toUpperCase(),
-          ...baseList.slice(0, 15).map(s => s.symbol.toUpperCase())
-        ])).join(',');
+      const refreshParam = bypassCache ? '&refresh=true' : '';
+      const [metricsRes, quotesRes] = await Promise.all([
+        fetch(`/api/market/metrics?symbols=${symbolsToFetch}${refreshParam}`),
+        fetch(`/api/market/equity-quotes?symbols=${symbolsToFetch}${refreshParam}`),
+      ]);
 
-        const [metricsRes, quotesRes] = await Promise.all([
-          fetch(`/api/market/metrics?symbols=${symbolsToFetch}`),
-          fetch(`/api/market/equity-quotes?symbols=${symbolsToFetch}`),
-        ]);
-
-        if (!isCancelled && metricsRes.ok) {
-          const json = await metricsRes.json();
-          if (json?.success && json?.data) {
-            setLiveMetricsMap(prev => ({ ...prev, ...json.data }));
-            if (json.live) {
-              setIsLiveConnected(true);
-            }
+      if (metricsRes.ok) {
+        const json = await metricsRes.json();
+        if (json?.success && json?.data) {
+          setLiveMetricsMap(prev => ({ ...prev, ...json.data }));
+          if (json.live) {
+            setIsLiveConnected(true);
           }
         }
-
-        if (!isCancelled && quotesRes.ok) {
-          const qJson = await quotesRes.json();
-          if (qJson?.success && qJson?.data) {
-            setLiveQuotesMap(prev => ({ ...prev, ...qJson.data }));
-          }
-        }
-      } catch (err) {
-        console.warn('[VolatilityAnalystView] Não foi possível obter live metrics:', err);
-      } finally {
-        if (!isCancelled) setIsRefreshingLive(false);
       }
+
+      if (quotesRes.ok) {
+        const qJson = await quotesRes.json();
+        if (qJson?.success && qJson?.data) {
+          setLiveQuotesMap(prev => ({ ...prev, ...qJson.data }));
+        }
+      }
+      setLastSyncTime(new Date().toLocaleTimeString('pt-BR'));
+    } catch (err) {
+      console.warn('[VolatilityAnalystView] Não foi possível obter live metrics:', err);
+    } finally {
+      setIsRefreshingLive(false);
     }
-
-    syncLiveMetrics();
-
-    return () => {
-      isCancelled = true;
-    };
   }, [selectedSymbol, baseList]);
+
+  useEffect(() => {
+    syncLiveMetrics(false);
+  }, [syncLiveMetrics]);
 
   // Sugestões instantâneas da busca global no S&P 500
   const searchSuggestions = useMemo(() => {
@@ -142,7 +138,10 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
       const liveQuote = liveQuotesMap[item.symbol.toUpperCase()];
       const enrichedItem: SP500StockData = {
         ...item,
-        ...(liveQuote?.last ? { spot: liveQuote.last } : {}),
+        ...(liveQuote?.last ? { 
+          spot: liveQuote.last,
+          change: liveQuote.changePct !== null && liveQuote.changePct !== undefined ? liveQuote.changePct : item.change
+        } : {}),
         ...(live ? {
           ivr: live.ivRank ?? item.ivr,
           ivp: live.ivPercentile ?? item.ivp,
@@ -167,10 +166,12 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
     const live = liveMetricsMap[selectedSymbol.toUpperCase()];
     const liveQuote = liveQuotesMap[selectedSymbol.toUpperCase()];
     const liveSpot = liveQuote?.last ?? asset.spot;
+    const liveChange = liveQuote?.changePct !== null && liveQuote?.changePct !== undefined ? liveQuote.changePct : asset.change;
 
     return {
       ...asset,
       spot: liveSpot,
+      change: liveChange,
       ...(live ? {
         ivr: live.ivRank ?? asset.ivr,
         ivp: live.ivPercentile ?? asset.ivp,
@@ -195,9 +196,12 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
   const [rec, setRec] = useState<VolatilityRecommendation | null>(null);
   const [recStatus, setRecStatus] = useState<'loading' | 'unavailable' | 'ready'>('loading');
 
-  const isSelectedLive = liveMetricsMap[selectedSymbol.toUpperCase()]?.source === 'tastytrade-live';
-  const liveSourceDesc = isSelectedLive ? 'Tastytrade REST (option-recommendation)' : 'Modelo calibrado interno';
-  const liveProv = isSelectedLive ? 'MEDIDO' : 'ESTIMADO';
+  const isSelectedMetricsLive = liveMetricsMap[selectedSymbol.toUpperCase()]?.source === 'tastytrade-live';
+  const isSelectedQuoteLive = liveQuotesMap[selectedSymbol.toUpperCase()]?.source === 'tastytrade-live';
+  const liveSourceDesc = isSelectedMetricsLive ? 'Tastytrade REST (/market-metrics)' : 'Modelo calibrado interno';
+  const liveProv = isSelectedMetricsLive ? 'MEDIDO' : 'ESTIMADO';
+  const spotLiveProv = isSelectedQuoteLive ? 'MEDIDO' : 'ESTIMADO';
+  const spotLiveSourceDesc = isSelectedQuoteLive ? 'Tastytrade Market Data (/market-data/by-type)' : 'SP500_DATASET (catálogo estático)';
   const [recReason, setRecReason] = useState<string>('');
 
   useEffect(() => {
@@ -411,8 +415,23 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                 </button>
               </div>
 
-              {/* Campo de Busca Global em Todo o S&P 500 com Autocomplete Instantâneo */}
-              <div className="relative w-52 md:w-64">
+              {/* Barra de Ações: Atualização Manual e Busca Global */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => syncLiveMetrics(true)}
+                  disabled={isRefreshingLive}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#070b14] border border-gray-800 text-xs font-mono text-gray-300 hover:text-white hover:border-purple-500/50 transition disabled:opacity-50"
+                  title="Forçar sincronização de cotações e métricas com a Tastytrade"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${isRefreshingLive ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">{isRefreshingLive ? 'Sincronizando...' : 'Atualizar'}</span>
+                  {lastSyncTime && (
+                    <span className="text-[10px] text-gray-500 hidden md:inline">({lastSyncTime})</span>
+                  )}
+                </button>
+
+                {/* Campo de Busca Global em Todo o S&P 500 com Autocomplete Instantâneo */}
+                <div className="relative w-48 md:w-56">
                 <Search className="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-2.5" />
                 <input 
                   type="text"
@@ -481,6 +500,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                 )}
               </div>
             </div>
+          </div>
 
             {/* Tabela de Scanner com Heatmap */}
             <div className="overflow-x-auto custom-scrollbar">
@@ -500,9 +520,12 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                   {filteredAssets.map(item => {
                     const isSelected = item.symbol === selectedSymbol;
                     const r = item.evaluation;
-                    const isItemLive = liveMetricsMap[item.symbol.toUpperCase()]?.source === 'tastytrade-live';
-                    const itemProv = isItemLive ? 'MEDIDO' : 'ESTIMADO';
-                    const itemSource = isItemLive ? 'Tastytrade REST (option-recommendation)' : 'Modelo calibrado interno';
+                    const isItemMetricsLive = liveMetricsMap[item.symbol.toUpperCase()]?.source === 'tastytrade-live';
+                    const isItemQuoteLive = liveQuotesMap[item.symbol.toUpperCase()]?.source === 'tastytrade-live';
+                    const itemProv = isItemMetricsLive ? 'MEDIDO' : 'ESTIMADO';
+                    const itemSource = isItemMetricsLive ? 'Tastytrade REST (/market-metrics)' : 'Modelo calibrado interno';
+                    const spotProv = isItemQuoteLive ? 'MEDIDO' : 'ESTIMADO';
+                    const spotSource = isItemQuoteLive ? 'Tastytrade Market Data (/market-data/by-type)' : 'SP500_DATASET (catálogo estático)';
 
                     return (
                       <tr
@@ -527,16 +550,16 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                             <DataValue
                               label="Spot"
                               value={item.spot}
-                              provenance="ESTIMADO"
-                              source="SP500_DATASET (catálogo estático)"
+                              provenance={spotProv}
+                              source={spotSource}
                               format="currency"
                               size="sm"
                             />
                             <DataValue
                               label="Var"
                               value={item.change}
-                              provenance="ESTIMADO"
-                              source="SP500_DATASET (catálogo estático)"
+                              provenance={spotProv}
+                              source={spotSource}
                               format="percent"
                               size="sm"
                             />
@@ -681,8 +704,8 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                   <DataValue
                     label="Spot"
                     value={selectedAsset.spot}
-                    provenance="ESTIMADO"
-                    source="SP500_DATASET (catálogo estático)"
+                    provenance={spotLiveProv}
+                    source={spotLiveSourceDesc}
                     format="currency"
                     size="sm"
                   />
@@ -755,7 +778,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                       opacity="0.6"
                     />
                     <text x="455" y={getYCoord(selectedAsset.spot) + 3} fill="#ffffff" fontSize="8" fontFamily="JetBrains Mono" opacity="0.8">
-                      Spot <DataValue variant="inline" as="tspan" value={selectedAsset.spot} format="currency" provenance="ESTIMADO" source="SP500_DATASET (catálogo estático)" />
+                      Spot <DataValue variant="inline" as="tspan" value={selectedAsset.spot} format="currency" provenance={spotLiveProv} source={spotLiveSourceDesc} />
                     </text>
 
                     {/* Candles / Barras de Preço da Ação */}
@@ -1209,16 +1232,16 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                   <DataValue
                     label="Spot"
                     value={selectedAsset.spot}
-                    provenance="ESTIMADO"
-                    source="SP500_DATASET (catálogo estático)"
+                    provenance={spotLiveProv}
+                    source={spotLiveSourceDesc}
                     format="currency"
                     size="sm"
                   />
                   <DataValue
                     label="Variação"
                     value={selectedAsset.change}
-                    provenance="ESTIMADO"
-                    source="SP500_DATASET (catálogo estático)"
+                    provenance={spotLiveProv}
+                    source={spotLiveSourceDesc}
                     format="percent"
                     size="sm"
                   />

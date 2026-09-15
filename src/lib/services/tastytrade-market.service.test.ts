@@ -108,6 +108,37 @@ describe('TastytradeMarketService - Market Metrics', () => {
     expect(metrics).toEqual({});
   });
 
+  it('deve priorizar tw-implied-volatility-index-rank (plataforma Tastytrade) sobre a fórmula legada TOS', async () => {
+    const fakeApiResponse = {
+      data: {
+        items: [
+          {
+            symbol: 'NVDA',
+            'implied-volatility-index-rank': '0.114',
+            'tos-implied-volatility-index-rank': '0.114',
+            'tw-implied-volatility-index-rank': '0.136',
+            'implied-volatility-percentile': '0.08',
+            'implied-volatility-30-day': '0.376',
+            'liquidity-rating': 4,
+            beta: '2.25',
+            'updated-at': '2026-09-15T12:00:00Z',
+          },
+        ],
+      },
+    };
+    vi.stubGlobal('fetch', mockFetchOnce({ ok: true, json: () => Promise.resolve(fakeApiResponse) }));
+
+    const metrics = await tastyMarketService.getMarketMetrics(['NVDA'], true);
+
+    expect(metrics.NVDA).toBeDefined();
+    // Prioridade máxima para a plataforma Tastyworks/Tastytrade (13.6%):
+    expect(metrics.NVDA.ivRank).toBe(13.6);
+    // Fórmula legada TOS armazenada em campo auxiliar para auditoria:
+    expect(metrics.NVDA.tosIvIndex).toBe(11.4);
+    expect(metrics.NVDA.ivPercentile).toBe(8.0);
+    expect(metrics.NVDA.iv30).toBe(37.6);
+  });
+
   // getQuote()/getGexAnalysis() foram removidos do servico (Nivel 1, Parte 1 — eram
   // codigo morto com uma terceira fonte de spot divergente). O teste de GEX que existia
   // aqui cobria esse metodo removido; a cobertura de calculateGex() em si permanece em
