@@ -574,12 +574,12 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                               format="percent"
                               size="sm"
                             />
-                            {liveQuote?.extendedPrice && (
+                            {liveQuotesMap[item.symbol.toUpperCase()]?.extendedPrice && (
                               <span className="text-[9px] font-mono text-amber-400/90 flex items-center gap-1 justify-end">
                                 <span>Pre</span>
                                 <DataValue
                                   variant="inline"
-                                  value={liveQuote.extendedPrice}
+                                  value={liveQuotesMap[item.symbol.toUpperCase()].extendedPrice}
                                   provenance={spotProv}
                                   source={spotSource}
                                   format="currency"
