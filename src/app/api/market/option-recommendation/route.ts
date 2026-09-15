@@ -25,7 +25,7 @@ interface RequestBody extends VolatilityAssetInput {
 }
 
 export async function POST(request: NextRequest) {
-  const guard = applyApiGuard(request, { maxRequestsPerKey: 10, windowMs: 60_000, globalMaxRequests: 120 });
+  const guard = applyApiGuard(request, { maxRequestsPerKey: 30, windowMs: 60_000, globalMaxRequests: 300 });
   if (!guard.ok) return withSessionCookie(guard.response!, guard);
 
   let body: RequestBody;
@@ -38,73 +38,84 @@ export async function POST(request: NextRequest) {
     return withSessionCookie(NextResponse.json({ available: false, reason: 'Campo "symbol" é obrigatório.' }, { status: 400 }), guard);
   }
 
-  // Consulta cotação de mercado real (spot) e métricas oficiais de volatilidade (IV Rank, IV30) direto da Tastytrade
-  const [equityQuotes, liveMetrics] = await Promise.all([
-    tastyMarketService.getEquityQuotes([body.symbol]),
-    tastyMarketService.getMarketMetrics([body.symbol]),
-  ]);
+  try {
+    // Consulta cotação de mercado real (spot) e métricas oficiais de volatilidade (IV Rank, IV30) direto da Tastytrade
+    const [equityQuotes, liveMetrics] = await Promise.all([
+      tastyMarketService.getEquityQuotes([body.symbol]),
+      tastyMarketService.getMarketMetrics([body.symbol]),
+    ]);
 
-  const liveSpot = equityQuotes[body.symbol]?.last ?? (typeof body.spot === 'number' && body.spot > 0 ? body.spot : null);
+    const liveSpot = equityQuotes[body.symbol]?.last ?? (typeof body.spot === 'number' && body.spot > 0 ? body.spot : null);
 
-  if (!liveSpot || liveSpot <= 0) {
+    if (!liveSpot || liveSpot <= 0) {
+      return withSessionCookie(
+        NextResponse.json({
+          available: false,
+          reason: `Cotação real do ativo (spot) indisponível na Tastytrade para ${body.symbol}. Não fabricamos preço para montar estratégia de opções.`,
+        }),
+        guard
+      );
+    }
+
+    const liveMetric = liveMetrics[body.symbol];
+    const liveIvr = liveMetric?.ivRank ?? body.ivr;
+    const liveIvp = liveMetric?.ivPercentile ?? body.ivp;
+    const liveIv30 = liveMetric?.iv30 ?? body.iv30;
+
+    const assetInput: VolatilityAssetInput = {
+      ...body,
+      spot: liveSpot,
+      ivr: liveIvr,
+      ivp: liveIvp,
+      iv30: liveIv30,
+    };
+
+    const chain = await tastyMarketService.getOptionChain(body.symbol);
+    const plan = planStrategy(assetInput, chain);
+    if (!plan) {
+      return withSessionCookie(
+        NextResponse.json({
+          available: false,
+          reason: chain
+            ? 'Cadeia de opções real obtida, mas sem vencimento/strikes utilizáveis nas faixas-alvo da estratégia.'
+            : 'Cadeia de opções real indisponível para este ativo neste momento (API Tastytrade não respondeu ou símbolo sem opções listadas).',
+        }),
+        guard
+      );
+    }
+
+    const legOccSymbols = plan.legs.map((l) => l.occSymbol);
+    const legStreamerSymbols = plan.legs.map((l) => l.streamerSymbol);
+    const smileStreamerSymbols = body.includeSmile
+      ? plan.expiration.strikes.flatMap((s) => [s.callStreamerSymbol, s.putStreamerSymbol])
+      : [];
+    const allStreamerSymbols = Array.from(new Set([...legStreamerSymbols, ...smileStreamerSymbols]));
+
+    const [optionQuotes, greeks] = await Promise.all([
+      tastyMarketService.getOptionQuotes(legOccSymbols),
+      fetchRealGreeks(allStreamerSymbols, 10000),
+    ]);
+
+    const recommendation = buildRecommendation(assetInput, plan, optionQuotes, greeks, body.includeSmile ? greeks : null);
+    if (!recommendation) {
+      return withSessionCookie(
+        NextResponse.json({
+          available: false,
+          reason: 'Cotação real de mercado (bid/ask/mid) indisponível para uma ou mais pernas da estrutura eleita neste momento.',
+        }),
+        guard
+      );
+    }
+
+    return withSessionCookie(NextResponse.json({ available: true, recommendation }), guard);
+  } catch (err: any) {
+    console.error(`[option-recommendation] Erro ao obter dados para ${body.symbol}:`, err);
     return withSessionCookie(
       NextResponse.json({
         available: false,
-        reason: `Cotação real do ativo (spot) indisponível na Tastytrade para ${body.symbol}. Não fabricamos preço para montar estratégia de opções.`,
+        reason: err?.message ? `Falha na API da Tastytrade: ${err.message}` : 'Falha transitória na conexão com a Tastytrade.',
       }),
       guard
     );
   }
-
-  const liveMetric = liveMetrics[body.symbol];
-  const liveIvr = liveMetric?.ivRank ?? body.ivr;
-  const liveIvp = liveMetric?.ivPercentile ?? body.ivp;
-  const liveIv30 = liveMetric?.iv30 ?? body.iv30;
-
-  const assetInput: VolatilityAssetInput = {
-    ...body,
-    spot: liveSpot,
-    ivr: liveIvr,
-    ivp: liveIvp,
-    iv30: liveIv30,
-  };
-
-  const chain = await tastyMarketService.getOptionChain(body.symbol);
-  const plan = planStrategy(assetInput, chain);
-  if (!plan) {
-    return withSessionCookie(
-      NextResponse.json({
-        available: false,
-        reason: chain
-          ? 'Cadeia de opções real obtida, mas sem vencimento/strikes utilizáveis nas faixas-alvo da estratégia.'
-          : 'Cadeia de opções real indisponível para este ativo neste momento (API Tastytrade não respondeu ou símbolo sem opções listadas).',
-      }),
-      guard
-    );
-  }
-
-  const legOccSymbols = plan.legs.map((l) => l.occSymbol);
-  const legStreamerSymbols = plan.legs.map((l) => l.streamerSymbol);
-  const smileStreamerSymbols = body.includeSmile
-    ? plan.expiration.strikes.flatMap((s) => [s.callStreamerSymbol, s.putStreamerSymbol])
-    : [];
-  const allStreamerSymbols = Array.from(new Set([...legStreamerSymbols, ...smileStreamerSymbols]));
-
-  const [optionQuotes, greeks] = await Promise.all([
-    tastyMarketService.getOptionQuotes(legOccSymbols),
-    fetchRealGreeks(allStreamerSymbols, 10000),
-  ]);
-
-  const recommendation = buildRecommendation(assetInput, plan, optionQuotes, greeks, body.includeSmile ? greeks : null);
-  if (!recommendation) {
-    return withSessionCookie(
-      NextResponse.json({
-        available: false,
-        reason: 'Cotação real de mercado (bid/ask/mid) indisponível para uma ou mais pernas da estrutura eleita neste momento.',
-      }),
-      guard
-    );
-  }
-
-  return withSessionCookie(NextResponse.json({ available: true, recommendation }), guard);
 }

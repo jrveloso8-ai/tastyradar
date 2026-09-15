@@ -205,6 +205,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
   const spotLiveProv = isSelectedQuoteLive ? 'MEDIDO' : 'ESTIMADO';
   const spotLiveSourceDesc = isSelectedQuoteLive ? 'Tastytrade Market Data (/market-data/by-type)' : 'SP500_DATASET (catálogo estático)';
   const [recReason, setRecReason] = useState<string>('');
+  const [recRefreshTrigger, setRecRefreshTrigger] = useState<number>(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -223,21 +224,22 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
         } else {
           setRec(null);
           setRecStatus('unavailable');
-          setRecReason(data.reason || 'Dado real indisponível no momento.');
+          setRecReason(data.reason || data.error || 'Dado real indisponível no momento.');
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (!cancelled) {
           setRec(null);
           setRecStatus('unavailable');
-          setRecReason('Falha ao consultar a API real da Tastytrade.');
+          setRecReason(err?.message ? `Falha ao consultar a API: ${err.message}` : 'Falha ao consultar a API real da Tastytrade.');
         }
       });
     return () => {
       cancelled = true;
     };
+    // Dispara por símbolo selecionado, aba de smile ou refresh explícito — não por nova referência de selectedAsset
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAsset, activeChartTab === 'VOL_SMILE']);
+  }, [selectedSymbol, activeChartTab === 'VOL_SMILE', recRefreshTrigger]);
 
   // Candlesticks simulados dos últimos 40 dias para o gráfico de preço com OI
   const candles: CandleDataPoint[] = useMemo(() => {
@@ -260,6 +262,13 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
               <AlertTriangle className="w-6 h-6 text-amber-400" />
               <p className="text-gray-200 text-sm font-semibold">Sem dado real de opções disponível para {selectedAsset.symbol} agora.</p>
               <p className="text-gray-400 text-xs max-w-md">{recReason}</p>
+              <button
+                onClick={() => setRecRefreshTrigger((n) => n + 1)}
+                className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-mono transition border border-gray-700 hover:border-gray-600"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Tentar reconectar / Atualizar</span>
+              </button>
             </>
           )}
         </div>

@@ -26,16 +26,16 @@ export interface VolatilityAssetInput {
   name: string;
   spot: number;
   change: number;
-  iv30: number; // Implied Volatility 30-day index (%) — métrica agregada REAL (Tastytrade market metrics)
-  rv20: number; // Realized Volatility 20-day Yang-Zhang (%)
-  ivr: number;  // IV Rank (0-100)
-  ivp: number;  // IV Percentile (0-100)
+  iv30?: number; // Implied Volatility 30-day index (%) — métrica agregada REAL (Tastytrade market metrics)
+  rv20?: number; // Realized Volatility 20-day Yang-Zhang (%)
+  ivr?: number;  // IV Rank (0-100)
+  ivp?: number;  // IV Percentile (0-100)
   skew25?: number;
   liquidityRating?: number;
-  netGex: number; // Dollar GEX em $ Milhões
-  zeroGammaFlip: number;
-  putWall: number;
-  callWall: number;
+  netGex?: number; // Dollar GEX em $ Milhões
+  zeroGammaFlip?: number;
+  putWall?: number;
+  callWall?: number;
   dividendAmount?: number;
   callExtrinsic?: number;
   daysToEarnings?: number;
@@ -252,28 +252,32 @@ export interface RegimeClassification {
  */
 export function classifyRegime(input: VolatilityAssetInput): RegimeClassification {
   const spot = input.spot;
-  const vrp = Number((input.iv30 - input.rv20).toFixed(1));
-  const ivr = input.ivr;
-  const isPlusGex = input.netGex >= 0;
+  const hasIv30 = typeof input.iv30 === 'number';
+  const hasRv20 = typeof input.rv20 === 'number';
+  const vrp = hasIv30 && hasRv20 ? Number((input.iv30! - input.rv20!).toFixed(1)) : 0;
+  const ivr = typeof input.ivr === 'number' ? input.ivr : null;
+  const isPlusGex = typeof input.netGex === 'number' ? input.netGex >= 0 : true;
   const gexRegime: '+GEX' | '-GEX' = isPlusGex ? '+GEX' : '-GEX';
+  const putWall = typeof input.putWall === 'number' ? input.putWall : null;
+  const callWall = typeof input.callWall === 'number' ? input.callWall : null;
 
   let volRegime: 'SELL_VOLATILITY' | 'BUY_VOLATILITY' | 'NEUTRAL' = 'NEUTRAL';
   let volRegimeLabel = 'Neutro em Volatilidade';
   let volRegimeReason = 'IV Rank intermediário (30-50%). Expressar viés direcional com risco definido.';
 
-  if (ivr >= 50 && vrp >= 4.0) {
+  if (ivr !== null && ivr >= 50 && vrp >= 4.0) {
     volRegime = 'SELL_VOLATILITY';
     volRegimeLabel = 'Venda de Volatilidade (Coleta de Prêmio)';
     volRegimeReason = `IV Rank em ${ivr.toFixed(1)}% com VRP de +${vrp.toFixed(1)} pts. O prêmio cobrado supera a volatilidade realizada Yang-Zhang.`;
-  } else if (ivr <= 30 && vrp <= 1.0) {
+  } else if (ivr !== null && ivr <= 30 && vrp <= 1.0) {
     volRegime = 'BUY_VOLATILITY';
     volRegimeLabel = 'Compra de Volatilidade / Débito';
     volRegimeReason = `IV Rank deprimido em ${ivr.toFixed(1)}% com VRP de ${vrp.toFixed(1)} pts. Opções baratas com assimetria para expansão de cauda.`;
   }
 
   let electedStrategyId = 20;
-  const distToPutWall = Math.abs(spot - input.putWall) / spot;
-  const distToCallWall = Math.abs(spot - input.callWall) / spot;
+  const distToPutWall = putWall !== null ? Math.abs(spot - putWall) / spot : 1.0;
+  const distToCallWall = callWall !== null ? Math.abs(spot - callWall) / spot : 1.0;
 
   if (volRegime === 'SELL_VOLATILITY') {
     if (isPlusGex) {
@@ -455,6 +459,10 @@ export function buildRecommendation(
   let upperBreakeven: number | null = null;
   const findLeg = (role: string) => pricedLegs[planLegs.findIndex((l) => l.role === role)];
 
+  const fmtNum = (val: number | null | undefined, decimals = 2, prefix = '', suffix = ''): string => {
+    return typeof val === 'number' && !isNaN(val) ? `${prefix}${val.toFixed(decimals)}${suffix}` : 'indisponível';
+  };
+
   if (strategy.id === 20) {
     const sp = findLeg('shortPut'), sc = findLeg('shortCall');
     lowerBreakeven = Number((sp.strike - netCredit).toFixed(2));
@@ -469,7 +477,8 @@ export function buildRecommendation(
     upperBreakeven = Number((centerK + Math.abs(netCredit)).toFixed(2));
   } else {
     const isAlta = strategy.bias === 'ALTA';
-    const k1Leg = findLeg('k1'), k2Leg = findLeg('k2');
+    const k1Leg = findLeg('k1') || pricedLegs[0];
+    const k2Leg = findLeg('k2') || pricedLegs[1] || pricedLegs[0];
     if (isAlta) {
       lowerBreakeven = Number((k1Leg.strike + Math.abs(netCredit)).toFixed(2));
       upperBreakeven = Number(k2Leg.strike.toFixed(2));
@@ -505,10 +514,10 @@ export function buildRecommendation(
   const formattedTextOutput = `DIAGNÓSTICO DE VOLATILIDADE — ${input.symbol} | Vencimento real: ${expiration.expirationDate} (${expiration.daysToExpiration} DTE)
 
 MÉTRICAS QUANTITATIVAS:
-• Spot: $${spot.toFixed(2)} | IV30: ${input.iv30.toFixed(1)}% | RV20 (Yang-Zhang): ${input.rv20.toFixed(1)}%
-• VRP: ${vrp >= 0 ? '+' : ''}${vrp.toFixed(1)} pts | IV Rank (252d): ${input.ivr.toFixed(1)}% | IV Percentil: ${input.ivp.toFixed(0)}%
-• Regime GEX: ${isPlusGex ? '+GEX ESTÁVEL' : '-GEX EXPLOSIVO'} | Zero Flip: $${input.zeroGammaFlip.toFixed(2)}
-• Put Wall: $${input.putWall.toFixed(2)} | Call Wall: $${input.callWall.toFixed(2)}
+• Spot: $${spot.toFixed(2)} | IV30: ${fmtNum(input.iv30, 1, '', '%')} | RV20 (Yang-Zhang): ${fmtNum(input.rv20, 1, '', '%')}
+• VRP: ${vrp != null ? `${vrp >= 0 ? '+' : ''}${vrp.toFixed(1)} pts` : 'indisponível'} | IV Rank (252d): ${fmtNum(input.ivr, 1, '', '%')} | IV Percentil: ${fmtNum(input.ivp, 0, '', '%')}
+• Regime GEX: ${isPlusGex ? '+GEX ESTÁVEL' : '-GEX EXPLOSIVO'} | Zero Flip: ${fmtNum(input.zeroGammaFlip, 2, '$')}
+• Put Wall: ${fmtNum(input.putWall, 2, '$')} | Call Wall: ${fmtNum(input.callWall, 2, '$')}
 
 ESTRUTURA ELEITA (strikes e vencimento confirmados na cadeia real da Tastytrade):
 • ${strategy.name} (${isCredit ? 'Crédito' : 'Débito'})
@@ -524,10 +533,10 @@ PLAYBOOK TASTYTRADE (§8):
   const strikeByStrikeJustification: StrikeJustificationItem[] = pricedLegs.map((leg) => {
     const ivText = leg.iv != null ? `IV real ${leg.iv.toFixed(1)}%` : 'IV real indisponível nesta consulta (streaming)';
     if (leg.action === 'SELL' && leg.type === 'PUT') {
-      return { strike: leg.strike, action: 'SELL', type: 'PUT', role: 'Pilar de Suporte Institucional (Venda de Put)', reason: `Strike real posicionado na ou abaixo da Put Wall ($${input.putWall.toFixed(2)}). Prêmio de mercado (mid real: $${leg.midPrice.toFixed(2)}, ${ivText}) cobrado num nível onde os Market Makers compram ações no delta-hedge para conter a queda.` };
+      return { strike: leg.strike, action: 'SELL', type: 'PUT', role: 'Pilar de Suporte Institucional (Venda de Put)', reason: `Strike real posicionado na ou abaixo da Put Wall (${fmtNum(input.putWall, 2, '$')}). Prêmio de mercado (mid real: $${leg.midPrice.toFixed(2)}, ${ivText}) cobrado num nível onde os Market Makers compram ações no delta-hedge para conter a queda.` };
     }
     if (leg.action === 'SELL' && leg.type === 'CALL') {
-      return { strike: leg.strike, action: 'SELL', type: 'CALL', role: 'Pilar de Resistência Institucional (Venda de Call)', reason: `Strike real posicionado na ou acima da Call Wall ($${input.callWall.toFixed(2)}). Prêmio de mercado (mid real: $${leg.midPrice.toFixed(2)}, ${ivText}) recolhido com alta probabilidade de expirar OTM.` };
+      return { strike: leg.strike, action: 'SELL', type: 'CALL', role: 'Pilar de Resistência Institucional (Venda de Call)', reason: `Strike real posicionado na ou acima da Call Wall (${fmtNum(input.callWall, 2, '$')}). Prêmio de mercado (mid real: $${leg.midPrice.toFixed(2)}, ${ivText}) recolhido com alta probabilidade de expirar OTM.` };
     }
     if (leg.action === 'BUY' && leg.type === 'PUT') {
       return { strike: leg.strike, action: 'BUY', type: 'PUT', role: 'Asa de Proteção Inferior (Seguro de Cauda)', reason: `Compra da Put real no strike $${leg.strike.toFixed(2)} (mid real: $${leg.midPrice.toFixed(2)}) para definir o risco máximo. Perda limitada matematicamente à largura real de $${width.toFixed(2)} entre os strikes negociados.` };
@@ -538,12 +547,12 @@ PLAYBOOK TASTYTRADE (§8):
   const didacticRationale: DidacticRationale = {
     oneLiner: 'É um analista de opções com mais de 20 anos de experiência que funciona dentro da inteligência artificial: ele não adivinha se a ação vai subir ou cair — ele calcula se o preço que estão te cobrando pela opção é justo e quanto você pode perder no pior cenário, antes de você colocar dinheiro na operação.',
     carInsuranceAnalogy: isCredit
-      ? `Pense em opções como um seguro de carro. Quem vende a opção está no papel da seguradora: recebe o prêmio em dinheiro (cotação real de mercado, não estimada) e assume o compromisso de pagar se o evento acontecer. Em ${input.symbol}, a volatilidade implícita está cobrando ${input.iv30.toFixed(1)}%, enquanto a ação oscila historicamente apenas ${input.rv20.toFixed(1)}% (VRP de +${vrp.toFixed(1)} pts).`
-      : `Pense em opções como um seguro de carro. Em ${input.symbol}, a volatilidade implícita está barata em ${input.iv30.toFixed(1)}% (IV Rank de apenas ${input.ivr.toFixed(1)}%). Estar no papel do comprador, pagando o prêmio real de mercado, com risco 100% limitado ao custo inicial, é a melhor relação risco/retorno.`,
-    whyThisStructure: `A estrutura eleita foi ${strategy.name} porque combina a avaliação relativa de volatilidade (IVR em ${input.ivr.toFixed(1)}%) com a física estabilizadora do regime de ${isPlusGex ? '+GEX (Market Makers amortecem oscilações)' : '-GEX (Dealers aceleram rompimentos)'}. Strikes e vencimento confirmados contra a cadeia real de opções da Tastytrade.`,
+      ? `Pense em opções como um seguro de carro. Quem vende a opção está no papel da seguradora: recebe o prêmio em dinheiro (cotação real de mercado, não estimada) e assume o compromisso de pagar se o evento acontecer. Em ${input.symbol}, a volatilidade implícita está cobrando ${fmtNum(input.iv30, 1, '', '%')}, enquanto a ação oscila historicamente apenas ${fmtNum(input.rv20, 1, '', '%')}${vrp != null ? ` (VRP de ${vrp >= 0 ? '+' : ''}${vrp.toFixed(1)} pts)` : ''}.`
+      : `Pense em opções como um seguro de carro. Em ${input.symbol}, a volatilidade implícita está com IV30 de ${fmtNum(input.iv30, 1, '', '%')} (IV Rank de ${fmtNum(input.ivr, 1, '', '%')}). Estar no papel do comprador, pagando o prêmio real de mercado, com risco 100% limitado ao custo inicial, é a melhor relação risco/retorno.`,
+    whyThisStructure: `A estrutura eleita foi ${strategy.name} porque combina a avaliação relativa de volatilidade (IVR em ${fmtNum(input.ivr, 1, '', '%')}) com a física estabilizadora do regime de ${isPlusGex ? '+GEX (Market Makers amortecem oscilações)' : '-GEX (Dealers aceleram rompimentos)'}. Strikes e vencimento confirmados contra a cadeia real de opções da Tastytrade.`,
     strikeByStrikeJustification,
     fourJobsSummary: {
-      insurancePricing: `IV 30d em ${input.iv30.toFixed(1)}% vs RV Yang-Zhang de ${input.rv20.toFixed(1)}% (VRP de ${vrp >= 0 ? '+' : ''}${vrp.toFixed(1)} pts).`,
+      insurancePricing: `IV 30d em ${fmtNum(input.iv30, 1, '', '%')} vs RV Yang-Zhang de ${fmtNum(input.rv20, 1, '', '%')}${vrp != null ? ` (VRP de ${vrp >= 0 ? '+' : ''}${vrp.toFixed(1)} pts)` : ''}.`,
       structureChoice: `${strategy.name} calibrada para o vencimento real mais próximo do sweet spot: ${expiration.expirationDate} (${expiration.daysToExpiration} DTE).`,
       riskBeforeReward: upperBreakeven !== null
         ? `Melhor cenário: Ganho de $${maxProfit.toFixed(2)}. Pior cenário: Perda máxima limitada a $${maxLoss.toFixed(2)}. Breakevens entre $${lowerBreakeven.toFixed(2)} e $${upperBreakeven.toFixed(2)}.`
@@ -557,7 +566,7 @@ PLAYBOOK TASTYTRADE (§8):
         ? `Abaixo de $${lowerBreakeven.toFixed(2)} ou acima de $${upperBreakeven.toFixed(2)}`
         : `Abaixo de $${lowerBreakeven.toFixed(2)}`,
       whatMakesItFail: isCredit
-        ? `Rompimento violento das barreiras de Open Interest (Put Wall $${input.putWall.toFixed(2)} ou Call Wall $${input.callWall.toFixed(2)}).`
+        ? `Rompimento violento das barreiras de Open Interest (Put Wall ${fmtNum(input.putWall, 2, '$')} ou Call Wall ${fmtNum(input.callWall, 2, '$')}).`
         : `Ausência de movimento direcional ou colapso da volatilidade implícita.`,
     },
     whatItDoesNotDo: [

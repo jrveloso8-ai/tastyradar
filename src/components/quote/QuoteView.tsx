@@ -221,7 +221,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
         } else {
           setVolRecommendation(null);
           setVolRecStatus('unavailable');
-          setVolRecReason(data.reason || 'Cotação real indisponível para montar recomendação no momento.');
+          setVolRecReason(data.reason || data.error || 'Cotação real indisponível para montar recomendação no momento.');
         }
       })
       .catch((err) => {
@@ -234,7 +234,8 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
     return () => {
       cancelled = true;
     };
-  }, [sp500Stock, liveEquity?.last, liveMetrics?.ivRank, liveMetrics?.ivPercentile, liveMetrics?.iv30]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sp500Stock?.symbol, liveEquity?.last, liveMetrics?.ivRank, liveMetrics?.ivPercentile, liveMetrics?.iv30]);
 
   const electedStrategy: ElectedStrategyData | null = useMemo(() => {
     if (!volRecommendation || !sp500Stock) return null;

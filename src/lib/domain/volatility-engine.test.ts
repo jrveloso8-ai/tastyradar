@@ -205,4 +205,27 @@ describe('buildRecommendation (precificação REAL — honestidade de dado)', ()
     expect(rec.lowerBreakeven).toBeCloseTo(shortPut.strike - rec.netCredit, 2);
     expect(rec.upperBreakeven!).toBeCloseTo(shortCall.strike + rec.netCredit, 2);
   });
+
+  it('não quebra com TypeError quando métricas opcionais estão ausentes (payload parcial/indisponível)', () => {
+    const partialInput: VolatilityAssetInput = {
+      symbol: 'NVDA',
+      name: 'NVIDIA Corporation',
+      spot: 213.20,
+      change: 1.06,
+    };
+    const regime = classifyRegime(partialInput);
+    expect(regime.strategy).toBeDefined();
+
+    const chain = buildMockChain(213.20, 35, 5, 20);
+    const plan = planStrategy(partialInput, chain);
+    expect(plan).not.toBeNull();
+
+    const quotes = mockQuotesForPlan(plan!, 2.0);
+    const greeks = mockGreeksForPlan(plan!);
+    const rec = buildRecommendation(partialInput, plan!, quotes, greeks);
+    expect(rec).not.toBeNull();
+    expect(rec?.formattedTextOutput).toContain('Spot: $213.20');
+    expect(rec?.formattedTextOutput).toContain('IV30: indisponível');
+    expect(rec?.didacticRationale).toBeDefined();
+  });
 });
