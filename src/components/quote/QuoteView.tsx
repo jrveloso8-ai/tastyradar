@@ -29,6 +29,8 @@ import {
 
 
 import { CandlestickChart } from './CandlestickChart';
+import { StockTradePlanChart } from './StockTradePlanChart';
+import { StudyAuditorCard } from './StudyAuditorCard';
 import { OptionPayoffChart, ElectedStrategyData, buildElectedStrategyFromRecommendation } from '../options/OptionPayoffChart';
 import { SP500_DATASET } from '@/lib/domain/sp500-dataset';
 import { VolatilityRecommendation } from '@/lib/domain/volatility-engine';
@@ -629,6 +631,35 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
               </div>
             </div>
           </div>
+
+          {/* Gráfico do Plano de Trade com Suportes, Alvos e Stop */}
+          <StockTradePlanChart
+            symbol={currentStock.symbol}
+            historicalPrices={candles.map((c) => ({
+              date: c.date,
+              open: c.open,
+              high: c.high,
+              low: c.low,
+              close: c.close,
+              volume: c.volume,
+            }))}
+            entryPrice={activeSpotPrice}
+            stopLoss={currentStock.stop}
+            target1={currentStock.alvo1}
+            target2={currentStock.alvo2}
+            bias={currentStock.category}
+          />
+
+          {/* Parecer e Certificação de Auditoria do Estudo */}
+          <StudyAuditorCard
+            symbol={currentStock.symbol}
+            spotPrice={activeSpotPrice}
+            ivRank={liveMetrics?.ivRank ?? currentStock.ivRank}
+            ivPercentile={liveMetrics?.ivPercentile ?? null}
+            liquidity={liveMetrics?.liquidityRating ?? 4}
+            source={liveEquity ? 'Tastytrade Live (equity-quotes)' : 'SP500_DATASET (catálogo estático)'}
+            updatedAt={liveEquity?.updatedAt || new Date().toISOString()}
+          />
         </div>
       )}
 

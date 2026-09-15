@@ -65,10 +65,11 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
   // Lista base pelo filtro selecionado
   const baseList = useMemo(() => {
     if (activeFilter === 'TOP_50_UNDER_150') return getTop50LiquidUnder150();
-    if (activeFilter === 'SELL_VOL') return SP500_DATASET.filter(s => s.ivr >= 50);
-    if (activeFilter === 'BUY_VOL') return SP500_DATASET.filter(s => s.ivr < 35);
+    if (activeFilter === 'SELL_VOL') return SP500_DATASET.filter(s => typeof s.ivr === 'number' && s.ivr >= 50);
+    if (activeFilter === 'BUY_VOL') return SP500_DATASET.filter(s => typeof s.ivr === 'number' && s.ivr < 35);
     if (activeFilter === 'WALL_SNIPER') {
       return SP500_DATASET.filter(s => {
+        if (typeof s.putWall !== 'number' || typeof s.callWall !== 'number') return false;
         const distToPut = Math.abs(s.spot - s.putWall) / s.spot;
         const distToCall = Math.abs(s.spot - s.callWall) / s.spot;
         return distToPut < 0.03 || distToCall < 0.03;

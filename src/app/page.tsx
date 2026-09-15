@@ -3,22 +3,24 @@
 import React, { useEffect, useState } from 'react';
 import { Navbar, ActiveTab } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
+import { HomeHubView } from '@/components/home/HomeHubView';
+import { TradingViewOverview } from '@/components/tradingview/TradingViewOverview';
+import { OpportunityRadarView } from '@/components/opportunities/OpportunityRadarView';
 import { QuoteView } from '@/components/quote/QuoteView';
 import { ScreenerView } from '@/components/screener/ScreenerView';
 import { BarreirasGexView } from '@/components/options/BarreirasGexView';
+import { SpecialStrategiesView } from '@/components/special-strategies/SpecialStrategiesView';
 import { VolatilityAnalystView } from '@/components/volatility/VolatilityAnalystView';
 import { HelpSupportView } from '@/components/help/HelpSupportView';
 
 type ApiStatus = { status: 'ONLINE' | 'OFFLINE' | 'CHECANDO'; latencyMs: number | null };
 
 export default function HomePage() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('consulta');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('home');
   const [selectedSymbol, setSelectedSymbol] = useState<string>('NVDA');
   const [apiStatus, setApiStatus] = useState<ApiStatus>({ status: 'CHECANDO', latencyMs: null });
 
-  // Health check real da Tastytrade (Parte 3 do Lote 1, Achado D-02/C-05): substitui o
-  // badge fixo "ONLINE 84ms" por uma checagem de fato, repetida a cada 60s. Uma falha de
-  // rede/parse na checagem em si vira "OFFLINE" (não deixa o badge preso em "checando…").
+  // Health check real da Tastytrade: checagem periódica a cada 60s
   useEffect(() => {
     let cancelled = false;
 
@@ -68,6 +70,33 @@ export default function HomePage() {
       <Navbar activeTab={activeTab} onTabChange={setActiveTab} apiStatus={apiStatus} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Painel 1: Hub Central de Inteligência */}
+        <div id="panel-home" role="tabpanel" className={activeTab === 'home' ? 'block' : 'hidden'}>
+          {activeTab === 'home' && (
+            <HomeHubView
+              onSelectModule={(tab, symbol) => {
+                if (symbol) {
+                  setSelectedSymbol(symbol);
+                }
+                setActiveTab(tab);
+              }}
+            />
+          )}
+        </div>
+
+        {/* Painel 2: Mercado & TradingView */}
+        <div id="panel-mercado" role="tabpanel" className={activeTab === 'mercado' ? 'block' : 'hidden'}>
+          {activeTab === 'mercado' && <TradingViewOverview />}
+        </div>
+
+        {/* Painel 3: Radar de Oportunidades */}
+        <div id="panel-oportunidades" role="tabpanel" className={activeTab === 'oportunidades' ? 'block' : 'hidden'}>
+          {activeTab === 'oportunidades' && (
+            <OpportunityRadarView onSelectSymbol={handleSelectSymbolFromScreener} />
+          )}
+        </div>
+
+        {/* Painel 4: Consulta & Raio-X do Ativo */}
         <div id="panel-consulta" role="tabpanel" className={activeTab === 'consulta' ? 'block' : 'hidden'}>
           {activeTab === 'consulta' && (
             <QuoteView 
@@ -78,10 +107,12 @@ export default function HomePage() {
           )}
         </div>
 
+        {/* Painel 5: Rastreador de Tendências */}
         <div id="panel-rastreador" role="tabpanel" className={activeTab === 'rastreador' ? 'block' : 'hidden'}>
           {activeTab === 'rastreador' && <ScreenerView onSelectSymbol={handleSelectSymbolFromScreener} />}
         </div>
 
+        {/* Painel 6: Barreiras & Motor GEX com Subabas */}
         <div id="panel-barreiras" role="tabpanel" className={activeTab === 'barreiras' ? 'block' : 'hidden'}>
           {activeTab === 'barreiras' && (
             <BarreirasGexView 
@@ -93,6 +124,14 @@ export default function HomePage() {
           )}
         </div>
 
+        {/* Painel 7: Estratégias Especiais */}
+        <div id="panel-estrategias-especiais" role="tabpanel" className={activeTab === 'estrategias-especiais' ? 'block' : 'hidden'}>
+          {activeTab === 'estrategias-especiais' && (
+            <SpecialStrategiesView onSelectSymbol={handleSelectSymbolFromScreener} />
+          )}
+        </div>
+
+        {/* Painel 8: Analista de Volatilidade */}
         <div id="panel-analista-vol" role="tabpanel" className={activeTab === 'analista-vol' ? 'block' : 'hidden'}>
           {activeTab === 'analista-vol' && (
             <VolatilityAnalystView 
@@ -102,6 +141,7 @@ export default function HomePage() {
           )}
         </div>
 
+        {/* Painel 9: Manual & Ajuda IA */}
         <div id="panel-manual" role="tabpanel" className={activeTab === 'manual' ? 'block' : 'hidden'}>
           {activeTab === 'manual' && <HelpSupportView />}
         </div>

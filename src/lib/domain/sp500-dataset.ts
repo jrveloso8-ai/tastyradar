@@ -1213,7 +1213,9 @@ export function getTop50LiquidUnder150(): SP500StockData[] {
         return b.avgOptionVolume - a.avgOptionVolume;
       }
       // 3º Critério: IV Rank descrescente
-      return b.ivr - a.ivr;
+      const aIvr = typeof a.ivr === 'number' ? a.ivr : -1;
+      const bIvr = typeof b.ivr === 'number' ? b.ivr : -1;
+      return bIvr - aIvr;
     })
     .slice(0, 50);
 }

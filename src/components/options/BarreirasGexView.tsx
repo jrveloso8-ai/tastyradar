@@ -2,8 +2,11 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { UnifiedGexBarreirasView } from './UnifiedGexBarreirasView';
+import { OptionsStrategyEngineView } from './OptionsStrategyEngineView';
+import { OptionsTop10View } from './OptionsTop10View';
+import { OptionsTracking5DView } from './OptionsTracking5DView';
 import { US_STOCKS_DATASET } from '@/lib/domain/us-market-data';
-import { Search, ArrowLeft, TrendingUp } from 'lucide-react';
+import { Search, ArrowLeft, TrendingUp, Target, SlidersHorizontal, BarChart2, Activity } from 'lucide-react';
 
 interface BarreirasGexViewProps {
   initialSymbol?: string;
@@ -12,6 +15,8 @@ interface BarreirasGexViewProps {
   onBackToScreener?: () => void;
 }
 
+export type OptionsSubTab = 'GEX' | 'STRATEGIES' | 'TOP10' | 'TRACKING_5D';
+
 export function BarreirasGexView({ 
   initialSymbol = 'NVDA', 
   onSelectSymbol,
@@ -19,6 +24,7 @@ export function BarreirasGexView({
   onBackToScreener
 }: BarreirasGexViewProps) {
   const [selectedSymbol, setSelectedSymbol] = useState(initialSymbol || 'NVDA');
+  const [activeSubTab, setActiveSubTab] = useState<OptionsSubTab>('GEX');
   const [searchInput, setSearchInput] = useState('');
   const [liveEquity, setLiveEquity] = useState<{ last: number | null } | null>(null);
 
@@ -131,13 +137,63 @@ export function BarreirasGexView({
         </div>
       </div>
 
-      {/* Main Unified View Component */}
-      <UnifiedGexBarreirasView 
-        symbol={currentStock.symbol} 
-        spotPrice={activeSpot} 
-        onBackToQuote={onBackToQuote}
-        onBackToScreener={onBackToScreener}
-      />
+      {/* Subabas do Módulo de Opções & Derivativos */}
+      <div className="flex flex-wrap items-center gap-2 bg-[#090e18] border border-gray-800/90 p-2 rounded-2xl shadow-lg">
+        {[
+          { id: 'GEX' as const, label: '1. Barreiras & Motor GEX', icon: Target },
+          { id: 'STRATEGIES' as const, label: '2. Motor de Estratégias & Payoff', icon: SlidersHorizontal },
+          { id: 'TOP10' as const, label: '3. Top 10 Concentração (OI)', icon: BarChart2 },
+          { id: 'TRACKING_5D' as const, label: '4. Rastreamento 5D', icon: Activity },
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeSubTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveSubTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs font-bold transition border ${
+                isActive
+                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-md shadow-cyan-500/10'
+                  : 'bg-[#070b14] text-gray-400 border-gray-800 hover:text-white hover:border-gray-700'
+              }`}
+            >
+              <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-400' : 'text-gray-500'}`} />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Renderização Condicional das Subabas */}
+      {activeSubTab === 'GEX' && (
+        <UnifiedGexBarreirasView 
+          symbol={currentStock.symbol} 
+          spotPrice={activeSpot} 
+          onBackToQuote={onBackToQuote}
+          onBackToScreener={onBackToScreener}
+        />
+      )}
+
+      {activeSubTab === 'STRATEGIES' && (
+        <OptionsStrategyEngineView
+          initialSymbol={selectedSymbol}
+          onSelectSymbol={(sym) => setSelectedSymbol(sym)}
+        />
+      )}
+
+      {activeSubTab === 'TOP10' && (
+        <OptionsTop10View
+          initialSymbol={selectedSymbol}
+          onSelectSymbol={(sym) => setSelectedSymbol(sym)}
+        />
+      )}
+
+      {activeSubTab === 'TRACKING_5D' && (
+        <OptionsTracking5DView
+          initialSymbol={selectedSymbol}
+          onSelectSymbol={(sym) => setSelectedSymbol(sym)}
+        />
+      )}
     </div>
   );
 }

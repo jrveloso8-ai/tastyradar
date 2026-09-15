@@ -11,10 +11,22 @@ import {
   Menu, 
   X,
   Zap,
-  Gauge
+  Gauge,
+  Compass,
+  LayoutDashboard,
+  Sparkles
 } from 'lucide-react';
 
-export type ActiveTab = 'consulta' | 'rastreador' | 'barreiras' | 'analista-vol' | 'manual';
+export type ActiveTab = 
+  | 'home'
+  | 'mercado'
+  | 'oportunidades'
+  | 'consulta'
+  | 'rastreador'
+  | 'barreiras'
+  | 'estrategias-especiais'
+  | 'analista-vol'
+  | 'manual';
 
 interface NavbarProps {
   activeTab: ActiveTab;
@@ -26,13 +38,7 @@ interface NavbarProps {
 export function Navbar({ 
   activeTab, 
   onTabChange, 
-  // Sem valor fabricado por padrão (Achado Nível 4, Ciclo 4): o projeto não tem
-  // contador de visitantes único implementado; se nada for passado, o badge
-  // simplesmente não aparece (ver `{uniqueVisitors && (...)}` abaixo) em vez de
-  // mostrar um número inventado.
   uniqueVisitors, 
-  // Sem checagem real ainda (ex.: componente renderizado fora de page.tsx) => estado
-  // neutro "CHECANDO", nunca mais um "ONLINE" fabricado por padrão (Achado D-02/C-05).
   apiStatus = { status: 'CHECANDO', latencyMs: null } 
 }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -42,12 +48,16 @@ export function Navbar({
     setMobileMenuOpen(false);
   };
 
-  const navItems: Array<{ id: ActiveTab; label: string; icon: any; isGex?: boolean; isVol?: boolean }> = [
-    { id: 'consulta', label: 'Consulta & Gráfico 12M', icon: Search },
-    { id: 'rastreador', label: 'Rastreador de Tendências', icon: TrendingUp },
-    { id: 'barreiras', label: 'Barreiras & Motor GEX', icon: Target, isGex: true },
-    { id: 'analista-vol', label: 'Analista de Volatilidade', icon: Gauge, isVol: true },
-    { id: 'manual', label: 'Manual & Ajuda IA', icon: BookOpen },
+  const navItems: Array<{ id: ActiveTab; label: string; icon: any; isGex?: boolean; isVol?: boolean; isSpecial?: boolean }> = [
+    { id: 'home', label: 'Hub', icon: Compass },
+    { id: 'mercado', label: 'Mercado TV', icon: LayoutDashboard },
+    { id: 'oportunidades', label: 'Radar', icon: Target },
+    { id: 'consulta', label: 'Consulta 12M', icon: Search },
+    { id: 'rastreador', label: 'Rastreador', icon: TrendingUp },
+    { id: 'barreiras', label: 'Barreiras GEX', icon: Zap, isGex: true },
+    { id: 'estrategias-especiais', label: 'Estratégias', icon: Sparkles, isSpecial: true },
+    { id: 'analista-vol', label: 'Analista Vol', icon: Gauge, isVol: true },
+    { id: 'manual', label: 'Manual', icon: BookOpen },
   ];
 
   return (
@@ -146,7 +156,8 @@ export function Navbar({
         <div className="md:hidden bg-[#070b14] border-b border-gray-800/90 px-4 pt-3 pb-5 space-y-2 shadow-2xl animate-in slide-in-from-top-2 duration-200">
           <div className="text-[10px] font-mono uppercase text-gray-400 px-2 pb-1 border-b border-gray-800/60 flex justify-between items-center">
             <span>Navegação do Radar</span>
-            <span className="text-purple-400">5 Módulos</span>
+            {/* eslint-disable-next-line local-rules/no-raw-numbers-in-jsx -- contador visual de itens de navegacao */}
+            <span className="text-purple-400 font-bold">{navItems.length} Ferramentas</span>
           </div>
 
           <div className="grid grid-cols-1 gap-1.5 pt-1">

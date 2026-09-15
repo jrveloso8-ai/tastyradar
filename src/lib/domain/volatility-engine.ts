@@ -340,9 +340,11 @@ export function planStrategy(input: VolatilityAssetInput, chain: OptionChainResu
   let legs: RealLeg[];
 
   if (strategy.id === 20) {
-    const shortPutStrike = pickStrikeNear(strikes, Math.min(input.putWall, spot * 0.96));
+    const effectivePutWall = input.putWall ?? spot * 0.96;
+    const effectiveCallWall = input.callWall ?? spot * 1.04;
+    const shortPutStrike = pickStrikeNear(strikes, Math.min(effectivePutWall, spot * 0.96));
     const longPutStrike = pickAdjacentStrike(strikes, shortPutStrike, 'below');
-    const shortCallStrike = pickStrikeNear(strikes, Math.max(input.callWall, spot * 1.04));
+    const shortCallStrike = pickStrikeNear(strikes, Math.max(effectiveCallWall, spot * 1.04));
     const longCallStrike = pickAdjacentStrike(strikes, shortCallStrike, 'above');
     if (longPutStrike == null || longCallStrike == null || shortPutStrike >= shortCallStrike) return null;
     const lp = byStrike.get(longPutStrike)!, sp = byStrike.get(shortPutStrike)!, sc = byStrike.get(shortCallStrike)!, lc = byStrike.get(longCallStrike)!;
@@ -353,7 +355,8 @@ export function planStrategy(input: VolatilityAssetInput, chain: OptionChainResu
       { action: 'BUY', type: 'CALL', strike: longCallStrike, occSymbol: lc.callSymbol, streamerSymbol: lc.callStreamerSymbol, role: 'longCall', description: `Asa de Proteção Superior ($${longCallStrike})` },
     ];
   } else if (strategy.id === 6) {
-    const shortPutStrike = pickStrikeNear(strikes, Math.min(input.putWall, spot * 0.98));
+    const effectivePutWall = input.putWall ?? spot * 0.98;
+    const shortPutStrike = pickStrikeNear(strikes, Math.min(effectivePutWall, spot * 0.98));
     const longPutStrike = pickAdjacentStrike(strikes, shortPutStrike, 'below');
     if (longPutStrike == null) return null;
     const lp = byStrike.get(longPutStrike)!, sp = byStrike.get(shortPutStrike)!;
@@ -593,19 +596,19 @@ PLAYBOOK TASTYTRADE (§8):
     symbol: input.symbol,
     spot,
     change: input.change,
-    iv30: input.iv30,
-    rv20: input.rv20,
+    iv30: input.iv30!,
+    rv20: input.rv20!,
     vrp,
-    ivr: input.ivr,
-    ivp: input.ivp,
+    ivr: input.ivr!,
+    ivp: input.ivp!,
     volRegime,
     volRegimeLabel,
     volRegimeReason,
     gexRegime,
     gexRegimeLabel: isPlusGex ? '+GEX ESTÁVEL (Market Makers Amortecem)' : '-GEX EXPLOSIVO (Dealers Aceleram)',
-    zeroGammaFlip: input.zeroGammaFlip,
-    putWall: input.putWall,
-    callWall: input.callWall,
+    zeroGammaFlip: input.zeroGammaFlip!,
+    putWall: input.putWall!,
+    callWall: input.callWall!,
     strategy,
     targetDte: expiration.daysToExpiration,
     targetDteLabel: dteLabel,
