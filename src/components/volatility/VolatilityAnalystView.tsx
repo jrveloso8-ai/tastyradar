@@ -172,6 +172,8 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
       ...asset,
       spot: liveSpot,
       change: liveChange,
+      extendedPrice: liveQuote?.extendedPrice ?? null,
+      extendedChangePct: liveQuote?.extendedChangePct ?? null,
       ...(live ? {
         ivr: live.ivRank ?? asset.ivr,
         ivp: live.ivPercentile ?? asset.ivp,
@@ -563,6 +565,18 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                               format="percent"
                               size="sm"
                             />
+                            {liveQuote?.extendedPrice && (
+                              <span className="text-[9px] font-mono text-amber-400/90 flex items-center gap-1 justify-end">
+                                <span>Pre</span>
+                                <DataValue
+                                  variant="inline"
+                                  value={liveQuote.extendedPrice}
+                                  provenance={spotProv}
+                                  source={spotSource}
+                                  format="currency"
+                                />
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="py-2.5 px-2 text-center">
@@ -1230,7 +1244,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                 </div>
                 <div className="flex flex-wrap items-center gap-4 font-mono text-xs mt-2">
                   <DataValue
-                    label="Spot"
+                    label="Spot (RTH)"
                     value={selectedAsset.spot}
                     provenance={spotLiveProv}
                     source={spotLiveSourceDesc}
@@ -1245,6 +1259,28 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                     format="percent"
                     size="sm"
                   />
+                  {selectedAsset.extendedPrice && (
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-300">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                      <span>Pre-Market:</span>
+                      <DataValue
+                        variant="inline"
+                        value={selectedAsset.extendedPrice}
+                        provenance={spotLiveProv}
+                        source={spotLiveSourceDesc}
+                        format="currency"
+                      />
+                      {selectedAsset.extendedChangePct !== null && selectedAsset.extendedChangePct !== undefined && (
+                        <DataValue
+                          variant="inline"
+                          value={selectedAsset.extendedChangePct}
+                          provenance={spotLiveProv}
+                          source={spotLiveSourceDesc}
+                          format="percent"
+                        />
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 

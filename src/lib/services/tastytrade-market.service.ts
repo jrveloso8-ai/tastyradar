@@ -71,6 +71,8 @@ export interface TastyEquityQuote {
   prevClose: number | null;
   change: number | null;
   changePct: number | null;
+  extendedPrice?: number | null;
+  extendedChangePct?: number | null;
   dayHigh: number | null;
   dayLow: number | null;
   volume: number | null;
@@ -157,16 +159,15 @@ export class TastytradeMarketService {
           const sym = (item.symbol || '').toUpperCase();
           if (!sym) continue;
 
-          // IV Rank oficial Tastytrade: prioridade máxima para tw-implied-volatility-index-rank
-          // (fórmula proprietária exibida na tela da plataforma Tastyworks/Tastytrade).
-          // Fallback secundário para implied-volatility-index-rank (metodologia TOS).
+          // IV Rank oficial Tastytrade (52 semanas / 252 dias úteis, padrão da Watchlist oficial da corretora):
+          // Prioridade para implied-volatility-index-rank / tos-implied-volatility-index-rank
+          const raw52wIvr = item['implied-volatility-index-rank'] ?? item['tos-implied-volatility-index-rank'];
           const rawTwIvr = item['tw-implied-volatility-index-rank'];
-          const rawTosIvr = item['tos-implied-volatility-index-rank'] ?? item['implied-volatility-index-rank'];
-          const rawIvr = rawTwIvr ?? rawTosIvr;
+          const rawIvr = raw52wIvr ?? rawTwIvr;
 
-          const rawIvp = item['tw-implied-volatility-percentile'] ?? item['implied-volatility-percentile'];
+          const rawIvp = item['implied-volatility-percentile'] ?? item['tw-implied-volatility-percentile'];
           const rawIv30 = item['implied-volatility-30-day'] ?? item['implied-volatility-index'];
-          const rawTosIv = rawTosIvr;
+          const rawTosIv = raw52wIvr;
 
           const earningsDate = item.earnings?.['expected-report-date'] || undefined;
           let daysToEarnings: number | undefined = undefined;
@@ -447,7 +448,15 @@ export class TastytradeMarketService {
               return isNaN(n) ? null : n;
             };
 
-            const last = parseNum(item.last ?? item.mark);
+            // No mercado americano:
+            // - lastMkt ('last-mkt'): último fechamento do PREGÃO REGULAR oficial (RTH). É o valor que a Tastytrade
+            //   exibe na coluna Last e usa para calcular a variação oficial da sessão (Chg / Chg%).
+            // - rawLast ('last' / 'mark'): último negócio registrado, que durante Pre-Market ou After-Hours (ETH)
+            //   reflete as negociações estendidas.
+            const rawLastMkt = parseNum(item['last-mkt']);
+            const rawLast = parseNum(item.last ?? item.mark);
+            const last = rawLastMkt !== null ? rawLastMkt : rawLast;
+
             const bid = parseNum(item.bid);
             const ask = parseNum(item.ask);
             const midRaw = parseNum(item.mid);
@@ -468,6 +477,16 @@ export class TastytradeMarketService {
               changePct = Number((((last - prevClose) / prevClose) * 100).toFixed(2));
             }
 
+            // Extended hours (pre-market / after-hours) quando o preço estendido difere do pregão regular
+            let extendedPrice: number | null = null;
+            let extendedChangePct: number | null = null;
+            if (rawLast !== null && rawLastMkt !== null && Math.abs(rawLast - rawLastMkt) > 0.001) {
+              extendedPrice = rawLast;
+              if (prevClose !== null && prevClose > 0) {
+                extendedChangePct = Number((((rawLast - prevClose) / prevClose) * 100).toFixed(2));
+              }
+            }
+
             const quote: TastyEquityQuote = {
               symbol: sym,
               last,
@@ -478,6 +497,8 @@ export class TastytradeMarketService {
               prevClose,
               change,
               changePct,
+              extendedPrice,
+              extendedChangePct,
               dayHigh,
               dayLow,
               volume,

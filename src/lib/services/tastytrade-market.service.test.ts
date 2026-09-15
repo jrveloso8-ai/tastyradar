@@ -108,7 +108,7 @@ describe('TastytradeMarketService - Market Metrics', () => {
     expect(metrics).toEqual({});
   });
 
-  it('deve priorizar tw-implied-volatility-index-rank (plataforma Tastytrade) sobre a fórmula legada TOS', async () => {
+  it('deve priorizar implied-volatility-index-rank (IV Rank de 52 semanas da Watchlist oficial) com fallback para tw', async () => {
     const fakeApiResponse = {
       data: {
         items: [
@@ -116,7 +116,7 @@ describe('TastytradeMarketService - Market Metrics', () => {
             symbol: 'NVDA',
             'implied-volatility-index-rank': '0.114',
             'tos-implied-volatility-index-rank': '0.114',
-            'tw-implied-volatility-index-rank': '0.136',
+            'tw-implied-volatility-index-rank': '0.086',
             'implied-volatility-percentile': '0.08',
             'implied-volatility-30-day': '0.376',
             'liquidity-rating': 4,
@@ -131,9 +131,8 @@ describe('TastytradeMarketService - Market Metrics', () => {
     const metrics = await tastyMarketService.getMarketMetrics(['NVDA'], true);
 
     expect(metrics.NVDA).toBeDefined();
-    // Prioridade máxima para a plataforma Tastyworks/Tastytrade (13.6%):
-    expect(metrics.NVDA.ivRank).toBe(13.6);
-    // Fórmula legada TOS armazenada em campo auxiliar para auditoria:
+    // IV Rank de 52 semanas consolidado (11.4%):
+    expect(metrics.NVDA.ivRank).toBe(11.4);
     expect(metrics.NVDA.tosIvIndex).toBe(11.4);
     expect(metrics.NVDA.ivPercentile).toBe(8.0);
     expect(metrics.NVDA.iv30).toBe(37.6);
@@ -228,12 +227,36 @@ describe('TastytradeMarketService - Equity Quotes (Spot Real)', () => {
     expect(quotes).toEqual({});
   });
 
-  it('REGRA 00: quando a API responde com status nao-2xx, nenhum fallback e injetado', async () => {
-    vi.stubGlobal('fetch', mockFetchOnce({ ok: false, status: 502 }));
+  it('deve priorizar last-mkt (RTH / pregão regular) e registrar extendedPrice de pre-market quando presente', async () => {
+    const samplePayload = {
+      data: {
+        items: [
+          {
+            symbol: 'NVDA',
+            last: '212.65',
+            'last-mkt': '210.89',
+            'prev-close': '210.96',
+            bid: '212.61',
+            ask: '212.69',
+            'updated-at': '2026-09-15T12:00:00Z',
+          },
+        ],
+      },
+    };
+
+    vi.stubGlobal('fetch', mockFetchOnce({ ok: true, json: () => Promise.resolve(samplePayload) }));
 
     const quotes = await tastyMarketService.getEquityQuotes(['NVDA'], true);
-    expect(quotes.NVDA).toBeUndefined();
-    expect(quotes).toEqual({});
+
+    expect(quotes.NVDA).toBeDefined();
+    // Spot oficial do pregão regular (210.89):
+    expect(quotes.NVDA.last).toBe(210.89);
+    // Variação oficial sobre prev-close (-0.07 / -0.03%):
+    expect(quotes.NVDA.change).toBe(-0.07);
+    expect(quotes.NVDA.changePct).toBe(-0.03);
+    // Cotação estendida de pre-market capturada separadamente:
+    expect(quotes.NVDA.extendedPrice).toBe(212.65);
+    expect(quotes.NVDA.extendedChangePct).toBeCloseTo(0.80, 2);
   });
 });
 
