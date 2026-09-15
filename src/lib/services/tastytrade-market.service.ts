@@ -61,6 +61,21 @@ function parsePct(val: any): number | null {
   return Number(num.toFixed(1));
 }
 
+/**
+ * Igual a parsePct, mas TRUNCA na 1ª casa decimal em vez de arredondar.
+ * A Tastytrade exibe IV Rank e IV Percentile com truncamento:
+ *   raw=0.133828996 → 13.3 (Tastytrade) vs 13.4 (toFixed round-half-up).
+ * Usar exclusivamente para campos de rank/percentil (escala 0–1).
+ */
+function parsePctRank(val: any): number | null {
+  if (val === undefined || val === null || val === '') return null;
+  const num = typeof val === 'number' ? val : parseFloat(val);
+  if (isNaN(num)) return null;
+  // converte para % e trunca na 1ª decimal  (ex: 13.3828... → 13.3)
+  const pct = num > 0 && num <= 1.0 ? num * 100 : num;
+  return Math.floor(pct * 10) / 10;
+}
+
 export interface TastyEquityQuote {
   symbol: string;
   last: number | null;
@@ -181,10 +196,10 @@ export class TastytradeMarketService {
 
           const metrics: TastyLiveMetrics = {
             symbol: sym,
-            ivRank: parsePct(rawIvr),
-            ivPercentile: parsePct(rawIvp),
+            ivRank: parsePctRank(rawIvr),
+            ivPercentile: parsePctRank(rawIvp),
             iv30: parsePct(rawIv30),
-            tosIvIndex: rawTosIv !== undefined ? parsePct(rawTosIv) : undefined,
+            tosIvIndex: rawTosIv !== undefined ? parsePctRank(rawTosIv) : undefined,
             liquidityRating: typeof item['liquidity-rating'] === 'number' ? item['liquidity-rating'] : 4,
             beta,
             dividendYield: parsePct(item['dividend-yield']),
