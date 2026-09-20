@@ -292,5 +292,46 @@ describe('Auditoria Ciclo 6 — N-04: Eliminação de Fallback de Rótulo de Fon
   });
 });
 
+describe('Auditoria Ciclo 6 — Cerca ESLint: AST de Ternários Numéricos e Cobertura de Scripts', () => {
+  it('Cerca ESLint: barra ternários com fallback numérico em src/lib/domain (ex.: vol > 0 ? vol : 0.30)', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { ESLint } = require('eslint') as { ESLint: any };
+    const eslint = new ESLint();
+    const [result] = await eslint.lintText('export const x = (vol: number) => vol > 0 ? vol : 0.30;\n', {
+      filePath: 'src/lib/domain/mock-test-ternary.ts',
+    });
+    const hasForbiddenTernaryError = result.messages.some((m: { message: string }) =>
+      m.message.includes('REGRA 00: Fallback numerico com ternario')
+    );
+    expect(hasForbiddenTernaryError).toBe(true);
+  });
+
+  it('Cerca ESLint: barra ternários com fallback numérico em scripts (ex.: dte > 0 ? dte : 35)', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { ESLint } = require('eslint') as { ESLint: any };
+    const eslint = new ESLint();
+    const [result] = await eslint.lintText('export const d = (dte: number) => dte > 0 ? dte : 35;\n', {
+      filePath: 'scripts/mock-test-ternary.ts',
+    });
+    const hasForbiddenTernaryError = result.messages.some((m: { message: string }) =>
+      m.message.includes('REGRA 00: Fallback numerico com ternario')
+    );
+    expect(hasForbiddenTernaryError).toBe(true);
+  });
+
+  it('Cerca ESLint: permite ternários com sinais legítimos 1 e -1 ou flags 0 e 1', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { ESLint } = require('eslint') as { ESLint: any };
+    const eslint = new ESLint();
+    const [result] = await eslint.lintText('export const sign = (val: number) => val >= 0 ? 1 : -1;\n', {
+      filePath: 'src/lib/domain/mock-test-sign.ts',
+    });
+    const hasForbiddenTernaryError = result.messages.some((m: { message: string }) =>
+      m.message.includes('REGRA 00: Fallback numerico com ternario')
+    );
+    expect(hasForbiddenTernaryError).toBe(false);
+  });
+});
+
 
 
