@@ -14,7 +14,8 @@ import {
   Gauge,
   Compass,
   LayoutDashboard,
-  Sparkles
+  Sparkles,
+  ShieldCheck
 } from 'lucide-react';
 
 export type ActiveTab = 
@@ -26,6 +27,7 @@ export type ActiveTab =
   | 'barreiras'
   | 'estrategias-especiais'
   | 'analista-vol'
+  | 'auditoria-sombra'
   | 'manual';
 
 interface NavbarProps {
@@ -57,6 +59,7 @@ export function Navbar({
     { id: 'barreiras', label: 'Barreiras GEX', icon: Zap, isGex: true },
     { id: 'estrategias-especiais', label: 'Estratégias', icon: Sparkles, isSpecial: true },
     { id: 'analista-vol', label: 'Analista Vol', icon: Gauge, isVol: true },
+    { id: 'auditoria-sombra', label: 'Modo Sombra', icon: ShieldCheck, isSpecial: true },
     { id: 'manual', label: 'Manual', icon: BookOpen },
   ];
 

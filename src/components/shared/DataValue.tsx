@@ -6,7 +6,8 @@ export interface DataValueProps {
   value: number | string | null | undefined;
   provenance: ProvenanceBadge;
   source: string;
-  format?: 'currency' | 'percent' | 'number' | 'raw';
+  format?: 'currency' | 'percent' | 'number' | 'integer' | 'raw';
+  decimals?: number;
   timestamp?: string;
   formula?: string;
   unavailableLabel?: string;
@@ -47,9 +48,10 @@ export function ProvenanceTag({ badge, source, formula, timestamp }: {
   );
 }
 
-function formatValue(
+export function formatDataValue(
   val: number | string,
-  format: 'currency' | 'percent' | 'number' | 'raw'
+  format: 'currency' | 'percent' | 'number' | 'integer' | 'raw' = 'raw',
+  decimals?: number
 ): string {
   if (format === 'raw') return String(val);
 
@@ -57,12 +59,20 @@ function formatValue(
   if (Number.isNaN(num)) return String(val);
 
   switch (format) {
-    case 'currency':
-      return `$${num.toFixed(2)}`;
-    case 'percent':
-      return `${num >= 0 ? '' : ''}${num.toFixed(2)}%`;
-    case 'number':
-      return num.toFixed(2);
+    case 'currency': {
+      const dec = decimals ?? 2;
+      return `$${num.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec })}`;
+    }
+    case 'percent': {
+      const dec = decimals ?? 2;
+      return `${num.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec })}%`;
+    }
+    case 'integer':
+      return Math.round(num).toLocaleString('en-US');
+    case 'number': {
+      const dec = decimals ?? 2;
+      return num.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+    }
     default:
       return String(val);
   }
@@ -84,6 +94,7 @@ export function DataValue({
   provenance,
   source,
   format = 'raw',
+  decimals,
   timestamp,
   formula,
   unavailableLabel = 'N/D',
@@ -99,7 +110,7 @@ export function DataValue({
     const Component = as as any;
     return (
       <Component className={className}>
-        {isAvailable ? formatValue(value as number | string, format) : unavailableLabel}
+        {isAvailable ? formatDataValue(value as number | string, format, decimals) : unavailableLabel}
       </Component>
     );
   }
@@ -126,7 +137,7 @@ export function DataValue({
       <div className="flex items-baseline gap-1">
         {isAvailable ? (
           <span className={`${valSize} font-bold text-gray-100`}>
-            {formatValue(value as number | string, format)}
+            {formatDataValue(value as number | string, format, decimals)}
           </span>
         ) : (
           <span className={`${valSize} font-semibold text-gray-400 italic`}>

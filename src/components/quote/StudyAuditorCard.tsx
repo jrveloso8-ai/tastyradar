@@ -14,7 +14,7 @@ import {
   ChevronUp,
   Award,
 } from 'lucide-react';
-import { DataValue } from '@/components/shared/DataValue';
+import { DataValue, formatDataValue } from '@/components/shared/DataValue';
 
 interface StudyAuditorCardProps {
   symbol: string;
@@ -39,15 +39,12 @@ export const StudyAuditorCard: React.FC<StudyAuditorCardProps> = ({
   const [isExpanded, setIsExpanded] = useState(true);
 
   const handleCopyReport = () => {
-    const formatNumber = (n: number, decimals: number = 2) =>
-      new Intl.NumberFormat('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(n);
-
     const text = `=== AUDITORIA DE INTEGRIDADE QUANTITATIVA — RADAR TASTYTRADE PRO ===
-Ativo: ${symbol} (Spot: $${spotPrice > 0 ? formatNumber(spotPrice, 2) : 'N/D'})
+Ativo: ${symbol} (Spot: $${spotPrice > 0 ? formatDataValue(spotPrice, 'number', 2) : 'N/D'})
 Fonte: ${source}
 Data da Coleta: ${updatedAt || new Date().toISOString()}
-IV Rank: ${ivRank !== null ? formatNumber(ivRank, 1) + '%' : 'N/D'}
-IV Percentile: ${ivPercentile !== null ? formatNumber(ivPercentile, 1) + '%' : 'N/D'}
+IV Rank: ${ivRank !== null ? formatDataValue(ivRank, 'number', 1) + '%' : 'N/D'}
+IV Percentile: ${ivPercentile !== null ? formatDataValue(ivPercentile, 'number', 1) + '%' : 'N/D'}
 Liquidez Tastytrade: ${liquidity}/5
 
 1. AUDITORIA DE PROVENIÊNCIA (REGRA 00):

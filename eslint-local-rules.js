@@ -6,8 +6,12 @@ function isNumberType(type) {
   if (type.flags & (ts.TypeFlags.Number | ts.TypeFlags.NumberLiteral)) {
     return true;
   }
-  // Se for uma união, checa se qualquer membro é number
+  // Se for uma união, checa se é união de ReactNode (que contém Object/JSXElement)
   if (type.isUnion && type.isUnion()) {
+    const hasObjectOrElement = type.types.some(t => Boolean(t.flags & (ts.TypeFlags.Object | ts.TypeFlags.NonPrimitive)));
+    if (hasObjectOrElement) {
+      return false;
+    }
     return type.types.some(t => isNumberType(t));
   }
   // Se for intersection
@@ -46,6 +50,9 @@ module.exports = {
 
       function checkExpression(node, targetNode) {
         try {
+          if (targetNode.type === 'Identifier' && targetNode.name === 'children') {
+            return;
+          }
           const tsNode = parserServices.esTreeNodeToTSNodeMap.get(targetNode);
           if (!tsNode) return;
 

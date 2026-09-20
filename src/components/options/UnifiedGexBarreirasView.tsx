@@ -729,7 +729,9 @@ export function UnifiedGexBarreirasView({
               return (
                 <div key={s.strike} className={`grid grid-cols-12 items-center text-xs font-mono py-1 rounded ${isAtm ? 'bg-cyan-950/30' : ''}`}>
                   <div className="col-span-5 flex items-center justify-end gap-2 pr-4">
-                    <span className="text-[10px] text-gray-400">{s.putOi.toLocaleString()}</span>
+                    <span className="text-[10px] text-gray-400">
+                      <DataValue variant="inline" value={s.putOi} format="integer" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" />
+                    </span>
                     <div className="w-32 bg-[#0d1527] h-3 rounded overflow-hidden flex justify-end">
                       <div
                         className="bg-gradient-to-l from-rose-500 to-rose-700 h-full rounded-l"
@@ -757,7 +759,9 @@ export function UnifiedGexBarreirasView({
                         style={{ width: `${callPct}%` }}
                       ></div>
                     </div>
-                    <span className="text-[10px] text-gray-400">{s.callOi.toLocaleString()}</span>
+                    <span className="text-[10px] text-gray-400">
+                      <DataValue variant="inline" value={s.callOi} format="integer" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" />
+                    </span>
                   </div>
                 </div>
               );
@@ -781,7 +785,9 @@ export function UnifiedGexBarreirasView({
                       <span className="text-[10px] text-gray-400">{w.callSymbol}</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-emerald-400 font-bold">{w.callOi.toLocaleString()} OI</span>
+                      <span className="text-emerald-400 font-bold">
+                        <DataValue variant="inline" value={w.callOi} format="integer" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" /> OI
+                      </span>
                       <span className="text-[10px] text-gray-400">
                         IV: <DataValue variant="inline" value={w.callIv} format="percent" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" />
                       </span>
@@ -809,7 +815,9 @@ export function UnifiedGexBarreirasView({
                       <span className="text-[10px] text-gray-400">{w.putSymbol}</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-rose-400 font-bold">{w.putOi.toLocaleString()} OI</span>
+                      <span className="text-rose-400 font-bold">
+                        <DataValue variant="inline" value={w.putOi} format="integer" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" /> OI
+                      </span>
                       <span className="text-[10px] text-gray-400">
                         IV: <DataValue variant="inline" value={w.putIv} format="percent" provenance="ESTIMADO" source="Modelo paramétrico interno de GEX (sem OI/gamma/IV reais da Tastytrade)" />
                       </span>

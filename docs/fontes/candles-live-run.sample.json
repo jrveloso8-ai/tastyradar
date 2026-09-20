@@ -1,0 +1,212 @@
+{
+  "summary": {
+    "AAPL": {
+      "totalBars": 254,
+      "firstDate": "2025-09-12",
+      "lastDate": "2026-09-16",
+      "sampleFirstBar": {
+        "date": "2025-09-12",
+        "open": 229.22,
+        "high": 234.51,
+        "low": 229.02,
+        "close": 234.07,
+        "volume": 116821
+      },
+      "sampleLastBar": {
+        "date": "2026-09-16",
+        "open": 332.42,
+        "high": 335.48,
+        "low": 331.87,
+        "close": 334.025,
+        "volume": 18094
+      }
+    },
+    "NVDA": {
+      "totalBars": 254,
+      "firstDate": "2025-09-12",
+      "lastDate": "2026-09-16",
+      "sampleFirstBar": {
+        "date": "2025-09-12",
+        "open": 177.77,
+        "high": 178.595,
+        "low": 176.45,
+        "close": 177.82,
+        "volume": 205392
+      },
+      "sampleLastBar": {
+        "date": "2026-09-16",
+        "open": 214.14,
+        "high": 215.0696,
+        "low": 213.31,
+        "close": 214.67,
+        "volume": 19575
+      }
+    },
+    "XOM": {
+      "totalBars": 254,
+      "firstDate": "2025-09-12",
+      "lastDate": "2026-09-16",
+      "sampleFirstBar": {
+        "date": "2025-09-12",
+        "open": 112.86,
+        "high": 113.22,
+        "low": 111.875,
+        "close": 112.16,
+        "volume": 16108
+      },
+      "sampleLastBar": {
+        "date": "2026-09-16",
+        "open": 167.495,
+        "high": 167.495,
+        "low": 165.5,
+        "close": 166.12,
+        "volume": 2244
+      }
+    },
+    "JNJ": {
+      "totalBars": 254,
+      "firstDate": "2025-09-12",
+      "lastDate": "2026-09-16",
+      "sampleFirstBar": {
+        "date": "2025-09-12",
+        "open": 177.705,
+        "high": 178.8,
+        "low": 176.72,
+        "close": 178.06,
+        "volume": 7398
+      },
+      "sampleLastBar": {
+        "date": "2026-09-16",
+        "open": 266.555,
+        "high": 268.435,
+        "low": 266.34,
+        "close": 267.84,
+        "volume": 373
+      }
+    },
+    "JPM": {
+      "totalBars": 254,
+      "firstDate": "2025-09-12",
+      "lastDate": "2026-09-16",
+      "sampleFirstBar": {
+        "date": "2025-09-12",
+        "open": 305,
+        "high": 307.55,
+        "low": 303.695,
+        "close": 306.91,
+        "volume": 8317
+      },
+      "sampleLastBar": {
+        "date": "2026-09-16",
+        "open": 353.42,
+        "high": 355.6,
+        "low": 349.365,
+        "close": 349.82,
+        "volume": 2246
+      }
+    },
+    "TSLA": {
+      "totalBars": 254,
+      "firstDate": "2025-09-12",
+      "lastDate": "2026-09-16",
+      "sampleFirstBar": {
+        "date": "2025-09-12",
+        "open": 370.94,
+        "high": 396.6899,
+        "low": 370.24,
+        "close": 395.94,
+        "volume": 400472
+      },
+      "sampleLastBar": {
+        "date": "2026-09-16",
+        "open": 357.71,
+        "high": 360.67,
+        "low": 354.8913,
+        "close": 360.3333,
+        "volume": 14900
+      }
+    }
+  },
+  "sampleAaplBars": [
+    {
+      "date": "2026-09-02",
+      "open": 326.865,
+      "high": 328.4,
+      "low": 323.53,
+      "close": 324.96,
+      "volume": 116207
+    },
+    {
+      "date": "2026-09-03",
+      "open": 324.87,
+      "high": 330.81,
+      "low": 324.11,
+      "close": 328.21,
+      "volume": 129522
+    },
+    {
+      "date": "2026-09-04",
+      "open": 328.305,
+      "high": 328.93,
+      "low": 317.86,
+      "close": 319.97,
+      "volume": 142565
+    },
+    {
+      "date": "2026-09-08",
+      "open": 317.1,
+      "high": 320.7,
+      "low": 314.9,
+      "close": 316.22,
+      "volume": 116515
+    },
+    {
+      "date": "2026-09-09",
+      "open": 315.485,
+      "high": 319.15,
+      "low": 309.9,
+      "close": 315.34,
+      "volume": 252022
+    },
+    {
+      "date": "2026-09-10",
+      "open": 316.67,
+      "high": 326.74,
+      "low": 316.51,
+      "close": 326.57,
+      "volume": 249913
+    },
+    {
+      "date": "2026-09-11",
+      "open": 327.45,
+      "high": 336.22,
+      "low": 326.3,
+      "close": 332.27,
+      "volume": 183559
+    },
+    {
+      "date": "2026-09-14",
+      "open": 334.79,
+      "high": 335.5,
+      "low": 331.34,
+      "close": 333.08,
+      "volume": 141715
+    },
+    {
+      "date": "2026-09-15",
+      "open": 330.135,
+      "high": 331.78,
+      "low": 328.35,
+      "close": 331.34,
+      "volume": 114223
+    },
+    {
+      "date": "2026-09-16",
+      "open": 332.42,
+      "high": 335.48,
+      "low": 331.87,
+      "close": 334.025,
+      "volume": 18094
+    }
+  ]
+}

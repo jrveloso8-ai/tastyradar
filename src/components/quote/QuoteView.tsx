@@ -860,7 +860,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                       className="[&_.font-bold]:text-emerald-400"
                     />
                     <span className="text-[10px] text-gray-500 block font-sans mt-1">
-                      (${electedStrategy.totalCostOrCreditForLot.toLocaleString('en-US', { minimumFractionDigits: 2 })} por contrato de 100)
+                      (<DataValue variant="inline" value={electedStrategy.totalCostOrCreditForLot} format="currency" provenance="MEDIDO" source="Tastytrade REST (option-recommendation)" /> por contrato de 100)
                     </span>
                   </div>
 
@@ -895,12 +895,17 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                   </div>
 
                   <div className="p-3.5 bg-[#111827] rounded-xl border border-emerald-500/30">
-                    <span className="text-[10px] text-emerald-400 block font-sans">LUCRO ESTIMADO MÁXIMO</span>
-                    <span className="text-lg font-bold text-emerald-400 mt-1 block">
-                      +${electedStrategy.maxProfitLot.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </span>
-                    <span className="text-[10px] text-red-400 block font-sans">
-                      Perda Máx: -${electedStrategy.maxLossLot.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    <DataValue
+                      label="LUCRO ESTIMADO MÁXIMO"
+                      value={electedStrategy.maxProfitLot}
+                      format="currency"
+                      provenance="MEDIDO"
+                      source="Tastytrade REST (option-recommendation)"
+                      size="lg"
+                      className="[&_.font-bold]:text-emerald-400"
+                    />
+                    <span className="text-[10px] text-red-400 block font-sans mt-1">
+                      Perda Máx: -<DataValue variant="inline" value={electedStrategy.maxLossLot} format="currency" provenance="MEDIDO" source="Tastytrade REST (option-recommendation)" />
                     </span>
                   </div>
                 </div>
@@ -919,41 +924,36 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                     {electedStrategy.legs.map((leg, idx) => (
                       <div
                         key={idx}
-                        className={`p-3 rounded-xl border flex items-center justify-between ${
-                          leg.action === 'VENDA'
-                            ? 'bg-red-950/20 border-red-500/30'
-                            : 'bg-emerald-950/20 border-emerald-500/30'
+                        className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
+                          leg.action === 'COMPRA'
+                            ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200'
+                            : 'bg-rose-950/20 border-rose-500/30 text-rose-200'
                         }`}
                       >
                         <div>
                           <div className="flex items-center gap-2">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                leg.action === 'VENDA'
-                                  ? 'bg-red-500/20 text-red-400'
-                                  : 'bg-emerald-500/20 text-emerald-400'
-                              }`}
-                            >
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono uppercase bg-gray-900 border border-gray-700 text-gray-300">
                               {leg.action}
                             </span>
-                            {/* nao e valor exibido como preco, e identificador de opcao (formato OCC-like) */}
+                            {/* nao e valor exibido como preco, e ticker formatado de contrato derivativo */}
                             <span className="font-bold text-white text-xs">{leg.symbol}</span>
                           </div>
-                          <div className="mt-1">
-                            <DataValue
-                              label={`STRIKE (${leg.type})`}
-                              value={leg.strike}
-                              format="currency"
-                              provenance="MEDIDO"
-                              source="Tastytrade REST (option-recommendation)"
-                              size="sm"
-                            />
+                          <div className="text-[10px] text-gray-400 font-sans mt-1">
+                            {leg.description}
+                          </div>
+                          <div className="text-[9px] text-gray-400 mt-1 flex items-center gap-2">
+                            <span>
+                              Δ: {leg.delta != null ? <DataValue variant="inline" value={leg.delta} format="number" provenance="MEDIDO" source="Tastytrade DXLink (real streaming)" /> : 'N/D'}
+                            </span>
+                            <span>
+                              IV: {leg.iv != null ? <DataValue variant="inline" value={leg.iv} format="percent" provenance="MEDIDO" source="Tastytrade DXLink (real streaming)" /> : 'N/D'}
+                            </span>
                           </div>
                         </div>
 
-                        <div className="text-right">
+                        <div className="text-right flex flex-col items-end">
                           <DataValue
-                            label={leg.action === 'VENDA' ? 'PRÊMIO RECEBIDO' : 'PRÊMIO PAGO'}
+                            label={leg.action === 'COMPRA' ? 'Débito' : 'Crédito'}
                             value={leg.unitPrice}
                             format="currency"
                             provenance="MEDIDO"
@@ -962,10 +962,10 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                             className="items-end text-right"
                           />
                           <div className="text-[10px] text-gray-400 font-sans mt-0.5">
-                            Total: ${leg.totalFinancial.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            Total: <DataValue variant="inline" value={leg.totalFinancial} format="currency" provenance="MEDIDO" source="Tastytrade REST (option-recommendation)" />
                           </div>
                           <div className="text-[9px] text-gray-500 font-mono">
-                            OI: {leg.openInterest.toLocaleString('en-US')}
+                            OI: <DataValue variant="inline" value={leg.openInterest} format="integer" provenance={leg.oiIsProxy ? 'ESTIMADO' : 'MEDIDO'} source={leg.oiIsProxy ? 'Proxy de liquidez (avgOptionVolume * 0.15)' : 'Tastytrade DXLink (real streaming)'} />
                           </div>
                         </div>
                       </div>
@@ -986,7 +986,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
                           className={electedStrategy.isCredit ? '[&_.font-bold]:text-emerald-400' : '[&_.font-bold]:text-cyan-400'}
                         />
                         <div className="text-xs font-bold text-gray-300 font-sans self-end pb-0.5">
-                          • ${Math.abs(electedStrategy.totalCostOrCreditForLot).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-[10px] text-gray-500 font-normal">no contrato de 100</span>
+                          • <DataValue variant="inline" value={Math.abs(electedStrategy.totalCostOrCreditForLot)} format="currency" provenance="MEDIDO" source="Tastytrade REST (option-recommendation)" /> <span className="text-[10px] text-gray-500 font-normal">no contrato de 100</span>
                         </div>
                       </div>
                     </div>

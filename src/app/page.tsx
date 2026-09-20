@@ -12,6 +12,7 @@ import { BarreirasGexView } from '@/components/options/BarreirasGexView';
 import { SpecialStrategiesView } from '@/components/special-strategies/SpecialStrategiesView';
 import { VolatilityAnalystView } from '@/components/volatility/VolatilityAnalystView';
 import { HelpSupportView } from '@/components/help/HelpSupportView';
+import { ShadowAuditView } from '@/components/shadow-audit/ShadowAuditView';
 
 type ApiStatus = { status: 'ONLINE' | 'OFFLINE' | 'CHECANDO'; latencyMs: number | null };
 
@@ -141,7 +142,12 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* Painel 9: Manual & Ajuda IA */}
+        {/* Painel 9: Modo Sombra (Paper Trading & Auditoria Manual) */}
+        <div id="panel-auditoria-sombra" role="tabpanel" className={activeTab === 'auditoria-sombra' ? 'block' : 'hidden'}>
+          {activeTab === 'auditoria-sombra' && <ShadowAuditView />}
+        </div>
+
+        {/* Painel 10: Manual & Ajuda IA */}
         <div id="panel-manual" role="tabpanel" className={activeTab === 'manual' ? 'block' : 'hidden'}>
           {activeTab === 'manual' && <HelpSupportView />}
         </div>

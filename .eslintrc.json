@@ -28,7 +28,25 @@
       }
     },
     {
-      "files": ["src/components/**/*.tsx", "src/components/**/*.jsx"],
+      "files": ["src/lib/domain/**/*.ts", "src/lib/types/**/*.ts"],
+      "rules": {
+        "no-unused-vars": [
+          "error",
+          {
+            "argsIgnorePattern": "^_",
+            "varsIgnorePattern": "^_",
+            "caughtErrorsIgnorePattern": "^_"
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/components/**/*.tsx",
+        "src/components/**/*.jsx",
+        "src/app/**/*.tsx",
+        "src/app/**/*.jsx"
+      ],
       "excludedFiles": ["src/components/shared/DataValue.tsx"],
       "parser": "@typescript-eslint/parser",
       "parserOptions": {
@@ -42,6 +60,14 @@
           {
             "selector": "CallExpression[callee.property.name='toFixed']",
             "message": "REGRA 00: Proibido .toFixed() em componentes de UI, mesmo fora do JSX (ex: pre-calcular numa variavel e so interpolar a variavel nao escapa a regra). Use o componente estrutural <DataValue format=\"...\" /> com proveniencia e fonte obrigatorias."
+          },
+          {
+            "selector": "CallExpression[callee.property.name='toLocaleString']",
+            "message": "REGRA 00: Proibido .toLocaleString() em componentes/paginas de UI. Use o componente estrutural <DataValue format=\"integer\"|\"currency\" ... /> com proveniencia e fonte obrigatorias."
+          },
+          {
+            "selector": ":matches(NewExpression, CallExpression)[callee.object.name='Intl'][callee.property.name='NumberFormat']",
+            "message": "REGRA 00: Proibido Intl.NumberFormat em componentes/paginas de UI. Use o componente estrutural <DataValue ... /> com proveniencia e fonte obrigatorias."
           }
         ]
       }

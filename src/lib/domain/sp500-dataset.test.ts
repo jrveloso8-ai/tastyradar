@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SP500_DATASET, getTop50LiquidUnder150, searchSP500, getSP500Asset } from './sp500-dataset';
+import { getTop50LiquidUnder150, searchSP500, getSP500Asset } from './sp500-dataset';
 
 describe('S&P 500 Dataset & Liquidity Filtering', () => {
   it('deve filtrar estritamente ativos com cotação spot <= $150 no Top 50', () => {

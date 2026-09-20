@@ -1,5 +1,5 @@
 import { USStockItem, US_STOCKS_DATASET } from '@/lib/domain/us-market-data';
-import { CME_25_STRATEGIES, StrategySpec } from '@/lib/domain/cme-catalog';
+import { StrategySpec } from '@/lib/domain/cme-catalog';
 
 export interface AIConsultantContext {
   symbol: string;

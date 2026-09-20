@@ -267,7 +267,7 @@ export const OptionPayoffChart: React.FC<OptionPayoffChartProps> = ({ electedStr
                 {isCredit ? 'Crédito Líquido:' : 'Custo Líquido (Débito):'} {isCredit ? '+' : '−'}<DataValue variant="inline" value={Math.abs(netCostOrCredit)} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" /> / cota
               </span>
               <span className="text-gray-400 font-sans">
-                (Total: ${(Math.abs(netCostOrCredit) * 100).toLocaleString('en-US', { minimumFractionDigits: 2 })} por contrato de 100)
+                (Total: <DataValue variant="inline" value={Math.abs(netCostOrCredit) * 100} format="currency" provenance="SIMULADO" source="Modelo interno de precificação (sem consulta a book de opções real)" /> por contrato de 100)
               </span>
             </div>
             {pricingViability && (
