@@ -162,40 +162,44 @@ export function processLayer2(
       atmIvPct = rawAtmIv <= 1.0 ? rawAtmIv * 100 : rawAtmIv;
     }
 
+    const hasSource = Boolean(metrics.source && metrics.source.trim().length > 0);
+    const source = hasSource ? metrics.source! : 'fonte-nao-informada';
+
     // Comparação estrita com precisão completa
     const passesIvr = ivrScaled <= cfg.maxIvRank;
     const passesIvp = ivpScaled <= cfg.maxIvPercentile;
-    const passesIvFilter = passesIvr && passesIvp && isAtmIvValid;
+    const passesIvFilter = passesIvr && passesIvp && isAtmIvValid && hasSource;
 
     let rejectionCode = l1.rejectionCode;
     let rejectionReason = l1.rejectionReason;
 
-    if (!isAtmIvValid && !rejectionReason) {
-      rejectionCode = 'IV_UNAVAILABLE';
-      rejectionReason = 'IV ATM não disponível ou inconsistente na corretora (<= 0)';
-    } else if (!passesIvFilter && !rejectionReason) {
+    if (!passesIvr || !passesIvp) {
       rejectionCode = 'IV_FILTER_FAIL';
       rejectionReason = `IV Rank (${ivrScaled.toFixed(2)}%) ou IV Percentile (${ivpScaled.toFixed(2)}%) acima do teto de ${cfg.maxIvRank.toFixed(0)}%`;
+    } else if (!isAtmIvValid && !rejectionReason) {
+      rejectionCode = 'IV_UNAVAILABLE';
+      rejectionReason = 'IV ATM não disponível ou inconsistente na corretora (<= 0)';
+    } else if (!hasSource && !rejectionReason) {
+      rejectionCode = 'IV_UNAVAILABLE';
+      rejectionReason = 'Fonte de métricas de IV não informada (rastreabilidade obrigatória pela Regra 00)';
     }
-
-    const source = metrics.source || 'tastytrade-market-metrics';
 
     return {
       ...l1,
       selectedExpiration,
       atmIv: {
         value: Number(atmIvPct.toFixed(2)),
-        provenance: isAtmIvValid ? 'MEDIDO' : 'INDISPONIVEL',
+        provenance: (isAtmIvValid && hasSource) ? 'MEDIDO' : 'INDISPONIVEL',
         source,
       },
       ivRank: {
         value: Number(ivrScaled.toFixed(4)), // Precisão completa mantida no valor de domínio
-        provenance: 'MEDIDO',
+        provenance: hasSource ? 'MEDIDO' : 'INDISPONIVEL',
         source,
       },
       ivPercentile: {
         value: Number(ivpScaled.toFixed(4)), // Precisão completa mantida no valor de domínio
-        provenance: 'MEDIDO',
+        provenance: hasSource ? 'MEDIDO' : 'INDISPONIVEL',
         source,
       },
       passesIvFilter,

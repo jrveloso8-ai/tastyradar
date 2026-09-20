@@ -125,12 +125,16 @@ export async function runShadowCycle(universe = process.argv.includes('--full') 
     const candleRes = candlesCollectionMap.get(sym);
     const bars = candleRes?.bars || [];
 
+    const hasCandleSource = Boolean(candleRes?.source);
+    const barsProvenance = hasCandleSource ? (candleRes!.provenance || 'MEDIDO') : 'INDISPONIVEL';
+    const barsSource = hasCandleSource ? candleRes!.source : 'fonte-nao-informada';
+
     candidates.push({
       symbol: sym,
       sector: item.sector,
       bars,
-      barsProvenance: candleRes?.provenance || 'INDISPONIVEL',
-      barsSource: candleRes?.source || 'tastytrade-dxlink-candles',
+      barsProvenance,
+      barsSource,
     });
 
     const spot = spotQuotes[sym]?.last ?? null;
@@ -193,6 +197,7 @@ export async function runShadowCycle(universe = process.argv.includes('--full') 
         rawIvp: rawIvp != null ? parseFloat(rawIvp) : null,
         atmIv,
         expirations,
+        source: 'tastytrade-market-metrics',
       },
     });
   }

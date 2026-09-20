@@ -233,4 +233,64 @@ describe('Auditoria Ciclo 6 — N-03: Proveniência do Delta BSM e Contágio na 
   });
 });
 
+describe('Auditoria Ciclo 6 — N-04: Eliminação de Fallback de Rótulo de Fonte', () => {
+  it('N-04: chamada a evaluateLegLiquidity sem source NÃO devolve MEDIDO com rótulo "tastytrade-live-chain"', async () => {
+    const { evaluateLegLiquidity } = await import('../src/lib/domain/liquidity-filter');
+
+    const evalRes = evaluateLegLiquidity({
+      symbol: 'AAPL_261023_C105',
+      strike: 105,
+      optionType: 'CALL',
+      isAtm: false,
+      bid: 2.0,
+      ask: 2.1,
+      openInterest: 500,
+      // source ausente intencionalmente
+    });
+
+    expect(evalRes.leg.provenance).toBe('INDISPONIVEL');
+    expect(evalRes.leg.source).not.toBe('tastytrade-live-chain');
+    expect(evalRes.leg.passesLiquidity).toBe(false);
+  });
+
+  it('N-04: Camada 2 sem metrics.source NÃO devolve MEDIDO com rótulo "tastytrade-market-metrics"', async () => {
+    const { processLayer2 } = await import('../src/lib/domain/screener-layer2');
+    const dummyL1: Layer1Output = {
+      symbol: 'AAPL',
+      sector: 'Technology',
+      hv12m: { value: 35.0, provenance: 'DERIVADO', source: 'garman-klass' },
+      hv12mTrimmed: { value: 32.0, provenance: 'DERIVADO', source: 'garman-klass-trimmed' },
+      hvDropRatio: { value: 0.0857, provenance: 'DERIVADO', source: 'drop-ratio' },
+      hv12mPercentile: { value: 75.0, provenance: 'DERIVADO', source: 'percentile' },
+      passesHvPercentile: true,
+      passesStability: true,
+      sectorQuotaApproved: true,
+      bbwCurrent: { value: 4.2, provenance: 'DERIVADO', source: 'bbw-20-2' },
+      bbwHistoryPercentile: { value: 12.0, provenance: 'DERIVADO', source: 'bbw-percentile' },
+      passesSqueeze: true,
+    };
+
+    const metricsMap = new Map([
+      [
+        'AAPL',
+        {
+          rawIvr: 0.20,
+          rawIvp: 0.20,
+          atmIv: 0.25,
+          expirations: [{ expirationDate: '2026-10-23', daysToExpiration: 37, expirationType: 'Standard' }],
+          // source ausente intencionalmente
+        },
+      ],
+    ]);
+
+    const results = processLayer2([dummyL1], metricsMap as any, { maxIvRank: 30, maxIvPercentile: 30 });
+    const res = results[0];
+
+    expect(res.passesIvFilter).toBe(false);
+    expect(res.ivRank.provenance).toBe('INDISPONIVEL');
+    expect(res.ivRank.source).not.toBe('tastytrade-market-metrics');
+  });
+});
+
+
 

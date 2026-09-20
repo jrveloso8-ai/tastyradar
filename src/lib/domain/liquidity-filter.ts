@@ -58,7 +58,8 @@ export function evaluateLegLiquidity(
   const cfg = { ...DEFAULT_LIQUIDITY_CONFIG, ...config };
 
   const { symbol, strike, optionType, isAtm, bid, ask, openInterest } = input;
-  const source = input.source || 'tastytrade-live-chain';
+  const hasSource = Boolean(input.source && input.source.trim().length > 0);
+  const source = hasSource ? input.source! : 'fonte-nao-informada';
 
   // 1. Validação de presença e integridade de cotação
   if (
@@ -146,7 +147,7 @@ export function evaluateLegLiquidity(
   const minRequiredOi = isAtm ? cfg.minOiAtm : cfg.minOiOtm;
   const passesOi = openInterest >= minRequiredOi;
 
-  const passesLiquidity = passesSpread && passesOi;
+  let passesLiquidity = passesSpread && passesOi && hasSource;
 
   let rejectionCode: ScreenerRejectionCode | undefined;
   let rejectionReason: string | undefined;
@@ -160,6 +161,9 @@ export function evaluateLegLiquidity(
   } else if (!passesOi) {
     rejectionCode = 'LIQUIDITY_OI_FAIL';
     rejectionReason = `Open Interest de ${openInterest} contratos abaixo do mínimo de ${minRequiredOi} (${isAtm ? 'ATM' : 'OTM'}) para ${optionType} ${strike}`;
+  } else if (!hasSource) {
+    rejectionCode = 'LIQUIDITY_SPREAD_FAIL';
+    rejectionReason = 'Fonte de cotação não informada (rastreabilidade obrigatória pela Regra 00)';
   }
 
   const leg: OptionLegLiquidity = {
@@ -174,7 +178,7 @@ export function evaluateLegLiquidity(
     openInterest,
     passesLiquidity,
     rejectionReason,
-    provenance: 'MEDIDO',
+    provenance: hasSource ? 'MEDIDO' : 'INDISPONIVEL',
     source,
   };
 

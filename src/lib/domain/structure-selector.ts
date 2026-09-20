@@ -171,6 +171,7 @@ export function selectStrangleStructure(input: StrangleSelectionInput): Strangle
       bid: selectedCallStrike.callBid,
       ask: selectedCallStrike.callAsk,
       openInterest: selectedCallStrike.callOi,
+      source: 'tastytrade-live-chain',
     },
     liquidityConfig
   );
@@ -185,6 +186,7 @@ export function selectStrangleStructure(input: StrangleSelectionInput): Strangle
       bid: selectedPutStrike.putBid,
       ask: selectedPutStrike.putAsk,
       openInterest: selectedPutStrike.putOi,
+      source: 'tastytrade-live-chain',
     },
     liquidityConfig
   );

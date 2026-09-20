@@ -211,6 +211,7 @@ describe('Orquestrador do Funil Screener V1 — Integração Ponta a Ponta', () 
             rawIvp: 0.22, // 22% <= 30%
             atmIv: 0.24,
             expirations: defaultExpirations,
+            source: 'tastytrade-market-metrics',
           },
         },
       ],
@@ -219,7 +220,7 @@ describe('Orquestrador do Funil Screener V1 — Integração Ponta a Ponta', () 
         {
           spotPrice: 100.0,
           chainStrikes: liquidStrikes,
-          optionMetrics: { rawIvr: 0.10, rawIvp: 0.10, atmIv: 0.15, expirations: defaultExpirations },
+          optionMetrics: { rawIvr: 0.10, rawIvp: 0.10, atmIv: 0.15, expirations: defaultExpirations, source: 'tastytrade-market-metrics' },
         },
       ],
       [
@@ -227,7 +228,7 @@ describe('Orquestrador do Funil Screener V1 — Integração Ponta a Ponta', () 
         {
           spotPrice: 100.0,
           chainStrikes: liquidStrikes,
-          optionMetrics: { rawIvr: 0.15, rawIvp: 0.15, atmIv: 0.25, expirations: defaultExpirations },
+          optionMetrics: { rawIvr: 0.15, rawIvp: 0.15, atmIv: 0.25, expirations: defaultExpirations, source: 'tastytrade-market-metrics' },
         },
       ],
       [
@@ -240,6 +241,7 @@ describe('Orquestrador do Funil Screener V1 — Integração Ponta a Ponta', () 
             rawIvp: 0.20,
             atmIv: 0.28,
             expirations: defaultExpirations,
+            source: 'tastytrade-market-metrics',
           },
         },
       ],
@@ -253,6 +255,7 @@ describe('Orquestrador do Funil Screener V1 — Integração Ponta a Ponta', () 
             rawIvp: 0.15,
             atmIv: 0.25,
             expirations: defaultExpirations,
+            source: 'tastytrade-market-metrics',
           },
         },
       ],
@@ -266,6 +269,7 @@ describe('Orquestrador do Funil Screener V1 — Integração Ponta a Ponta', () 
             rawIvp: 0.15,
             atmIv: 0.25,
             expirations: outsideExpirations, // Sem ciclos na janela 30-45 DTE
+            source: 'tastytrade-market-metrics',
           },
         },
       ],
@@ -427,7 +431,7 @@ describe('Orquestrador do Funil Screener V1 — Integração Ponta a Ponta', () 
         {
           spotPrice: 102.0,
           chainStrikes: liquidStrikes,
-          optionMetrics: { rawIvr: 0.18, rawIvp: 0.20, atmIv: 0.24, expirations: standardExpirations },
+          optionMetrics: { rawIvr: 0.18, rawIvp: 0.20, atmIv: 0.24, expirations: standardExpirations, source: 'tastytrade-market-metrics' },
         },
       ],
       [
@@ -435,7 +439,7 @@ describe('Orquestrador do Funil Screener V1 — Integração Ponta a Ponta', () 
         {
           spotPrice: 102.0,
           chainStrikes: liquidStrikes,
-          optionMetrics: { rawIvr: 0.18, rawIvp: 0.20, atmIv: 0.24, expirations: standardExpirations },
+          optionMetrics: { rawIvr: 0.18, rawIvp: 0.20, atmIv: 0.24, expirations: standardExpirations, source: 'tastytrade-market-metrics' },
         },
       ],
       [
@@ -443,7 +447,7 @@ describe('Orquestrador do Funil Screener V1 — Integração Ponta a Ponta', () 
         {
           spotPrice: 102.0,
           chainStrikes: liquidStrikes,
-          optionMetrics: { rawIvr: 0.18, rawIvp: 0.20, atmIv: 0.24, expirations: standardExpirations },
+          optionMetrics: { rawIvr: 0.18, rawIvp: 0.20, atmIv: 0.24, expirations: standardExpirations, source: 'tastytrade-market-metrics' },
         },
       ],
       [
@@ -451,7 +455,7 @@ describe('Orquestrador do Funil Screener V1 — Integração Ponta a Ponta', () 
         {
           spotPrice: 102.0,
           chainStrikes: liquidStrikes,
-          optionMetrics: { rawIvr: 0.18, rawIvp: 0.20, atmIv: 0.24, expirations: standardExpirations },
+          optionMetrics: { rawIvr: 0.18, rawIvp: 0.20, atmIv: 0.24, expirations: standardExpirations, source: 'tastytrade-market-metrics' },
         },
       ],
     ]);

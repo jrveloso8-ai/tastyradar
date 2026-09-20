@@ -40,6 +40,7 @@ describe('Camada 2 — Confirmação por IV Rank / IV Percentile e Seleção de 
           rawIvp: 0.20,
           atmIv: 0.28,
           expirations: defaultExpirations,
+          source: 'tastytrade-market-metrics',
         },
       ],
     ]);
@@ -62,6 +63,7 @@ describe('Camada 2 — Confirmação por IV Rank / IV Percentile e Seleção de 
           rawIvp: 0.3000,
           atmIv: 0.25,
           expirations: defaultExpirations,
+          source: 'tastytrade-market-metrics',
         },
       ],
     ]);
@@ -85,6 +87,7 @@ describe('Camada 2 — Confirmação por IV Rank / IV Percentile e Seleção de 
           rawIvp: 0.090843054,
           atmIv: 0.379462751,
           expirations: defaultExpirations,
+          source: 'tastytrade-market-metrics',
         },
       ],
     ]);
@@ -110,6 +113,7 @@ describe('Camada 2 — Confirmação por IV Rank / IV Percentile e Seleção de 
           rawIvp: 0.45, // 45% (estourou)
           atmIv: 0.28,
           expirations: defaultExpirations,
+          source: 'tastytrade-market-metrics',
         },
       ],
     ]);
@@ -130,6 +134,7 @@ describe('Camada 2 — Confirmação por IV Rank / IV Percentile e Seleção de 
           rawIvp: null, // Ausente
           atmIv: 0.25,
           expirations: defaultExpirations,
+          source: 'tastytrade-market-metrics',
         },
       ],
     ]);
@@ -152,6 +157,7 @@ describe('Camada 2 — Confirmação por IV Rank / IV Percentile e Seleção de 
           rawIvp: 0.20, // Presente
           atmIv: 0.25,
           expirations: defaultExpirations,
+          source: 'tastytrade-market-metrics',
         },
       ],
     ]);
@@ -179,6 +185,7 @@ describe('Camada 2 — Confirmação por IV Rank / IV Percentile e Seleção de 
           rawIvp: 0.20,
           atmIv: 0.25,
           expirations: outsideCycles,
+          source: 'tastytrade-market-metrics',
         },
       ],
     ]);

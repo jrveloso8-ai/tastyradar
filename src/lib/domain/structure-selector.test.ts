@@ -17,6 +17,7 @@ describe('Filtros de Liquidez de Opções', () => {
       bid: 2.00,
       ask: 2.10,
       openInterest: 350,
+      source: 'tastytrade-live-chain',
     });
 
     expect(evalRes.leg.mid).toBe(2.05);
