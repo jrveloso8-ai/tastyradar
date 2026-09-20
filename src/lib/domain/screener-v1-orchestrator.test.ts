@@ -298,7 +298,7 @@ describe('Orquestrador do Funil Screener V1 — Integração Ponta a Ponta', () 
     expect(winnerRes.strategy!.structureType).toBe('STRANGLE');
     expect(winnerRes.strategy!.callLeg.strike).toBe(105);
     expect(winnerRes.strategy!.putLeg.strike).toBe(95);
-    expect(winnerRes.strategy!.provenance).toBe('DERIVADO');
+    expect(winnerRes.strategy!.provenance).toBe('ESTIMADO');
 
     // 2. Valida FAIL_L0
     const failL0Res = results.find(r => r.candidate.symbol === 'FAIL_L0')!;

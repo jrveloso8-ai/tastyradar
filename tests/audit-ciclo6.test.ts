@@ -170,3 +170,67 @@ describe('Auditoria Ciclo 6 — N-02: Cotação ausente ou inconsistente tratada
   });
 });
 
+describe('Auditoria Ciclo 6 — N-03: Proveniência do Delta BSM e Contágio na Estratégia', () => {
+  it('N-03: delta modelado por BSM com taxa fixa e rotulado ESTIMADO e contagia strategy.provenance', async () => {
+    const { selectStrangleStructure } = await import('../src/lib/domain/structure-selector');
+
+    const dummyLayer2: Layer2Output = {
+      symbol: 'AAPL',
+      sector: 'Technology',
+      hv12m: { value: 35.0, provenance: 'DERIVADO', source: 'garman-klass' },
+      hv12mTrimmed: { value: 32.0, provenance: 'DERIVADO', source: 'garman-klass-trimmed' },
+      hvDropRatio: { value: 0.0857, provenance: 'DERIVADO', source: 'drop-ratio' },
+      hv12mPercentile: { value: 75.0, provenance: 'DERIVADO', source: 'percentile' },
+      passesHvPercentile: true,
+      passesStability: true,
+      sectorQuotaApproved: true,
+      bbwCurrent: { value: 4.2, provenance: 'DERIVADO', source: 'bbw-20-2' },
+      bbwHistoryPercentile: { value: 12.0, provenance: 'DERIVADO', source: 'bbw-percentile' },
+      passesSqueeze: true,
+      selectedExpiration: {
+        expirationDate: '2026-10-23',
+        dte: 37,
+        selectionRule: 'CASO_B_SQUEEZE_GERAL',
+        bufferDaysApplied: 0,
+        isMonthlyStandard: true,
+        provenance: 'MEDIDO',
+        source: 'expiration-selector',
+      },
+      atmIv: { value: 28, provenance: 'MEDIDO', source: 'tastytrade-market-metrics' },
+      ivRank: { value: 20, provenance: 'MEDIDO', source: 'tastytrade-market-metrics' },
+      ivPercentile: { value: 20, provenance: 'MEDIDO', source: 'tastytrade-market-metrics' },
+      passesIvFilter: true,
+    };
+
+    const strikes: ChainStrikeQuote[] = [
+      { strike: 90, callSymbol: 'AAPL_C90', putSymbol: 'AAPL_P90', callBid: 11, callAsk: 11.2, callOi: 500, putBid: 0.5, putAsk: 0.55, putOi: 500 },
+      { strike: 95, callSymbol: 'AAPL_C95', putSymbol: 'AAPL_P95', callBid: 6, callAsk: 6.2, callOi: 500, putBid: 1.5, putAsk: 1.6, putOi: 500 },
+      { strike: 100, callSymbol: 'AAPL_C100', putSymbol: 'AAPL_P100', callBid: 2.5, callAsk: 2.6, callOi: 500, putBid: 2.5, putAsk: 2.6, putOi: 500 },
+      { strike: 105, callSymbol: 'AAPL_C105', putSymbol: 'AAPL_P105', callBid: 1.5, callAsk: 1.6, callOi: 500, putBid: 6, putAsk: 6.2, putOi: 500 },
+      { strike: 110, callSymbol: 'AAPL_C110', putSymbol: 'AAPL_P110', callBid: 0.5, callAsk: 0.55, callOi: 500, putBid: 11, putAsk: 11.2, putOi: 500 },
+    ];
+
+    const res = selectStrangleStructure({
+      layer2Candidate: dummyLayer2,
+      spotPrice: 100,
+      strikes,
+    });
+
+    expect(res.success).toBe(true);
+    expect(res.strategy).toBeDefined();
+
+    // 1. O delta deve ser ESTIMADO porque a taxa livre de risco é fixa (não medida de fonte externa)
+    expect(res.callLeg?.delta?.provenance).toBe('ESTIMADO');
+    expect(res.putLeg?.delta?.provenance).toBe('ESTIMADO');
+
+    // 2. O rótulo da fonte do delta deve declarar a taxa fixa usada
+    expect(res.callLeg?.delta?.source).toMatch(/4\.?5%/);
+    expect(res.putLeg?.delta?.source).toMatch(/4\.?5%/);
+
+    // 3. Contágio: a estratégia combina vencimento, pernas E os deltas; logo strategy.provenance NUNCA pode ser MEDIDO
+    expect(res.strategy?.provenance).not.toBe('MEDIDO');
+    expect(res.strategy?.provenance).toBe('ESTIMADO');
+  });
+});
+
+

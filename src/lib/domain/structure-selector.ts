@@ -21,7 +21,7 @@ import {
   ScreenerRejectionCode,
   StrategySelectionResult,
 } from '../types/low-vol-screener.types';
-import { combineProvenance } from '../types/provenance';
+import { combineProvenance, ProvenanceValue } from '../types/provenance';
 import { calculateBsm } from './bsm-pricer';
 import { evaluateLegLiquidity, LiquidityFilterConfig } from './liquidity-filter';
 
@@ -210,32 +210,38 @@ export function selectStrangleStructure(input: StrangleSelectionInput): Strangle
     };
   }
 
-  // 6. Contágio de Proveniência: combina a proveniência do vencimento e das duas pernas
-  const finalProvenance = combineProvenance([
-    layer2Candidate.selectedExpiration.provenance,
-    callEval.leg.provenance,
-    putEval.leg.provenance,
-  ]);
+  const callDelta: ProvenanceValue<number> = {
+    value: Number(bestCall.delta.toFixed(3)),
+    provenance: 'ESTIMADO',
+    source: 'black-scholes-merton-delta (taxa livre de risco fixa 4.5%)',
+  };
+
+  const putDelta: ProvenanceValue<number> = {
+    value: Number(bestPut.delta.toFixed(3)),
+    provenance: 'ESTIMADO',
+    source: 'black-scholes-merton-delta (taxa livre de risco fixa 4.5%)',
+  };
 
   const callLegWithAction: OptionLegLiquidity = {
     ...callEval.leg,
     action: 'BUY',
-    delta: {
-      value: Number(bestCall.delta.toFixed(3)),
-      provenance: 'DERIVADO',
-      source: 'black-scholes-merton-delta',
-    },
+    delta: callDelta,
   };
 
   const putLegWithAction: OptionLegLiquidity = {
     ...putEval.leg,
     action: 'BUY',
-    delta: {
-      value: Number(bestPut.delta.toFixed(3)),
-      provenance: 'DERIVADO',
-      source: 'black-scholes-merton-delta',
-    },
+    delta: putDelta,
   };
+
+  // 6. Contágio de Proveniência: combina a proveniência do vencimento, das pernas e dos deltas modelados
+  const finalProvenance = combineProvenance([
+    layer2Candidate.selectedExpiration.provenance,
+    callEval.leg.provenance,
+    putEval.leg.provenance,
+    callDelta.provenance,
+    putDelta.provenance,
+  ]);
 
   const callMid = callLegWithAction.mid;
   const putMid = putLegWithAction.mid;

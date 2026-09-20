@@ -169,14 +169,14 @@ describe('Seleção de Estrutura — Strangle OTM Default (Caso B)', () => {
     expect(strat.callLeg.strike).toBe(110);
     expect(strat.callLeg.action).toBe('BUY');
     expect(strat.callLeg.delta).toBeDefined();
-    expect(strat.callLeg.delta?.provenance).toBe('DERIVADO');
-    expect(strat.callLeg.delta?.source).toBe('black-scholes-merton-delta');
+    expect(strat.callLeg.delta?.provenance).toBe('ESTIMADO');
+    expect(strat.callLeg.delta?.source).toBe('black-scholes-merton-delta (taxa livre de risco fixa 4.5%)');
 
     expect(strat.putLeg.strike).toBe(100);
     expect(strat.putLeg.action).toBe('BUY');
     expect(strat.putLeg.delta).toBeDefined();
-    expect(strat.putLeg.delta?.provenance).toBe('DERIVADO');
-    expect(strat.putLeg.delta?.source).toBe('black-scholes-merton-delta');
+    expect(strat.putLeg.delta?.provenance).toBe('ESTIMADO');
+    expect(strat.putLeg.delta?.source).toBe('black-scholes-merton-delta (taxa livre de risco fixa 4.5%)');
 
     expect(strat.callLeg.passesLiquidity).toBe(true);
     expect(strat.putLeg.passesLiquidity).toBe(true);
@@ -185,8 +185,8 @@ describe('Seleção de Estrutura — Strangle OTM Default (Caso B)', () => {
     expect(strat.deterministicReason).toContain('STRANGLE default eleito');
     expect(strat.deterministicReason).toContain('delta-alvo 25 (OTM)');
 
-    // Valida proveniência combinada estrita
-    expect(strat.provenance).toBe('DERIVADO');
+    // Valida proveniência combinada estrita (contaminada por delta ESTIMADO)
+    expect(strat.provenance).toBe('ESTIMADO');
   });
 
   it('descarta o candidato se a perna Put OTM falhar no filtro de liquidez (ex: spread > 10%)', () => {
