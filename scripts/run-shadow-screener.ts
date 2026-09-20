@@ -133,11 +133,12 @@ export async function runShadowCycle(universe = process.argv.includes('--full') 
       barsSource: candleRes?.source || 'tastytrade-dxlink-candles',
     });
 
-    const spot = spotQuotes[sym]?.last || 0;
+    const spot = spotQuotes[sym]?.last ?? null;
     const mItem = metricsBySym.get(sym);
     const rawIvr = mItem ? mItem['tos-implied-volatility-index-rank'] ?? mItem['implied-volatility-index-rank'] : null;
     const rawIvp = mItem ? mItem['implied-volatility-percentile'] : null;
-    const atmIv = mItem ? parseFloat(mItem['implied-volatility-30-day'] || '0') / 100 : 0;
+    const rawAtmIvStr = mItem?.['implied-volatility-30-day'];
+    const atmIv = rawAtmIvStr ? parseFloat(rawAtmIvStr) / 100 : null;
 
     let chainStrikes: any[] = [];
     let expirations: any[] = [];
@@ -157,7 +158,7 @@ export async function runShadowCycle(universe = process.argv.includes('--full') 
           (e) => e.daysToExpiration >= 30 && e.daysToExpiration <= 45
         ) || chain.expirations[0];
 
-        if (targetExp && spot > 0) {
+        if (targetExp && spot != null && spot > 0) {
           const sorted = [...targetExp.strikes].sort((a, b) => a.strike - b.strike);
           const nearStrikes = sorted.filter((s) => Math.abs(s.strike - spot) / spot < 0.12);
           const occSymbols = nearStrikes.flatMap((s) => [s.callSymbol, s.putSymbol]);
@@ -170,11 +171,11 @@ export async function runShadowCycle(universe = process.argv.includes('--full') 
               strike: s.strike,
               callSymbol: s.callSymbol,
               putSymbol: s.putSymbol,
-              callBid: callQ?.bid || 0,
-              callAsk: callQ?.ask || 0,
+              callBid: callQ?.bid ?? null,
+              callAsk: callQ?.ask ?? null,
               callOi: 500, // Cotação de streamer
-              putBid: putQ?.bid || 0,
-              putAsk: putQ?.ask || 0,
+              putBid: putQ?.bid ?? null,
+              putAsk: putQ?.ask ?? null,
               putOi: 500,
             });
           }
@@ -302,8 +303,10 @@ export async function runShadowCycle(universe = process.argv.includes('--full') 
       markdown += `### Ticker: **${app.candidate.symbol}** (${app.candidate.sector})\n`;
       markdown += `- **Estrutura:** ${st.structureType} (${st.positionDirection}) | **Proveniência:** \`${st.provenance}\`\n`;
       markdown += `- **Vencimento Selecionado:** \`${st.expiration.expirationDate}\` (**DTE: ${st.expiration.dte} dias**, Regra: \`${st.expiration.selectionRule}\`)\n`;
-      markdown += `- **Perna Call OTM (BUY):** Strike **$${st.callLeg.strike}** | Bid: $${st.callLeg.bid} | Ask: $${st.callLeg.ask} | Mid: $${st.callLeg.mid} | Spread: ${(st.callLeg.relativeSpread * 100).toFixed(1)}% | OI: ${st.callLeg.openInterest}\n`;
-      markdown += `- **Perna Put OTM (BUY):** Strike **$${st.putLeg.strike}** | Bid: $${st.putLeg.bid} | Ask: $${st.putLeg.ask} | Mid: $${st.putLeg.mid} | Spread: ${(st.putLeg.relativeSpread * 100).toFixed(1)}% | OI: ${st.putLeg.openInterest}\n`;
+      const callSpreadStr = st.callLeg.relativeSpread !== null ? `${(st.callLeg.relativeSpread * 100).toFixed(1)}%` : 'INDISPONIVEL';
+      const putSpreadStr = st.putLeg.relativeSpread !== null ? `${(st.putLeg.relativeSpread * 100).toFixed(1)}%` : 'INDISPONIVEL';
+      markdown += `- **Perna Call OTM (BUY):** Strike **$${st.callLeg.strike}** | Bid: $${st.callLeg.bid} | Ask: $${st.callLeg.ask} | Mid: $${st.callLeg.mid} | Spread: ${callSpreadStr} | OI: ${st.callLeg.openInterest}\n`;
+      markdown += `- **Perna Put OTM (BUY):** Strike **$${st.putLeg.strike}** | Bid: $${st.putLeg.bid} | Ask: $${st.putLeg.ask} | Mid: $${st.putLeg.mid} | Spread: ${putSpreadStr} | OI: ${st.putLeg.openInterest}\n`;
       markdown += `- **Débito Teórico Mid (Custo da Estrutura):** **$${totalDebitMid}** (${st.provenance} - sum-of-bought-leg-mids)\n\n`;
     }
   } else {

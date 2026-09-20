@@ -132,10 +132,10 @@ export interface OptionLegLiquidity {
   optionType: 'CALL' | 'PUT';
   action?: 'BUY' | 'SELL'; // Direção da perna individual (default BUY para Long Strangle)
   isAtm: boolean;
-  bid: number;
-  ask: number;
-  mid: number;
-  relativeSpread: number; // (ask - bid) / mid
+  bid: number | null;
+  ask: number | null;
+  mid: number | null;
+  relativeSpread: number | null; // (ask - bid) / mid
   openInterest: number;
   delta?: ProvenanceValue<number>; // Delta BSM da perna (ex: +0.25 para Call, -0.25 para Put)
   passesLiquidity: boolean;

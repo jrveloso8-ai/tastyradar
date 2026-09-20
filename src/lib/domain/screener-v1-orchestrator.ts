@@ -22,7 +22,7 @@ import { ChainStrikeQuote, selectStrangleStructure } from './structure-selector'
 
 export interface CandidateMarketDataV1 {
   optionMetrics?: CandidateOptionMetrics;
-  spotPrice: number;
+  spotPrice?: number | null;
   chainStrikes?: ChainStrikeQuote[];
 }
 
@@ -121,7 +121,7 @@ export function runScreenerV1Pipeline(
     }
 
     // Verificação de dados de mercado para montagem de opções
-    if (!marketData || marketData.spotPrice <= 0 || !marketData.chainStrikes) {
+    if (!marketData || marketData.spotPrice == null || marketData.spotPrice <= 0 || !marketData.chainStrikes) {
       results.push({
         candidate,
         layer0: l0,

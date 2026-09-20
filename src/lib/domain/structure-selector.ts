@@ -32,11 +32,11 @@ export interface ChainStrikeQuote {
   strike: number;
   callSymbol: string;
   putSymbol: string;
-  callBid: number;
-  callAsk: number;
+  callBid: number | null;
+  callAsk: number | null;
   callOi: number;
-  putBid: number;
-  putAsk: number;
+  putBid: number | null;
+  putAsk: number | null;
   putOi: number;
 }
 
@@ -237,7 +237,12 @@ export function selectStrangleStructure(input: StrangleSelectionInput): Strangle
     },
   };
 
-  const totalDebitMid = Number((callLegWithAction.mid + putLegWithAction.mid).toFixed(2));
+  const callMid = callLegWithAction.mid;
+  const putMid = putLegWithAction.mid;
+  const totalDebitMid =
+    callMid !== null && putMid !== null
+      ? Number((callMid + putMid).toFixed(2))
+      : 0;
 
   const deterministicReason =
     'STRANGLE default eleito: candidato em squeeze de volatilidade sem catalisador iminente de curto prazo (Caso B, DTE 30-45d), selecionado por delta-alvo 25 (OTM), priorizando convexidade e menor custo de débito/theta relativo com pernas OTM';

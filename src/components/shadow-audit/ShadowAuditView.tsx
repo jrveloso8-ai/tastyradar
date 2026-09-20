@@ -35,10 +35,10 @@ interface OptionLegData {
   optionType: 'CALL' | 'PUT';
   action?: 'BUY' | 'SELL';
   isAtm: boolean;
-  bid: number;
-  ask: number;
-  mid: number;
-  relativeSpread: number;
+  bid: number | null;
+  ask: number | null;
+  mid: number | null;
+  relativeSpread: number | null;
   openInterest: number;
   passesLiquidity: boolean;
   delta?: ProvenanceValue<number>;
@@ -566,7 +566,7 @@ export function ShadowAuditView() {
                             <div>
                               <span className="text-zinc-400 block text-[9px]">SPREAD</span>
                               <span className="text-zinc-300">
-                                <DataValue value={strat.callLeg.relativeSpread * 100} format="percent" provenance={strat.callLeg.provenance} source={strat.callLeg.source} variant="inline" />
+                                <DataValue value={strat.callLeg.relativeSpread != null ? strat.callLeg.relativeSpread * 100 : null} format="percent" provenance={strat.callLeg.provenance} source={strat.callLeg.source} variant="inline" />
                               </span>
                             </div>
                           </div>
@@ -645,7 +645,7 @@ export function ShadowAuditView() {
                             <div>
                               <span className="text-zinc-400 block text-[9px]">SPREAD</span>
                               <span className="text-zinc-300">
-                                <DataValue value={strat.putLeg.relativeSpread * 100} format="percent" provenance={strat.putLeg.provenance} source={strat.putLeg.source} variant="inline" />
+                                <DataValue value={strat.putLeg.relativeSpread != null ? strat.putLeg.relativeSpread * 100 : null} format="percent" provenance={strat.putLeg.provenance} source={strat.putLeg.source} variant="inline" />
                               </span>
                             </div>
                           </div>

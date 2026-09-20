@@ -112,3 +112,61 @@ describe('Auditoria Ciclo 6 — N-01: Tratamento de IV e DTE ausentes ou inváli
     expect(res.rejectionCode).toBeDefined();
   });
 });
+
+describe('Auditoria Ciclo 6 — N-02: Cotação ausente ou inconsistente tratada como INDISPONIVEL sem sentinela', () => {
+  it('N-02: bid/ask ausentes devolvem provenance "INDISPONIVEL", relativeSpread nulo e passesLiquidity false', async () => {
+    const { evaluateLegLiquidity } = await import('../src/lib/domain/liquidity-filter');
+
+    // Cotação com bid/ask ausentes (null)
+    const evalRes = evaluateLegLiquidity({
+      symbol: 'AAPL_261023_C105',
+      strike: 105,
+      optionType: 'CALL',
+      isAtm: false,
+      bid: null as any,
+      ask: null as any,
+      openInterest: 500,
+    });
+
+    expect(evalRes.leg.passesLiquidity).toBe(false);
+    expect(evalRes.leg.provenance).toBe('INDISPONIVEL');
+    expect(evalRes.leg.relativeSpread).toBeNull();
+  });
+
+  it('N-02: bid > ask (cotação cruzada) devolve provenance "INDISPONIVEL", relativeSpread nulo e passesLiquidity false', async () => {
+    const { evaluateLegLiquidity } = await import('../src/lib/domain/liquidity-filter');
+
+    const evalRes = evaluateLegLiquidity({
+      symbol: 'AAPL_261023_C105',
+      strike: 105,
+      optionType: 'CALL',
+      isAtm: false,
+      bid: 2.50,
+      ask: 2.00, // Cotação cruzada
+      openInterest: 500,
+    });
+
+    expect(evalRes.leg.passesLiquidity).toBe(false);
+    expect(evalRes.leg.provenance).toBe('INDISPONIVEL');
+    expect(evalRes.leg.relativeSpread).toBeNull();
+  });
+
+  it('N-02: bid=0 e ask=0 (mid <= 0) devolve provenance "INDISPONIVEL", relativeSpread nulo e passesLiquidity false', async () => {
+    const { evaluateLegLiquidity } = await import('../src/lib/domain/liquidity-filter');
+
+    const evalRes = evaluateLegLiquidity({
+      symbol: 'AAPL_261023_C105',
+      strike: 105,
+      optionType: 'CALL',
+      isAtm: false,
+      bid: 0,
+      ask: 0,
+      openInterest: 500,
+    });
+
+    expect(evalRes.leg.passesLiquidity).toBe(false);
+    expect(evalRes.leg.provenance).toBe('INDISPONIVEL');
+    expect(evalRes.leg.relativeSpread).toBeNull();
+  });
+});
+

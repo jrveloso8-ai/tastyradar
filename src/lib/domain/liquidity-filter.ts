@@ -24,8 +24,8 @@ export interface LegEvaluationInput {
   strike: number;
   optionType: 'CALL' | 'PUT';
   isAtm: boolean;
-  bid: number;
-  ask: number;
+  bid: number | null | undefined;
+  ask: number | null | undefined;
   openInterest: number;
   source?: string;
 }
@@ -60,7 +60,37 @@ export function evaluateLegLiquidity(
   const { symbol, strike, optionType, isAtm, bid, ask, openInterest } = input;
   const source = input.source || 'tastytrade-live-chain';
 
-  // 1. Validação de integridade de cotação
+  // 1. Validação de presença e integridade de cotação
+  if (
+    bid === null ||
+    bid === undefined ||
+    ask === null ||
+    ask === undefined ||
+    !Number.isFinite(bid) ||
+    !Number.isFinite(ask)
+  ) {
+    const leg: OptionLegLiquidity = {
+      symbol,
+      strike,
+      optionType,
+      isAtm,
+      bid: bid ?? null,
+      ask: ask ?? null,
+      mid: null,
+      relativeSpread: null,
+      openInterest,
+      passesLiquidity: false,
+      rejectionReason: 'Cotação de bid/ask ausente na corretora',
+      provenance: 'INDISPONIVEL',
+      source,
+    };
+    return {
+      leg,
+      rejectionCode: 'LIQUIDITY_SPREAD_FAIL',
+      rejectionReason: leg.rejectionReason,
+    };
+  }
+
   if (bid < 0 || ask < 0 || ask < bid) {
     const leg: OptionLegLiquidity = {
       symbol,
@@ -69,12 +99,12 @@ export function evaluateLegLiquidity(
       isAtm,
       bid,
       ask,
-      mid: 0,
-      relativeSpread: 1.0,
+      mid: null,
+      relativeSpread: null,
       openInterest,
       passesLiquidity: false,
       rejectionReason: `Cotação de spread inconsistente (bid: ${bid}, ask: ${ask})`,
-      provenance: 'MEDIDO',
+      provenance: 'INDISPONIVEL',
       source,
     };
     return {
@@ -93,12 +123,12 @@ export function evaluateLegLiquidity(
       isAtm,
       bid,
       ask,
-      mid: 0,
-      relativeSpread: 1.0,
+      mid: null,
+      relativeSpread: null,
       openInterest,
       passesLiquidity: false,
-      rejectionReason: `Preço médio (mid) menor ou igual a zero`,
-      provenance: 'MEDIDO',
+      rejectionReason: 'Preço médio (mid) menor ou igual a zero',
+      provenance: 'INDISPONIVEL',
       source,
     };
     return {
