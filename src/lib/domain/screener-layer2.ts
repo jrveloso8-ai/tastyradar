@@ -149,17 +149,31 @@ export function processLayer2(
     // Ex: raw 0.3005 vira 30.05 (e NÃO 30.0)
     const ivrScaled = metrics.rawIvr * 100;
     const ivpScaled = metrics.rawIvp * 100;
-    const atmIvPct = metrics.atmIv !== null ? (metrics.atmIv <= 1.0 ? metrics.atmIv * 100 : metrics.atmIv) : 0;
+
+    const rawAtmIv = metrics.atmIv;
+    const isAtmIvValid =
+      rawAtmIv !== null &&
+      rawAtmIv !== undefined &&
+      Number.isFinite(rawAtmIv) &&
+      rawAtmIv > 0;
+
+    let atmIvPct = 0;
+    if (rawAtmIv !== null && rawAtmIv !== undefined && Number.isFinite(rawAtmIv) && rawAtmIv > 0) {
+      atmIvPct = rawAtmIv <= 1.0 ? rawAtmIv * 100 : rawAtmIv;
+    }
 
     // Comparação estrita com precisão completa
     const passesIvr = ivrScaled <= cfg.maxIvRank;
     const passesIvp = ivpScaled <= cfg.maxIvPercentile;
-    const passesIvFilter = passesIvr && passesIvp;
+    const passesIvFilter = passesIvr && passesIvp && isAtmIvValid;
 
     let rejectionCode = l1.rejectionCode;
     let rejectionReason = l1.rejectionReason;
 
-    if (!passesIvFilter && !rejectionReason) {
+    if (!isAtmIvValid && !rejectionReason) {
+      rejectionCode = 'IV_UNAVAILABLE';
+      rejectionReason = 'IV ATM não disponível ou inconsistente na corretora (<= 0)';
+    } else if (!passesIvFilter && !rejectionReason) {
       rejectionCode = 'IV_FILTER_FAIL';
       rejectionReason = `IV Rank (${ivrScaled.toFixed(2)}%) ou IV Percentile (${ivpScaled.toFixed(2)}%) acima do teto de ${cfg.maxIvRank.toFixed(0)}%`;
     }
@@ -171,7 +185,7 @@ export function processLayer2(
       selectedExpiration,
       atmIv: {
         value: Number(atmIvPct.toFixed(2)),
-        provenance: 'MEDIDO',
+        provenance: isAtmIvValid ? 'MEDIDO' : 'INDISPONIVEL',
         source,
       },
       ivRank: {

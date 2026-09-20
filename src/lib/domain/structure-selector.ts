@@ -82,14 +82,32 @@ export function selectStrangleStructure(input: StrangleSelectionInput): Strangle
     };
   }
 
-  const dte = layer2Candidate.selectedExpiration.dte > 0 ? layer2Candidate.selectedExpiration.dte : 35;
+  const dte = layer2Candidate.selectedExpiration?.dte;
+  if (!dte || dte <= 0 || !Number.isFinite(dte)) {
+    return {
+      success: false,
+      rejectionCode: 'NO_VALID_EXPIRATION_CYCLE',
+      rejectionReason: 'DTE do vencimento selecionado inválido ou menor ou igual a zero',
+    };
+  }
   const timeToExpiry = dte / 365;
 
-  // IV anualizada em decimal (ex: 28% -> 0.28). Se não disponível, assume proxy 0.30
+  // IV anualizada em decimal (ex: 28% -> 0.28). Zero proxies ou fallbacks permitidos pela Regra 00.
   const rawIv = layer2Candidate.atmIv?.value;
-  const volatility = typeof rawIv === 'number' && rawIv > 0
-    ? (rawIv > 1.5 ? rawIv / 100 : rawIv)
-    : 0.30;
+  if (
+    !layer2Candidate.atmIv ||
+    layer2Candidate.atmIv.provenance !== 'MEDIDO' ||
+    typeof rawIv !== 'number' ||
+    !Number.isFinite(rawIv) ||
+    rawIv <= 0
+  ) {
+    return {
+      success: false,
+      rejectionCode: 'IV_HISTORY_UNAVAILABLE',
+      rejectionReason: 'IV ATM não disponível ou não medida na corretora (proxy proibido pela Regra 00)',
+    };
+  }
+  const volatility = rawIv > 1.5 ? rawIv / 100 : rawIv;
 
   // Ordena a grade de strikes por valor crescente
   const sortedStrikes = [...strikes].sort((a, b) => a.strike - b.strike);
