@@ -47,7 +47,7 @@ export function calculateGarmanKlassBarVariance(bar: OHLCVBar): number {
  */
 export function calculateGarmanKlassHV(bars: OHLCVBar[]): GarmanKlassResult {
   if (!bars || bars.length < 20) {
-    throw new Error(`Série de barras insuficiente para Garman-Klass (mínimo 20 barras, recebidas ${bars ? bars.length : 0})`);
+    throw new Error(`Série de barras insuficiente para Garman-Klass (mínimo 20 barras, recebidas ${Array.isArray(bars) ? bars.length : 'nenhuma'})`);
   }
 
   let sumVariance = 0;
@@ -88,7 +88,7 @@ export interface RobustnessTestResult {
 
 export function testHvRobustness(bars: OHLCVBar[], dropThreshold = 0.40): RobustnessTestResult {
   if (!bars || bars.length < 50) {
-    throw new Error(`Série insuficiente para teste de robustez (mínimo 50 barras, recebidas ${bars ? bars.length : 0})`);
+    throw new Error(`Série insuficiente para teste de robustez (mínimo 50 barras, recebidas ${Array.isArray(bars) ? bars.length : 'nenhuma'})`);
   }
 
   const originalResult = calculateGarmanKlassHV(bars);
@@ -120,7 +120,11 @@ export function testHvRobustness(bars: OHLCVBar[], dropThreshold = 0.40): Robust
   const trimmedResult = calculateGarmanKlassHV(trimmedBars);
   const trimmedHv = trimmedResult.annualizedHv;
 
-  const dropRatio = originalHv > 0 ? Number(((originalHv - trimmedHv) / originalHv).toFixed(4)) : 0;
+  if (!(originalHv > 0)) {
+    // HV nula/invalida: a razao de queda nao e calculavel. NUNCA assumir 0 (aprovaria a robustez sem medir).
+    throw new Error('Barra inconsistente: HV anualizada nula ou invalida (serie sem variacao mensuravel)');
+  }
+  const dropRatio = Number(((originalHv - trimmedHv) / originalHv).toFixed(4));
   const isRobust = dropRatio <= dropThreshold;
 
   return {
