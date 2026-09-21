@@ -13,7 +13,7 @@ export interface RawOptionData {
 
 export interface GexOperationalDiagnostics {
   isClustered: boolean; // Walls encavaladas
-  clusteringDistancePct: number;
+  clusteringDistancePct: number | null;
   pinCandidateStrike?: number | null;
   sniperEntryCallWall?: number | null;
   sniperEntryPutWall?: number | null;
@@ -36,8 +36,8 @@ export function calculateGex(
       totalPutGex: 0,
       zeroGammaFlip: spotPrice,
       maxGexMagnetStrike: spotPrice,
-      putCallRatioOi: 0,
-      putCallRatioVolume: 0,
+      putCallRatioOi: null,
+      putCallRatioVolume: null,
       gammaRegime: 'NEUTRAL',
       strikes: [],
       callWalls: [],
@@ -46,7 +46,7 @@ export function calculateGex(
       source,
       diagnostics: {
         isClustered: false,
-        clusteringDistancePct: 0,
+        clusteringDistancePct: null,
         pinCandidateStrike: spotPrice,
         sniperEntryCallWall: spotPrice,
         sniperEntryPutWall: spotPrice,
@@ -180,8 +180,8 @@ export function calculateGex(
 
   const wallDistancePct = (topCallWall !== null && topPutWall !== null)
     ? Number((((topCallWall - topPutWall) / spotPrice) * 100).toFixed(1))
-    : 0;
-  const isClustered = topCallWall !== null && topPutWall !== null && wallDistancePct <= 4.0;
+    : null;
+  const isClustered = wallDistancePct !== null && wallDistancePct <= 4.0;
 
   return {
     symbol,
@@ -191,8 +191,8 @@ export function calculateGex(
     totalPutGex: Number(totalPutGex.toFixed(2)),
     zeroGammaFlip,
     maxGexMagnetStrike,
-    putCallRatioOi: totalCallOi > 0 ? Number((totalPutOi / totalCallOi).toFixed(2)) : 0,
-    putCallRatioVolume: totalCallVol > 0 ? Number((totalPutVol / totalCallVol).toFixed(2)) : 0,
+    putCallRatioOi: totalCallOi > 0 ? Number((totalPutOi / totalCallOi).toFixed(2)) : null,
+    putCallRatioVolume: totalCallVol > 0 ? Number((totalPutVol / totalCallVol).toFixed(2)) : null,
     gammaRegime: totalNetGex > 0 ? 'LONG_GAMMA_STABLE' : totalNetGex < 0 ? 'SHORT_GAMMA_VOLATILE' : 'NEUTRAL',
     strikes: sortedStrikes,
     callWalls,

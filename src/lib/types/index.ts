@@ -48,8 +48,8 @@ export interface GexAnalysisResult {
   totalPutGex: number;
   zeroGammaFlip: number;
   maxGexMagnetStrike: number;
-  putCallRatioOi: number;
-  putCallRatioVolume: number;
+  putCallRatioOi: number | null; // null = sem OI/volume de call (razao indefinida)
+  putCallRatioVolume: number | null;
   gammaRegime: 'LONG_GAMMA_STABLE' | 'SHORT_GAMMA_VOLATILE' | 'NEUTRAL';
   strikes: GexByStrike[];
   callWalls: { strike: number; symbol: string; contracts: number; delta: number; iv: number; distancePct: number }[];

@@ -62,6 +62,8 @@ export function calculateBsm(
 ): BsmGreeks {
   if (spot <= 0 || strike <= 0 || timeToExpiry <= 0 || volatility <= 0) {
     const intrinsic = type === 'CALL' ? Math.max(0, spot - strike) : Math.max(0, strike - spot);
+    // Limite matematico do delta no vencimento (payoff), nao dado de mercado.
+    // eslint-disable-next-line no-restricted-syntax
     const delta = type === 'CALL' ? (spot >= strike ? 1 : 0) : (spot <= strike ? -1 : 0);
     return {
       price: Number(intrinsic.toFixed(2)),
