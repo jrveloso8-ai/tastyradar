@@ -21,7 +21,7 @@ interface StudyAuditorCardProps {
   spotPrice: number;
   ivRank: number | null;
   ivPercentile: number | null;
-  liquidity: number;
+  liquidity: number | null;
   source: string;
   updatedAt: string;
 }
@@ -45,7 +45,7 @@ Fonte: ${source}
 Data da Coleta: ${updatedAt || new Date().toISOString()}
 IV Rank: ${ivRank !== null ? formatDataValue(ivRank, 'number', 1) + '%' : 'N/D'}
 IV Percentile: ${ivPercentile !== null ? formatDataValue(ivPercentile, 'number', 1) + '%' : 'N/D'}
-Liquidez Tastytrade: ${liquidity}/5
+Liquidez Tastytrade: ${liquidity !== null ? liquidity + '/5' : 'N/D'}
 
 1. AUDITORIA DE PROVENIÊNCIA (REGRA 00):
 • Spot Price: MEDIDO (Tastytrade Live Equity Quote)
@@ -139,12 +139,12 @@ Liquidez Tastytrade: ${liquidity}/5
                   <div
                     key={star}
                     className={`w-2.5 h-2.5 rounded-full ${
-                      star <= liquidity ? 'bg-amber-400' : 'bg-gray-700'
+                      liquidity !== null && star <= liquidity ? 'bg-amber-400' : 'bg-gray-700'
                     }`}
                   />
                 ))}
                 {/* eslint-disable-next-line local-rules/no-raw-numbers-in-jsx -- indicador de estrelas de liquidez */}
-                <span className="text-gray-300 font-bold ml-1">{liquidity}/5</span>
+                <span className="text-gray-300 font-bold ml-1">{liquidity !== null ? `${liquidity}/5` : 'N/D'}</span>
               </div>
             </div>
           </div>

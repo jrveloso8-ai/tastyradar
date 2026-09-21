@@ -656,7 +656,7 @@ export function QuoteView({ initialSymbol, symbol: propSymbol, onNavigateToGex, 
             spotPrice={activeSpotPrice}
             ivRank={liveMetrics?.ivRank ?? currentStock.ivRank}
             ivPercentile={liveMetrics?.ivPercentile ?? null}
-            liquidity={liveMetrics?.liquidityRating ?? 4}
+            liquidity={liveMetrics?.liquidityRating ?? null}
             source={liveEquity ? 'Tastytrade Live (equity-quotes)' : 'SP500_DATASET (catálogo estático)'}
             updatedAt={liveEquity?.updatedAt || new Date().toISOString()}
           />

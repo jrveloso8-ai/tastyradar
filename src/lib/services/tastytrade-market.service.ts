@@ -6,7 +6,7 @@ export interface TastyLiveMetrics {
   ivPercentile: number | null;
   iv30: number | null;
   tosIvIndex?: number | null;
-  liquidityRating: number;
+  liquidityRating: number | null; // null = rating ausente na corretora (nunca assumido)
   beta: number | null;
   dividendYield: number | null;
   earningsDate?: string;
@@ -200,7 +200,7 @@ export class TastytradeMarketService {
             ivPercentile: parsePctRank(rawIvp),
             iv30: parsePct(rawIv30),
             tosIvIndex: rawTosIv !== undefined ? parsePctRank(rawTosIv) : undefined,
-            liquidityRating: typeof item['liquidity-rating'] === 'number' ? item['liquidity-rating'] : 4,
+            liquidityRating: typeof item['liquidity-rating'] === 'number' ? item['liquidity-rating'] : null,
             beta,
             dividendYield: parsePct(item['dividend-yield']),
             earningsDate,
