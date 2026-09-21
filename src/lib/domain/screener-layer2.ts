@@ -50,6 +50,12 @@ const DEFAULT_EMPTY_EXPIRATION: SelectedExpiration = {
   source: 'none',
 };
 
+/** IV ATM em escala 0-100. Ausente, nao finita ou <= 0 => null (nunca 0 rotulado como medido). */
+function toAtmIvPercent(raw: number | null | undefined): number | null {
+  if (raw === null || raw === undefined || !Number.isFinite(raw) || raw <= 0) return null;
+  return raw <= 1.0 ? raw * 100 : raw;
+}
+
 /**
  * Executa a filtragem pura da Camada 2 sobre os candidatos aprovados na Camada 1.
  */
@@ -68,21 +74,9 @@ export function processLayer2(
       return {
         ...l1,
         selectedExpiration: DEFAULT_EMPTY_EXPIRATION,
-        atmIv: {
-          value: 0,
-          provenance: l1.hv12m.provenance,
-          source: 'tastytrade-live-atm-iv',
-        },
-        ivRank: {
-          value: 0,
-          provenance: l1.hv12m.provenance,
-          source: 'tastytrade-tos-ivr-scaled',
-        },
-        ivPercentile: {
-          value: 0,
-          provenance: l1.hv12m.provenance,
-          source: 'tastytrade-ivp-scaled',
-        },
+        atmIv: { value: 0, provenance: 'INDISPONIVEL', source: 'nao-avaliado (reprovado em camada anterior)' },
+        ivRank: { value: 0, provenance: 'INDISPONIVEL', source: 'nao-avaliado (reprovado em camada anterior)' },
+        ivPercentile: { value: 0, provenance: 'INDISPONIVEL', source: 'nao-avaliado (reprovado em camada anterior)' },
         passesIvFilter: false,
       };
     }
@@ -123,6 +117,8 @@ export function processLayer2(
     }
 
     // 3. Validação do Histórico de IVR / IVP (Regra de Falha)
+    const histAtmIvPct = toAtmIvPercent(metrics.atmIv);
+    const histHasSource = Boolean(metrics.source && metrics.source.trim().length > 0);
     if (
       metrics.rawIvr === null ||
       metrics.rawIvr === undefined ||
@@ -132,11 +128,9 @@ export function processLayer2(
       return {
         ...l1,
         selectedExpiration,
-        atmIv: {
-          value: typeof metrics.atmIv === 'number' ? metrics.atmIv : 0,
-          provenance: typeof metrics.atmIv === 'number' ? 'MEDIDO' : 'INDISPONIVEL',
-          source: 'tastytrade-market-metrics',
-        },
+        atmIv: histAtmIvPct !== null && histHasSource
+          ? { value: Number(histAtmIvPct.toFixed(2)), provenance: 'MEDIDO', source: metrics.source! }
+          : { value: 0, provenance: 'INDISPONIVEL', source: histHasSource ? metrics.source! : 'fonte-nao-informada' },
         ivRank: { value: 0, provenance: 'INDISPONIVEL', source: 'tastytrade-market-metrics' },
         ivPercentile: { value: 0, provenance: 'INDISPONIVEL', source: 'tastytrade-market-metrics' },
         passesIvFilter: false,
