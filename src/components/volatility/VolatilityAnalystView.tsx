@@ -618,7 +618,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                             <DataValue
                               label="VRP"
                               value={r.vrp}
-                              provenance="DERIVADO"
+                              provenance={r.vrp === null ? 'INDISPONIVEL' : 'DERIVADO'}
                               source="Cálculo VRP: IV 30d - HV 20d (YZ)"
                               format="number"
                               size="sm"
@@ -865,7 +865,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                     <DataValue
                       label="VRP"
                       value={rec.vrp}
-                      provenance="DERIVADO"
+                      provenance={rec.vrp === null ? 'INDISPONIVEL' : 'DERIVADO'}
                       source="Cálculo VRP: IV 30d - HV 20d (YZ)"
                       format="number"
                       size="sm"
@@ -921,7 +921,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                             ${selectedAsset.ivHistory.map((v, i) => `${(i / 5) * 320 + 10},${118 - ((v - selectedAsset.iv52wMin) / (selectedAsset.iv52wMax - selectedAsset.iv52wMin || 1)) * 100}`).join(' ')}
                             ${selectedAsset.hvHistory.slice().reverse().map((v, i) => `${((5 - i) / 5) * 320 + 10},${118 - ((v - selectedAsset.iv52wMin) / (selectedAsset.iv52wMax - selectedAsset.iv52wMin || 1)) * 100}`).join(' ')}
                           `}
-                          fill={rec.vrp >= 0 ? '#10b981' : '#f43f5e'}
+                          fill={rec.vrp !== null && rec.vrp >= 0 ? '#10b981' : '#f43f5e'}
                           fillOpacity="0.12"
                         />
 
@@ -1350,12 +1350,12 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                 <DataValue
                   label="VRP (Prêmio Risco)"
                   value={rec.vrp}
-                  provenance="DERIVADO"
+                  provenance={rec.vrp === null ? 'INDISPONIVEL' : 'DERIVADO'}
                   source="Cálculo VRP: IV 30d - HV 20d (YZ)"
                   format="number"
                   size="sm"
                 />
-                <div className="text-[9px] text-gray-400 mt-1">{rec.vrp >= 0 ? 'IV > RV Yang-Zhang' : 'IV < RV'}</div>
+                <div className="text-[9px] text-gray-400 mt-1">{rec.vrp === null ? 'VRP indisponível' : rec.vrp >= 0 ? 'IV > RV Yang-Zhang' : 'IV < RV'}</div>
               </div>
 
               <div className="bg-[#070b14] p-2.5 rounded-xl border border-gray-800 col-span-2 sm:col-span-1 flex flex-col items-center justify-center">
@@ -1477,7 +1477,7 @@ export function VolatilityAnalystView({ onNavigateToQuote, onNavigateToGex }: Vo
                 <li>
                   <strong>Untested Side:</strong> Rolar no máximo 1x por ciclo se uma asa for pressionada.
                 </li>
-                <li className={rec.lifecycle.hasDividendRisk ? 'text-rose-400 font-bold' : 'text-emerald-400'}>
+                <li className={rec.lifecycle.hasDividendRisk === null ? 'text-gray-400' : rec.lifecycle.hasDividendRisk ? 'text-rose-400 font-bold' : 'text-emerald-400'}>
                   <strong>Teste de Dividendo:</strong> {rec.lifecycle.dividendRiskReason}
                 </li>
               </ul>

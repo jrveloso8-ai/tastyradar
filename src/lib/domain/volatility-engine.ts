@@ -61,7 +61,7 @@ export interface StrategyPlan {
   volRegimeReason: string;
   gexRegime: '+GEX' | '-GEX';
   isPlusGex: boolean;
-  vrp: number;
+  vrp: number | null; // null = IV30 ou RV20 ausente (nunca 0)
 }
 
 export interface PricedLeg {
@@ -123,7 +123,7 @@ export interface VolatilityRecommendation {
   change: number;
   iv30: number;
   rv20: number;
-  vrp: number;
+  vrp: number | null; // null = IV30 ou RV20 ausente (nunca 0)
   ivr: number;
   ivp: number;
   volRegime: 'SELL_VOLATILITY' | 'BUY_VOLATILITY' | 'NEUTRAL';
@@ -141,7 +141,7 @@ export interface VolatilityRecommendation {
   legs: PricedLeg[];
   netCredit: number;
   isCredit: boolean;
-  creditWidthRatio: number;
+  creditWidthRatio: number | null;
   meetsCreditRule: boolean;
   maxProfit: number;
   maxLoss: number;
@@ -154,7 +154,7 @@ export interface VolatilityRecommendation {
     defenseDte: number;
     defenseDateNotice: string;
     untestedSideRule: string;
-    hasDividendRisk: boolean;
+    hasDividendRisk: boolean | null; // null = teste indisponivel (dado ausente)
     dividendRiskReason: string;
     whatMakesItLose: string;
   };
@@ -238,7 +238,7 @@ export interface RegimeClassification {
   volRegimeReason: string;
   gexRegime: '+GEX' | '-GEX';
   isPlusGex: boolean;
-  vrp: number;
+  vrp: number | null; // null = IV30 ou RV20 ausente (nunca 0)
 }
 
 /**
@@ -250,11 +250,19 @@ export interface RegimeClassification {
  * seria abrir dezenas de WebSockets só para renderizar uma lista, desproporcional ao
  * dado exibido (VRP e nome da estratégia, nenhum strike/preço/grego).
  */
+// Parametros de politica (DTE-alvo por tipo de estrutura); o vencimento usado e sempre o REAL mais proximo da cadeia.
+const TARGET_DTE_CALENDAR = 30;
+const TARGET_DTE_DEFAULT = 35;
+
+// Identificadores do catalogo CME (nao sao dado de mercado).
+const STRATEGY_ID_BULL_SPREAD = 1;
+const STRATEGY_ID_BEAR_SPREAD = 2;
+
 export function classifyRegime(input: VolatilityAssetInput): RegimeClassification {
   const spot = input.spot;
   const hasIv30 = typeof input.iv30 === 'number';
   const hasRv20 = typeof input.rv20 === 'number';
-  const vrp = hasIv30 && hasRv20 ? Number((input.iv30! - input.rv20!).toFixed(1)) : 0;
+  const vrp: number | null = hasIv30 && hasRv20 ? Number((input.iv30! - input.rv20!).toFixed(1)) : null;
   const ivr = typeof input.ivr === 'number' ? input.ivr : null;
   const isPlusGex = typeof input.netGex === 'number' ? input.netGex >= 0 : true;
   const gexRegime: '+GEX' | '-GEX' = isPlusGex ? '+GEX' : '-GEX';
@@ -265,19 +273,19 @@ export function classifyRegime(input: VolatilityAssetInput): RegimeClassificatio
   let volRegimeLabel = 'Neutro em Volatilidade';
   let volRegimeReason = 'IV Rank intermediário (30-50%). Expressar viés direcional com risco definido.';
 
-  if (ivr !== null && ivr >= 50 && vrp >= 4.0) {
+  if (ivr !== null && vrp !== null && ivr >= 50 && vrp >= 4.0) {
     volRegime = 'SELL_VOLATILITY';
     volRegimeLabel = 'Venda de Volatilidade (Coleta de Prêmio)';
     volRegimeReason = `IV Rank em ${ivr.toFixed(1)}% com VRP de +${vrp.toFixed(1)} pts. O prêmio cobrado supera a volatilidade realizada Yang-Zhang.`;
-  } else if (ivr !== null && ivr <= 30 && vrp <= 1.0) {
+  } else if (ivr !== null && vrp !== null && ivr <= 30 && vrp <= 1.0) {
     volRegime = 'BUY_VOLATILITY';
     volRegimeLabel = 'Compra de Volatilidade / Débito';
     volRegimeReason = `IV Rank deprimido em ${ivr.toFixed(1)}% com VRP de ${vrp.toFixed(1)} pts. Opções baratas com assimetria para expansão de cauda.`;
   }
 
   let electedStrategyId = 20;
-  const distToPutWall = putWall !== null ? Math.abs(spot - putWall) / spot : 1.0;
-  const distToCallWall = callWall !== null ? Math.abs(spot - callWall) / spot : 1.0;
+  const distToPutWall = putWall !== null ? Math.abs(spot - putWall) / spot : Number.POSITIVE_INFINITY;
+  const distToCallWall = callWall !== null ? Math.abs(spot - callWall) / spot : Number.POSITIVE_INFINITY;
 
   if (volRegime === 'SELL_VOLATILITY') {
     if (isPlusGex) {
@@ -289,9 +297,9 @@ export function classifyRegime(input: VolatilityAssetInput): RegimeClassificatio
     }
   } else if (volRegime === 'BUY_VOLATILITY') {
     if (isPlusGex) electedStrategyId = 28;
-    else electedStrategyId = input.change < 0 ? 2 : 1;
+    else electedStrategyId = input.change < 0 ? STRATEGY_ID_BEAR_SPREAD : STRATEGY_ID_BULL_SPREAD;
   } else {
-    electedStrategyId = input.change >= 0 ? 1 : 2;
+    electedStrategyId = input.change >= 0 ? STRATEGY_ID_BULL_SPREAD : STRATEGY_ID_BEAR_SPREAD;
   }
 
   const strategy = CME_STRATEGIES.find((s) => s.id === electedStrategyId) || CME_STRATEGIES[19];
@@ -304,7 +312,7 @@ export function planStrategy(input: VolatilityAssetInput, chain: OptionChainResu
   const spot = input.spot;
   const { strategy, volRegime, volRegimeLabel, volRegimeReason, gexRegime, isPlusGex, vrp } = classifyRegime(input);
   const isCalendar = strategy.id === 28 || strategy.id === 14;
-  const targetDte = isCalendar ? 30 : 35;
+  const targetDte = isCalendar ? TARGET_DTE_CALENDAR : TARGET_DTE_DEFAULT;
 
   const planBase = { strategy, volRegime, volRegimeLabel, volRegimeReason, gexRegime, isPlusGex, vrp };
 
@@ -441,7 +449,7 @@ export function buildRecommendation(
   }
 
   const meetsCreditRule = isCredit ? Number((netCredit / width).toFixed(3)) >= 1 / 3 : true;
-  const creditRatio = width > 0 ? Number((Math.abs(netCredit) / width).toFixed(3)) : 0;
+  const creditRatio = width > 0 ? Number((Math.abs(netCredit) / width).toFixed(3)) : null;
 
   const maxProfit = isCredit
     ? Number((netCredit * 100).toFixed(2))
@@ -450,12 +458,25 @@ export function buildRecommendation(
     ? Math.max(0, Number(((width - netCredit) * 100).toFixed(2)))
     : Number((Math.abs(netCredit) * 100).toFixed(2));
 
-  const divAmount = typeof input.dividendAmount === 'number' ? input.dividendAmount : 0;
-  const callExtrinsic = typeof input.callExtrinsic === 'number' ? input.callExtrinsic : (netCredit > 0 ? netCredit * 0.5 : 1.0);
-  const hasDividendRisk = divAmount > 0 && divAmount > callExtrinsic;
-  const dividendRiskReason = hasDividendRisk
-    ? `ALERTA DE ATRIBUIÇÃO: Dividendo de $${divAmount.toFixed(2)} supera o extrínseco de $${callExtrinsic.toFixed(2)}. Risco iminente de exercício antecipado da Call curta!`
-    : `Seguro: Dividendo de $${divAmount.toFixed(2)} inferior ao extrínseco remanescente ($${callExtrinsic.toFixed(2)}).`;
+  // Teste de dividendo (risco de atribuicao antecipada da CALL vendida). O extrinseco vem da
+  // cotacao REAL da propria perna (mid - intrinseco); nunca de catalogo estatico nem de valor assumido.
+  const divAmount = typeof input.dividendAmount === 'number' ? input.dividendAmount : null;
+  const shortCall = pricedLegs.find((l) => l.action === 'SELL' && l.type === 'CALL');
+  const callExtrinsic = shortCall ? Number((shortCall.midPrice - Math.max(0, spot - shortCall.strike)).toFixed(2)) : null;
+  let hasDividendRisk: boolean | null;
+  let dividendRiskReason: string;
+  if (!shortCall) {
+    hasDividendRisk = false;
+    dividendRiskReason = 'Sem call vendida na estrutura: nao ha risco de atribuicao antecipada por dividendo.';
+  } else if (divAmount === null || callExtrinsic === null) {
+    hasDividendRisk = null;
+    dividendRiskReason = 'Teste de dividendo indisponivel: dividendo nao informado pela fonte.';
+  } else {
+    hasDividendRisk = divAmount > 0 && divAmount > callExtrinsic;
+    dividendRiskReason = hasDividendRisk
+      ? `ALERTA DE ATRIBUIÇÃO: Dividendo de $${divAmount.toFixed(2)} supera o extrínseco real de $${callExtrinsic.toFixed(2)}. Risco iminente de exercício antecipado da Call curta!`
+      : `Dividendo de $${divAmount.toFixed(2)} inferior ao extrínseco real da call vendida ($${callExtrinsic.toFixed(2)}).`;
+  }
 
   // Breakevens a partir dos strikes reais
   let lowerBreakeven = 0;
@@ -500,12 +521,14 @@ export function buildRecommendation(
     if (strategy.id === 20) {
       const putLeg = soldLegs.find((l) => l.type === 'PUT');
       const callLeg = soldLegs.find((l) => l.type === 'CALL');
-      const pDelta = putLeg?.delta != null ? Math.abs(putLeg.delta) : 0;
-      const cDelta = callLeg?.delta != null ? Math.abs(callLeg.delta) : 0;
-      dynamicPop = Math.min(95, Math.max(5, Math.round((1 - pDelta - cDelta) * 100)));
+      const pDelta = putLeg?.delta != null ? Math.abs(putLeg.delta) : null;
+      const cDelta = callLeg?.delta != null ? Math.abs(callLeg.delta) : null;
+      dynamicPop = pDelta !== null && cDelta !== null
+        ? Math.min(95, Math.max(5, Math.round((1 - pDelta - cDelta) * 100)))
+        : null;
     } else if (isCredit) {
-      const sDelta = soldLegs[0]?.delta != null ? Math.abs(soldLegs[0].delta) : 0;
-      dynamicPop = Math.min(95, Math.max(5, Math.round((1 - sDelta) * 100)));
+      const sDelta = soldLegs[0]?.delta != null ? Math.abs(soldLegs[0].delta) : null;
+      dynamicPop = sDelta !== null ? Math.min(95, Math.max(5, Math.round((1 - sDelta) * 100))) : null;
     } else {
       const boughtLeg = pricedLegs.find((l) => l.action === 'BUY');
       dynamicPop = boughtLeg?.delta != null ? Math.min(85, Math.max(5, Math.round(Math.abs(boughtLeg.delta) * 100))) : null;

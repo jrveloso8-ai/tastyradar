@@ -44,7 +44,7 @@ export interface ElectedStrategyData {
   pricingViability?: {
     isAdequate: boolean;
     statusLabel: string;
-    ratioToWidthPct: number;
+    ratioToWidthPct: number | null;
     recommendationRule: string;
   };
   takeProfitRule: {
@@ -559,7 +559,7 @@ export function buildElectedStrategyFromRecommendation(
     pricingViability: {
       isAdequate: rec.meetsCreditRule,
       statusLabel: rec.meetsCreditRule ? '✓ Crédito/Débito Adequado' : '⚠ Fora da Regra de 1/3',
-      ratioToWidthPct: Math.round((rec.creditWidthRatio * 100) * 10) / 10,
+      ratioToWidthPct: rec.creditWidthRatio !== null ? Math.round((rec.creditWidthRatio * 100) * 10) / 10 : null,
       recommendationRule:
         'Regra institucional Tastytrade: crédito recebido deve cobrir ao menos 1/3 (33%) da largura das asas vendidas.',
     },
