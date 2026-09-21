@@ -39,7 +39,7 @@ interface OptionLegData {
   ask: number | null;
   mid: number | null;
   relativeSpread: number | null;
-  openInterest: number;
+  openInterest: number | null;
   passesLiquidity: boolean;
   delta?: ProvenanceValue<number>;
   provenance: ProvenanceBadge;

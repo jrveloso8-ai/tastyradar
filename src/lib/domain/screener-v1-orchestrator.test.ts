@@ -173,7 +173,7 @@ describe('Orquestrador do Funil Screener V1 — Integração Ponta a Ponta', () 
         putAsk: 5.0,
         putOi: 600,
       },
-    ];
+    ].map((q) => ({ ...q, callSource: 'fixture-chain-quote', putSource: 'fixture-chain-quote' }));
 
     const illiquidStrikes = [
       {
@@ -198,7 +198,7 @@ describe('Orquestrador do Funil Screener V1 — Integração Ponta a Ponta', () 
         putAsk: 5.0,
         putOi: 500,
       },
-    ];
+    ].map((q) => ({ ...q, callSource: 'fixture-chain-quote', putSource: 'fixture-chain-quote' }));
 
     const marketDataMap = new Map<string, CandidateMarketDataV1>([
       [
@@ -423,7 +423,7 @@ describe('Orquestrador do Funil Screener V1 — Integração Ponta a Ponta', () 
         putAsk: 5.0,
         putOi: 600,
       },
-    ];
+    ].map((q) => ({ ...q, callSource: 'fixture-chain-quote', putSource: 'fixture-chain-quote' }));
 
     const marketDataMap = new Map<string, CandidateMarketDataV1>([
       [
@@ -510,7 +510,7 @@ describe('Orquestrador do Funil Screener V1 — Integração Ponta a Ponta', () 
               putAsk: 2.1,
               putOi: 1000,
             },
-          ],
+          ].map((q) => ({ ...q, callSource: 'fixture-chain-quote', putSource: 'fixture-chain-quote' })),
         },
       ],
     ]);

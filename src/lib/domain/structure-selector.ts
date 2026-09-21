@@ -34,10 +34,13 @@ export interface ChainStrikeQuote {
   putSymbol: string;
   callBid: number | null;
   callAsk: number | null;
-  callOi: number;
+  callOi: number | null;
+  /** Origem rastreada da cotacao/OI da perna. Ausente => perna INDISPONIVEL (rotulo nunca e assumido). */
+  callSource?: string;
   putBid: number | null;
   putAsk: number | null;
-  putOi: number;
+  putOi: number | null;
+  putSource?: string;
 }
 
 export interface StrangleSelectionInput {
@@ -171,7 +174,7 @@ export function selectStrangleStructure(input: StrangleSelectionInput): Strangle
       bid: selectedCallStrike.callBid,
       ask: selectedCallStrike.callAsk,
       openInterest: selectedCallStrike.callOi,
-      source: 'tastytrade-live-chain',
+      source: selectedCallStrike.callSource,
     },
     liquidityConfig
   );
@@ -186,7 +189,7 @@ export function selectStrangleStructure(input: StrangleSelectionInput): Strangle
       bid: selectedPutStrike.putBid,
       ask: selectedPutStrike.putAsk,
       openInterest: selectedPutStrike.putOi,
-      source: 'tastytrade-live-chain',
+      source: selectedPutStrike.putSource,
     },
     liquidityConfig
   );
@@ -247,10 +250,16 @@ export function selectStrangleStructure(input: StrangleSelectionInput): Strangle
 
   const callMid = callLegWithAction.mid;
   const putMid = putLegWithAction.mid;
-  const totalDebitMid =
-    callMid !== null && putMid !== null
-      ? Number((callMid + putMid).toFixed(2))
-      : 0;
+  if (callMid === null || putMid === null) {
+    return {
+      success: false,
+      callLeg: callLegWithAction,
+      putLeg: putLegWithAction,
+      rejectionCode: 'LIQUIDITY_SPREAD_FAIL',
+      rejectionReason: 'Mid de perna indisponivel: custo da estrutura nao calculavel (nunca assume 0)',
+    };
+  }
+  const totalDebitMid = Number((callMid + putMid).toFixed(2));
 
   const deterministicReason =
     'STRANGLE default eleito: candidato em squeeze de volatilidade sem catalisador iminente de curto prazo (Caso B, DTE 30-45d), selecionado por delta-alvo 25 (OTM), priorizando convexidade e menor custo de débito/theta relativo com pernas OTM';

@@ -136,7 +136,7 @@ export interface OptionLegLiquidity {
   ask: number | null;
   mid: number | null;
   relativeSpread: number | null; // (ask - bid) / mid
-  openInterest: number;
+  openInterest: number | null; // null = OI nao obtido da fonte (nunca 0/constante)
   delta?: ProvenanceValue<number>; // Delta BSM da perna (ex: +0.25 para Call, -0.25 para Put)
   passesLiquidity: boolean;
   rejectionReason?: string;

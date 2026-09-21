@@ -15,12 +15,17 @@ import path from 'path';
 import { dxlinkCandleCollectorService } from '../src/lib/services/dxlink-candle-collector.service';
 import { tastyMarketService } from '../src/lib/services/tastytrade-market.service';
 import { tastyAuthService } from '../src/lib/services/tastytrade-auth.service';
+import { fetchRealGreeks } from '../src/lib/services/tastytrade-dxlink.service';
 import { runScreenerV1Pipeline, CandidateMarketDataV1 } from '../src/lib/domain/screener-v1-orchestrator';
 import { ScreenerCandidateInput } from '../src/lib/types/low-vol-screener.types';
 
 import { SP500_DATASET } from '../src/lib/domain/sp500-dataset';
 import { US_STOCKS_DATASET } from '../src/lib/domain/us-market-data';
 import { normalizeSector } from '../src/lib/domain/sector-normalizer';
+
+// Rotulo de origem rastreada: bid/ask via REST /market-data/by-type, OI via DXLink Summary.
+const CHAIN_QUOTE_SOURCE = 'tastytrade-market-data-by-type (bid/ask) + dxlink-summary (open interest)';
+const OI_STREAM_WAIT_MS = 8000;
 
 // Universo de Ativos Elegíveis (Diversificação nos 11 Setores GICS - Amostra 20 ativos)
 export const SHADOW_UNIVERSE = [
@@ -167,6 +172,9 @@ export async function runShadowCycle(universe = process.argv.includes('--full') 
           const nearStrikes = sorted.filter((s) => Math.abs(s.strike - spot) / spot < 0.12);
           const occSymbols = nearStrikes.flatMap((s) => [s.callSymbol, s.putSymbol]);
           const quotesMap = await tastyMarketService.getOptionQuotes(occSymbols);
+          // Open Interest REAL via DXLink (evento Summary). Sem resposta => null (INDISPONIVEL), nunca constante.
+          const streamerSymbols = nearStrikes.flatMap((s) => [s.callStreamerSymbol, s.putStreamerSymbol]);
+          const oiMap = await fetchRealGreeks(streamerSymbols, OI_STREAM_WAIT_MS);
 
           for (const s of nearStrikes) {
             const callQ = quotesMap.get(s.callSymbol);
@@ -177,10 +185,12 @@ export async function runShadowCycle(universe = process.argv.includes('--full') 
               putSymbol: s.putSymbol,
               callBid: callQ?.bid ?? null,
               callAsk: callQ?.ask ?? null,
-              callOi: 500, // Cotação de streamer
+              callOi: oiMap.get(s.callStreamerSymbol)?.openInterest ?? null,
+              callSource: callQ ? CHAIN_QUOTE_SOURCE : undefined,
               putBid: putQ?.bid ?? null,
               putAsk: putQ?.ask ?? null,
-              putOi: 500,
+              putOi: oiMap.get(s.putStreamerSymbol)?.openInterest ?? null,
+              putSource: putQ ? CHAIN_QUOTE_SOURCE : undefined,
             });
           }
         }
@@ -246,7 +256,7 @@ export async function runShadowCycle(universe = process.argv.includes('--full') 
       selectedExpiration: a.strategy?.expiration,
       callLeg: a.strategy?.callLeg,
       putLeg: a.strategy?.putLeg,
-      totalDebitMid: a.strategy ? a.strategy.totalDebitMid : 0,
+      totalDebitMid: a.strategy?.totalDebitMid,
       provenance: a.strategy?.provenance,
     })),
     detailedEvaluations: results.map((r) => ({
@@ -296,9 +306,9 @@ export async function runShadowCycle(universe = process.argv.includes('--full') 
   markdown += `| Camada Funcional | Critério de Corte | Aprovados | Taxa de Passagem |\n`;
   markdown += `|---|---|---|---|\n`;
   markdown += `| **Camada 0: HV Histórico** | Garman-Klass Percentil $\\ge 65\\%$, Queda $\\le 40\\%$, Cota Setorial | ${l0PassCount} / ${results.length} | ${((l0PassCount / results.length) * 100).toFixed(1)}% |\n`;
-  markdown += `| **Camada 1: Squeeze BBW** | BBW(20,2) Percentil Histórico $\\le 15\\%$ | ${l1PassCount} / ${l0PassCount || 1} | ${l0PassCount > 0 ? ((l1PassCount / l0PassCount) * 100).toFixed(1) : '0.0'}% |\n`;
-  markdown += `| **Camada 2: Confirmação IV** | IV Rank e IV Percentile $\\le 30.0$ + DTE 30-45d | ${l2PassCount} / ${l1PassCount || 1} | ${l1PassCount > 0 ? ((l2PassCount / l1PassCount) * 100).toFixed(1) : '0.0'}% |\n`;
-  markdown += `| **Final: Liquidez & Strangle** | Bid/Ask Spread $\\le 10\\%$ e $\\text{OI} \\ge 250$ | **${approvedList.length}** / ${l2PassCount || 1} | ${l2PassCount > 0 ? ((approvedList.length / l2PassCount) * 100).toFixed(1) : '0.0'}% |\n\n`;
+  markdown += `| **Camada 1: Squeeze BBW** | BBW(20,2) Percentil Histórico $\\le 15\\%$ | ${l1PassCount} / ${l0PassCount} | ${l0PassCount > 0 ? ((l1PassCount / l0PassCount) * 100).toFixed(1) : '0.0'}% |\n`;
+  markdown += `| **Camada 2: Confirmação IV** | IV Rank e IV Percentile $\\le 30.0$ + DTE 30-45d | ${l2PassCount} / ${l1PassCount} | ${l1PassCount > 0 ? ((l2PassCount / l1PassCount) * 100).toFixed(1) : '0.0'}% |\n`;
+  markdown += `| **Final: Liquidez & Strangle** | Bid/Ask Spread $\\le 10\\%$ e $\\text{OI} \\ge 250$ | **${approvedList.length}** / ${l2PassCount} | ${l2PassCount > 0 ? ((approvedList.length / l2PassCount) * 100).toFixed(1) : '0.0'}% |\n\n`;
 
   if (approvedList.length > 0) {
     markdown += `## 2. Estruturas Eleitas (Long Strangle — Débito) — Registro de Decisão\n\n`;
@@ -310,8 +320,8 @@ export async function runShadowCycle(universe = process.argv.includes('--full') 
       markdown += `- **Vencimento Selecionado:** \`${st.expiration.expirationDate}\` (**DTE: ${st.expiration.dte} dias**, Regra: \`${st.expiration.selectionRule}\`)\n`;
       const callSpreadStr = st.callLeg.relativeSpread !== null ? `${(st.callLeg.relativeSpread * 100).toFixed(1)}%` : 'INDISPONIVEL';
       const putSpreadStr = st.putLeg.relativeSpread !== null ? `${(st.putLeg.relativeSpread * 100).toFixed(1)}%` : 'INDISPONIVEL';
-      markdown += `- **Perna Call OTM (BUY):** Strike **$${st.callLeg.strike}** | Bid: $${st.callLeg.bid} | Ask: $${st.callLeg.ask} | Mid: $${st.callLeg.mid} | Spread: ${callSpreadStr} | OI: ${st.callLeg.openInterest}\n`;
-      markdown += `- **Perna Put OTM (BUY):** Strike **$${st.putLeg.strike}** | Bid: $${st.putLeg.bid} | Ask: $${st.putLeg.ask} | Mid: $${st.putLeg.mid} | Spread: ${putSpreadStr} | OI: ${st.putLeg.openInterest}\n`;
+      markdown += `- **Perna Call OTM (BUY):** Strike **$${st.callLeg.strike}** | Bid: $${st.callLeg.bid} | Ask: $${st.callLeg.ask} | Mid: $${st.callLeg.mid} | Spread: ${callSpreadStr} | OI: ${st.callLeg.openInterest ?? 'INDISPONIVEL'}\n`;
+      markdown += `- **Perna Put OTM (BUY):** Strike **$${st.putLeg.strike}** | Bid: $${st.putLeg.bid} | Ask: $${st.putLeg.ask} | Mid: $${st.putLeg.mid} | Spread: ${putSpreadStr} | OI: ${st.putLeg.openInterest ?? 'INDISPONIVEL'}\n`;
       markdown += `- **Débito Teórico Mid (Custo da Estrutura):** **$${totalDebitMid}** (${st.provenance} - sum-of-bought-leg-mids)\n\n`;
     }
   } else {

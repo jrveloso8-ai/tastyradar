@@ -26,7 +26,7 @@ export interface LegEvaluationInput {
   isAtm: boolean;
   bid: number | null | undefined;
   ask: number | null | undefined;
-  openInterest: number;
+  openInterest: number | null | undefined;
   source?: string;
 }
 
@@ -79,7 +79,7 @@ export function evaluateLegLiquidity(
       ask: ask ?? null,
       mid: null,
       relativeSpread: null,
-      openInterest,
+      openInterest: openInterest ?? null,
       passesLiquidity: false,
       rejectionReason: 'Cotação de bid/ask ausente na corretora',
       provenance: 'INDISPONIVEL',
@@ -88,6 +88,30 @@ export function evaluateLegLiquidity(
     return {
       leg,
       rejectionCode: 'LIQUIDITY_SPREAD_FAIL',
+      rejectionReason: leg.rejectionReason,
+    };
+  }
+
+  // Open Interest ausente: sem ele a liquidez nao e verificavel. Nunca assume constante.
+  if (openInterest === null || openInterest === undefined || !Number.isFinite(openInterest)) {
+    const leg: OptionLegLiquidity = {
+      symbol,
+      strike,
+      optionType,
+      isAtm,
+      bid,
+      ask,
+      mid: null,
+      relativeSpread: null,
+      openInterest: null,
+      passesLiquidity: false,
+      rejectionReason: 'Open Interest ausente na fonte (liquidez nao verificavel)',
+      provenance: 'INDISPONIVEL',
+      source,
+    };
+    return {
+      leg,
+      rejectionCode: 'LIQUIDITY_OI_FAIL',
       rejectionReason: leg.rejectionReason,
     };
   }

@@ -149,7 +149,7 @@ describe('Seleção de Estrutura — Strangle OTM Default (Caso B)', () => {
       putAsk: 8.80,
       putOi: 600,
     },
-  ];
+  ].map((q) => ({ ...q, callSource: 'fixture-chain-quote', putSource: 'fixture-chain-quote' }));
 
   it('seleciona deterministicamente os strikes mais próximos de 25 Delta com BSM para spot em 102.50', () => {
     const spotPrice = 102.50;
