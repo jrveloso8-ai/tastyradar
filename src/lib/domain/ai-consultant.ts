@@ -32,21 +32,23 @@ export class AIConsultantEngine {
   ): Promise<AIConsultantResponse> {
     const symbol = context.symbol.toUpperCase().trim();
     const knownStock = context.stock || US_STOCKS_DATASET.find((s) => s.symbol === symbol);
-    const isKnownTicker = !!knownStock;
-    const stock = knownStock || {
-      symbol,
-      name: `${symbol} Stock`,
-      sector: 'Geral',
-      category: 'ALTA' as const,
-      spot: typeof context.spotPrice === 'number' ? context.spotPrice : 0,
-      change: 1.2,
-      ivRank: 35.0,
-      ivAtm: 22.0,
-      stop: 142.5,
-      alvo1: 157.5,
-      alvo2: 165.0,
-      rr: '2.10:1',
-    } as USStockItem;
+    // REGRA 00: ticker fora da cobertura NAO recebe stop/alvo/IV Rank/regime inventados,
+    // nem "ilustrativos". Sem dado real do ativo, o consultor recusa em vez de fabricar.
+    if (!knownStock) {
+      return {
+        answer:
+          `⚠️ **${symbol} está fora da cobertura atual do RADAR** (não consta no dataset de ativos monitorados).\n\n` +
+          `Sem dado real de ${symbol}, o consultor **não gera** stop, alvos, IV Rank, regime GEX nem estratégia: ` +
+          `qualquer número aqui seria inventado. Consulte um ativo monitorado ou adicione ${symbol} à cobertura.`,
+        suggestedQuestions: [],
+        contextUsed: {
+          symbol,
+          gexRegime: 'INDISPONIVEL',
+          electedStrategy: 'INDISPONIVEL',
+        },
+      };
+    }
+    const stock: USStockItem = knownStock;
 
     // Identifica a estratégia de opções
     let electedStrategyName = 'Trava de Alta com Call (Bull Call Spread)';
@@ -289,14 +291,6 @@ ${stock.category === 'LATERAL'
       `Quais os parâmetros de Stop Loss e Alvos para ${stock.symbol}?`,
       `Como montar a estratégia de opções ${electedStrategyName}?`,
     ];
-
-    if (!isKnownTicker) {
-      answer =
-        `⚠️ **${symbol} está fora da cobertura atual do RADAR** (não consta no dataset de ~66 ativos monitorados).\n\n` +
-        `Os números abaixo (stop/alvo, estratégia, volatilidade) são apenas **ilustrativos de como a análise funcionaria**, ` +
-        `não foram calculados a partir de dado real de ${symbol}, e não devem ser usados para decisão de investimento.\n\n---\n\n` +
-        answer;
-    }
 
     return {
       answer,
