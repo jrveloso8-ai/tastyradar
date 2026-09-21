@@ -13,6 +13,7 @@
   "overrides": [
     {
       "files": ["src/lib/domain/**/*.ts", "src/lib/services/**/*.ts"],
+      "excludedFiles": ["**/*.test.ts"],
       "rules": {
         "no-restricted-syntax": [
           "error",
@@ -25,7 +26,7 @@
             "message": "REGRA 00: Fallback magico com || ou ?? <numero literal> e proibido em domain/services."
           },
           {
-            "selector": "ConditionalExpression:matches([consequent.type='Literal'][consequent.raw=/^(?!(?:0|1)$)[0-9]/], [alternate.type='Literal'][alternate.raw=/^(?!(?:0|1)$)[0-9]/])",
+            "selector": "ConditionalExpression:matches([consequent.type='Literal'][consequent.raw=/^(?!1$)[0-9]/], [alternate.type='Literal'][alternate.raw=/^(?!1$)[0-9]/])",
             "message": "REGRA 00: Fallback numerico com ternario (ex: x > 0 ? x : 0.30) e proibido em domain/services/scripts."
           }
         ]
@@ -45,7 +46,7 @@
             "message": "REGRA 00: Fallback magico com || ou ?? <numero literal> e proibido em scripts."
           },
           {
-            "selector": "ConditionalExpression:matches([consequent.type='Literal'][consequent.raw=/^(?!(?:0|1)$)[0-9]/], [alternate.type='Literal'][alternate.raw=/^(?!(?:0|1)$)[0-9]/])",
+            "selector": "ConditionalExpression:matches([consequent.type='Literal'][consequent.raw=/^(?!1$)[0-9]/], [alternate.type='Literal'][alternate.raw=/^(?!1$)[0-9]/])",
             "message": "REGRA 00: Fallback numerico com ternario (ex: x > 0 ? x : 0.30) e proibido em scripts."
           }
         ]

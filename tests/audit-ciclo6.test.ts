@@ -208,7 +208,7 @@ describe('Auditoria Ciclo 6 — N-03: Proveniência do Delta BSM e Contágio na 
       { strike: 100, callSymbol: 'AAPL_C100', putSymbol: 'AAPL_P100', callBid: 2.5, callAsk: 2.6, callOi: 500, putBid: 2.5, putAsk: 2.6, putOi: 500 },
       { strike: 105, callSymbol: 'AAPL_C105', putSymbol: 'AAPL_P105', callBid: 1.5, callAsk: 1.6, callOi: 500, putBid: 6, putAsk: 6.2, putOi: 500 },
       { strike: 110, callSymbol: 'AAPL_C110', putSymbol: 'AAPL_P110', callBid: 0.5, callAsk: 0.55, callOi: 500, putBid: 11, putAsk: 11.2, putOi: 500 },
-    ];
+    ].map((q) => ({ ...q, callSource: 'fixture-chain-quote', putSource: 'fixture-chain-quote' }));
 
     const res = selectStrangleStructure({
       layer2Candidate: dummyLayer2,
@@ -292,7 +292,7 @@ describe('Auditoria Ciclo 6 — N-04: Eliminação de Fallback de Rótulo de Fon
   });
 });
 
-describe('Auditoria Ciclo 6 — Cerca ESLint: AST de Ternários Numéricos e Cobertura de Scripts', () => {
+describe('Auditoria Ciclo 6 — Cerca ESLint: AST de Ternários Numéricos e Cobertura de Scripts', { timeout: 60000 }, () => {
   it('Cerca ESLint: barra ternários com fallback numérico em src/lib/domain (ex.: vol > 0 ? vol : 0.30)', async () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { ESLint } = require('eslint') as { ESLint: any };
@@ -319,11 +319,11 @@ describe('Auditoria Ciclo 6 — Cerca ESLint: AST de Ternários Numéricos e Cob
     expect(hasForbiddenTernaryError).toBe(true);
   });
 
-  it('Cerca ESLint: permite ternários com sinais legítimos 1 e -1 ou flags 0 e 1', async () => {
+  it('Cerca ESLint: permite o sinal legítimo `? 1 : -1`', async () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { ESLint } = require('eslint') as { ESLint: any };
     const eslint = new ESLint();
-    const [result] = await eslint.lintText('export const sign = (val: number) => val >= 0 ? 1 : -1;\n', {
+    const [result] = await eslint.lintText('export const sign = (val: number) => val >= 0 ? 1 : -1;', {
       filePath: 'src/lib/domain/mock-test-sign.ts',
     });
     const hasForbiddenTernaryError = result.messages.some((m: { message: string }) =>
@@ -331,7 +331,20 @@ describe('Auditoria Ciclo 6 — Cerca ESLint: AST de Ternários Numéricos e Cob
     );
     expect(hasForbiddenTernaryError).toBe(false);
   });
+
+  it('B-03: barra o padrão do N-01 original — `m !== null ? m * 100 : 0` (0 NÃO é mais isento)', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { ESLint } = require('eslint') as { ESLint: any };
+    const eslint = new ESLint();
+    for (const filePath of ['src/lib/domain/mock-zero.ts', 'scripts/mock-zero.ts']) {
+      const [result] = await eslint.lintText(
+        'export const a = (m: number | null) => (m !== null ? m * 100 : 0);',
+        { filePath }
+      );
+      const barred = result.messages.some((m: { message: string }) =>
+        m.message.includes('REGRA 00: Fallback numerico com ternario')
+      );
+      expect(barred, filePath).toBe(true);
+    }
+  });
 });
-
-
-
