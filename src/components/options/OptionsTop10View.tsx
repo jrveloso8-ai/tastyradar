@@ -36,7 +36,8 @@ export interface Top10OIResponse {
   top10Puts: Top10StrikeItem[];
   totalCallOI: number;
   totalPutOI: number;
-  pcRatioOI: number;
+  pcRatioOI: number | null;
+  rankingUniverse?: string;
   source: string;
   updatedAt: string;
 }
@@ -230,8 +231,8 @@ export const OptionsTop10View: React.FC<OptionsTop10ViewProps> = ({
               <DataValue
                 value={data.totalCallOI}
                 format="number"
-                provenance="MEDIDO"
-                source={data.source}
+                provenance="DERIVADO"
+                source="Soma do OI real (DXLink Summary) dos Top 10 CALLs"
                 className="text-lg font-bold text-emerald-400 font-mono"
               />
             </div>
@@ -241,8 +242,8 @@ export const OptionsTop10View: React.FC<OptionsTop10ViewProps> = ({
               <DataValue
                 value={data.totalPutOI}
                 format="number"
-                provenance="MEDIDO"
-                source={data.source}
+                provenance="DERIVADO"
+                source="Soma do OI real (DXLink Summary) dos Top 10 PUTs"
                 className="text-lg font-bold text-rose-400 font-mono"
               />
             </div>
@@ -252,7 +253,7 @@ export const OptionsTop10View: React.FC<OptionsTop10ViewProps> = ({
               <DataValue
                 value={data.pcRatioOI}
                 format="number"
-                provenance="DERIVADO"
+                provenance={data.pcRatioOI === null ? 'INDISPONIVEL' : 'DERIVADO'}
                 source="Total Put OI / Total Call OI"
                 className="text-lg font-bold text-cyan-400 font-mono"
               />
