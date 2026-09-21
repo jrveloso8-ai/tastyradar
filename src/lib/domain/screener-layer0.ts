@@ -49,7 +49,7 @@ export function processLayer0(
   // 1. Etapa de cálculo individual por ativo
   interface EvaluatedCandidate {
     candidate: ScreenerCandidateInput;
-    spot: number;
+    spot: number | null;
     passesPriceThreshold: boolean;
     hv12m: number;
     hv12mTrimmed: number;
@@ -63,10 +63,11 @@ export function processLayer0(
   const evaluatedList: EvaluatedCandidate[] = [];
 
   for (const c of candidates) {
-    const spot = typeof c.spotPrice === 'number' && c.spotPrice > 0
+    const spot: number | null = typeof c.spotPrice === 'number' && c.spotPrice > 0
       ? c.spotPrice
-      : (c.bars && c.bars.length > 0 ? c.bars[c.bars.length - 1].close : 0);
-    const passesPrice = spot > 0 ? spot < cfg.maxSpotPrice : true;
+      : (c.bars && c.bars.length > 0 ? c.bars[c.bars.length - 1].close : null);
+    // Spot desconhecido NUNCA aprova o teto de preco (fail-closed).
+    const passesPrice = spot !== null && spot > 0 && spot < cfg.maxSpotPrice;
 
     if (!c.bars || c.bars.length < cfg.minBarsRequired) {
       evaluatedList.push({
@@ -79,7 +80,7 @@ export function processLayer0(
         hasValidHistory: false,
         passesStability: false,
         rejectionCode: 'INSUFFICIENT_HISTORY',
-        rejectionReason: `Histórico diário insuficiente (< ${cfg.minBarsRequired} barras disponíveis: ${c.bars ? c.bars.length : 0})`,
+        rejectionReason: `Histórico diário insuficiente (< ${cfg.minBarsRequired} barras disponíveis: ${Array.isArray(c.bars) ? c.bars.length : 'nenhuma'})`,
       });
       continue;
     }
@@ -98,7 +99,7 @@ export function processLayer0(
           hasValidHistory: true,
           passesStability: robustness.isRobust,
           rejectionCode: 'PRICE_ABOVE_THRESHOLD',
-          rejectionReason: `Preço spot ($${spot.toFixed(2)}) acima do teto de $${cfg.maxSpotPrice.toFixed(2)} (gestão de capital por lote)`,
+          rejectionReason: `Preço spot ($${spot !== null ? spot.toFixed(2) : 'indisponível'}) acima do teto de $${cfg.maxSpotPrice.toFixed(2)} (gestão de capital por lote)`,
         });
         continue;
       }
@@ -224,11 +225,15 @@ export function processLayer0(
     return {
       symbol: item.candidate.symbol,
       sector: item.candidate.sector,
-      spotPrice: {
-        value: item.spot,
-        provenance: item.spot > 0 ? (typeof item.candidate.spotPrice === 'number' ? 'MEDIDO' : item.candidate.barsProvenance) : 'INDISPONIVEL',
-        source: typeof item.candidate.spotPrice === 'number' ? 'live-spot-quote' : item.candidate.barsSource,
-      },
+      spotPrice: item.spot !== null && item.spot > 0
+        ? {
+            value: item.spot,
+            provenance: typeof item.candidate.spotPrice === 'number' ? 'MEDIDO' : item.candidate.barsProvenance,
+            source: typeof item.candidate.spotPrice === 'number'
+              ? 'live-spot-quote'
+              : `ultimo-fechamento-diario (${item.candidate.barsSource})`,
+          }
+        : { value: 0, provenance: 'INDISPONIVEL', source: item.candidate.barsSource },
       passesPriceThreshold: item.passesPriceThreshold,
       hv12m: {
         value: item.hv12m,
