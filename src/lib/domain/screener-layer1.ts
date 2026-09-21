@@ -71,7 +71,9 @@ export function calculateBbwSeries(
     const stdDev = Math.sqrt(sumSqDiff / period);
     const upperBand = sma + numStdDev * stdDev;
     const lowerBand = sma - numStdDev * stdDev;
-    const bbw = sma > 0 ? ((upperBand - lowerBand) / sma) * 100 : 0;
+    // SMA <= 0 nao existe em serie de precos valida: pula o ponto em vez de fabricar BBW = 0 (squeeze maximo).
+    if (!(sma > 0)) continue;
+    const bbw = ((upperBand - lowerBand) / sma) * 100;
 
     result.push({
       date: closes[i].date,
